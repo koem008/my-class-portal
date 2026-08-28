@@ -2,10 +2,7 @@ import { AlertTriangle, ChevronRight } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { loadSpecialCases, loadSpecialPedagogyAccess } from "@/lib/special-education-data";
-import {
-  loadCaseContinuityWatch,
-  type ContinuityAlert,
-} from "@/lib/special-observation-data";
+import { loadCaseContinuityWatch, type ContinuityAlert } from "@/lib/special-observation-data";
 
 type PriorityItem = ContinuityAlert & {
   caseId: string;
@@ -64,9 +61,7 @@ export function SpecialContinuityAssistantCard() {
 
   const topItems = useMemo(() => {
     const weight: Record<ContinuityAlert["severity"], number> = { high: 0, medium: 1, low: 2 };
-    return [...items]
-      .sort((a, b) => weight[a.severity] - weight[b.severity])
-      .slice(0, 3);
+    return [...items].sort((a, b) => weight[a.severity] - weight[b.severity]).slice(0, 3);
   }, [items]);
 
   if (!visible || !loaded || topItems.length === 0) return null;
