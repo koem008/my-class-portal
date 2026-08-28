@@ -5,7 +5,6 @@ import {
   loadCaseWorkspace,
   loadSpecialCases,
   loadSpecialPedagogyAccess,
-  loadSupportAreaCatalog,
   type CaseSupportArea,
   type Followup,
   type Intervention,
@@ -15,8 +14,10 @@ import {
   type SupportGoal,
 } from "@/lib/special-education-data";
 import {
+  loadCaseContinuityWatch,
   loadStructuredObservations,
   loadSupportInsights,
+  type ContinuityAlert,
   type StructuredObservation,
   type SupportInsight,
 } from "@/lib/special-observation-data";
@@ -35,6 +36,13 @@ type SummaryState = {
   reviews: ProgressReview[];
   structured: StructuredObservation[];
   insights: SupportInsight[];
+  continuity: ContinuityAlert[];
+};
+
+const continuityLabel: Record<ContinuityAlert["severity"], string> = {
+  high: "Vyžaduje pozornost",
+  medium: "Blíží se termín",
+  low: "Ke kontrole",
 };
 
 function SpecialCaseSummaryPage() {
@@ -50,17 +58,12 @@ function SpecialCaseSummaryPage() {
         const access = await loadSpecialPedagogyAccess();
         if (!access.length) throw new Error("Nemáte oprávnění pro speciální pedagogiku.");
         const schoolId = access[0].school_id as string;
-        const [cases, workspace, structured, insights] = await Promise.all([
+        const [cases, workspace, structured, insights, continuity] = await Promise.all([
           loadSpecialCases(schoolId),
           loadCaseWorkspace(caseId),
           loadStructuredObservations(caseId),
           loadSupportInsights(caseId),
-          loadSupportAreaCatalog(),
-        ]).then(([loadedCases, loadedWorkspace, loadedStructured, loadedInsights]) => [
-          loadedCases,
-          loadedWorkspace,
-          loadedStructured,
-          loadedInsights,
+          loadCaseContinuityWatch(caseId),
         ]);
         const specialCase = cases.find((item) => item.id === caseId);
         if (!specialCase) throw new Error("Případ nebyl nalezen nebo k němu nemáte přístup.");
@@ -75,6 +78,7 @@ function SpecialCaseSummaryPage() {
           reviews: workspace.reviews,
           structured,
           insights,
+          continuity,
         });
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : "Souhrn se nepodařilo načíst.");
@@ -148,6 +152,35 @@ function SpecialCaseSummaryPage() {
               automatickou diagnózu ani automatický odborný závěr AI.
             </p>
           </header>
+
+          <SummarySection title="Co teď vyžaduje pozornost">
+            {state.continuity.length ? (
+              <div className="space-y-2">
+                {state.continuity.slice(0, 8).map((item) => (
+                  <div key={item.id} className="rounded-xl border border-amber-100 bg-amber-50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold">{item.title}</div>
+                      <span className="text-[11px] font-semibold text-amber-800">
+                        {continuityLabel[item.severity]}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-600">{item.detail}</div>
+                    {item.dueOn && (
+                      <div className="mt-2 text-[11px] text-slate-500">
+                        Datum / poslední revize:{" "}
+                        {new Date(`${item.dueOn.slice(0, 10)}T12:00:00`).toLocaleDateString("cs-CZ")}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyText text="Podle evidovaných termínů a revizí není nyní nic po termínu ani bez kontroly." />
+            )}
+            <p className="mt-3 text-[11px] leading-5 text-slate-500">
+              Jde pouze o mechanické hlídání termínů a stáří revizí, nikoli pedagogické doporučení.
+            </p>
+          </SummarySection>
 
           <SummarySection title="Aktivní oblasti podpory">
             {state.supportAreas.length ? (
