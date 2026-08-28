@@ -144,8 +144,8 @@ function SpecialCaseSummaryPage() {
               </div>
             </div>
             <p className="mt-4 text-xs leading-5 text-slate-500">
-              Souhrn vychází pouze z potvrzených záznamů oprávněného pedagoga. Neobsahuje automatickou
-              diagnózu ani automatický odborný závěr AI.
+              Souhrn vychází pouze z potvrzených záznamů oprávněného pedagoga. Neobsahuje
+              automatickou diagnózu ani automatický odborný závěr AI.
             </p>
           </header>
 
@@ -177,10 +177,13 @@ function SpecialCaseSummaryPage() {
                 {activeGoals.map((goal) => (
                   <div key={goal.id} className="rounded-xl border border-slate-200 p-3">
                     <div className="font-semibold">{goal.title}</div>
-                    {goal.description && <p className="mt-1 text-sm text-slate-600">{goal.description}</p>}
+                    {goal.description && (
+                      <p className="mt-1 text-sm text-slate-600">{goal.description}</p>
+                    )}
                     {goal.target_date && (
                       <div className="mt-2 text-xs text-slate-500">
-                        Termín {new Date(`${goal.target_date}T12:00:00`).toLocaleDateString("cs-CZ")}
+                        Termín{" "}
+                        {new Date(`${goal.target_date}T12:00:00`).toLocaleDateString("cs-CZ")}
                       </div>
                     )}
                   </div>
@@ -269,7 +272,10 @@ function SpecialCaseSummaryPage() {
             {openFollowups.length ? (
               <div className="space-y-2">
                 {openFollowups.map((item) => (
-                  <div key={item.id} className="flex justify-between gap-4 rounded-xl bg-amber-50 p-3">
+                  <div
+                    key={item.id}
+                    className="flex justify-between gap-4 rounded-xl bg-amber-50 p-3"
+                  >
                     <div className="text-sm">{item.note}</div>
                     <div className="shrink-0 text-xs font-semibold text-amber-800">
                       {new Date(`${item.due_on}T12:00:00`).toLocaleDateString("cs-CZ")}
@@ -286,11 +292,14 @@ function SpecialCaseSummaryPage() {
             {state.insights.length ? (
               <div className="space-y-2">
                 {state.insights.slice(0, 8).map((item) => (
-                  <div key={item.supportUsed.toLocaleLowerCase("cs-CZ")} className="rounded-xl bg-slate-50 p-3">
+                  <div
+                    key={item.supportUsed.toLocaleLowerCase("cs-CZ")}
+                    className="rounded-xl bg-slate-50 p-3"
+                  >
                     <div className="font-semibold">{item.supportUsed}</div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {item.total}× použito · pomohlo {item.helped}× · bez jasné změny {item.noClearChange}× ·
-                      zhoršení {item.worse}× · nejasné {item.unclear}×
+                      {item.total}× použito · pomohlo {item.helped}× · bez jasné změny{" "}
+                      {item.noClearChange}× · zhoršení {item.worse}× · nejasné {item.unclear}×
                     </div>
                   </div>
                 ))}
