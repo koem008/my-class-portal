@@ -156,10 +156,7 @@ export async function loadCaseContinuityWatch(caseId: string): Promise<Continuit
         .select("id,strategy,planned_for,status")
         .eq("case_id", caseId)
         .eq("status", "planned"),
-      db
-        .from("special_education_support_area_catalog")
-        .select("code,label")
-        .eq("is_active", true),
+      db.from("special_education_support_area_catalog").select("code,label").eq("is_active", true),
     ]);
 
   for (const result of [
