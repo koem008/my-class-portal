@@ -14,6 +14,14 @@ export type SupportInsight = {
   unclear: number;
 };
 
+export type StructuredObservation = {
+  id: string;
+  observedAt: string;
+  supportUsed: string | null;
+  immediateResponse: string | null;
+  responseEffect: ObservationEffect | null;
+};
+
 async function currentUserId() {
   const { data, error } = await supabase.auth.getUser();
   if (error) throw error;
@@ -61,6 +69,23 @@ export async function addStructuredObservation(input: {
   });
   if (auditError) throw auditError;
   return data.id as string;
+}
+
+export async function loadStructuredObservations(caseId: string): Promise<StructuredObservation[]> {
+  const { data, error } = await db
+    .from("special_education_observations")
+    .select("id,observed_at,support_used,immediate_response,response_effect")
+    .eq("case_id", caseId)
+    .order("observed_at", { ascending: false });
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    observedAt: String(row.observed_at),
+    supportUsed: row.support_used ? String(row.support_used) : null,
+    immediateResponse: row.immediate_response ? String(row.immediate_response) : null,
+    responseEffect: (row.response_effect as ObservationEffect | null) ?? null,
+  }));
 }
 
 export async function loadSupportInsights(caseId: string): Promise<SupportInsight[]> {
