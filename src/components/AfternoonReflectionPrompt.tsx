@@ -1,12 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Mic, MoonStar, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { loadAccessibleClasses, loadWeekLessons, mondayOf } from "@/lib/schedule-data";
 import type { LessonInstance } from "@/lib/lesson-workspace-data";
-
-const db = supabase as unknown as SupabaseClient<any>;
 
 type PromptState = {
   lessons: LessonInstance[];
@@ -51,15 +48,15 @@ export function AfternoonReflectionPrompt() {
         if (lastEnd === null || minutesNow(now) < lastEnd) return;
 
         const lessonIds = lessons.map((lesson) => lesson.id);
-        const { data, error } = await db
+        const { data, error } = await supabase
           .from("lesson_progress")
           .select("lesson_id,state")
           .in("lesson_id", lessonIds);
         if (error) throw error;
         const reflectedIds = new Set(
           (data ?? [])
-            .filter((row: { lesson_id: string; state: string }) => row.state !== "not_started")
-            .map((row: { lesson_id: string }) => row.lesson_id),
+            .filter((row) => row.state !== "not_started")
+            .map((row) => row.lesson_id),
         );
         if (!active) return;
         setState({
@@ -78,7 +75,6 @@ export function AfternoonReflectionPrompt() {
 
   if (dismissed || !state || state.missingReflectionIds.length === 0) return null;
   const firstMissing = state.missingReflectionIds[0];
-  const allDone = state.missingReflectionIds.length === 0;
 
   return (
     <aside className="fixed bottom-24 left-4 right-4 z-40 mx-auto max-w-md rounded-[28px] border border-[#e5dfd4] bg-white/95 p-5 shadow-[0_24px_70px_rgba(45,60,55,.18)] backdrop-blur md:left-auto md:right-6">
@@ -92,10 +88,12 @@ export function AfternoonReflectionPrompt() {
       </button>
       <div className="flex items-start gap-3 pr-8">
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#f0ecff] text-[#6f5da8]">
-          {allDone ? <CheckCircle2 className="h-5 w-5" /> : <MoonStar className="h-5 w-5" />}
+          <MoonStar className="h-5 w-5" />
         </div>
         <div>
-          <div className="text-xs font-bold uppercase tracking-[.14em] text-[#786aa0]">Po vyučování</div>
+          <div className="text-xs font-bold uppercase tracking-[.14em] text-[#786aa0]">
+            Po vyučování
+          </div>
           <h2 className="mt-1 text-lg font-bold text-[#24343f]">Jak to dnes dopadlo?</h2>
           <p className="mt-1 text-sm leading-5 text-[#758482]">
             {state.missingReflectionIds.length === 1
@@ -114,8 +112,9 @@ export function AfternoonReflectionPrompt() {
       <Link
         to="/hodina/$lessonId"
         params={{ lessonId: firstMissing }}
-        className="mt-2 inline-flex w-full items-center justify-center rounded-2xl border border-[#e5dfd4] px-4 py-2.5 text-xs font-bold text-[#5f7774]"
+        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#e5dfd4] px-4 py-2.5 text-xs font-bold text-[#5f7774]"
       >
+        <CheckCircle2 className="h-4 w-4" />
         Otevřít hodinu bez reflexe
       </Link>
     </aside>
