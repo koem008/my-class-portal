@@ -1,5 +1,26 @@
 import { BookOpenCheck, CalendarClock, Eye, Target, Wrench } from "lucide-react";
+import { useParams } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import type { SupportAreaCatalogItem, TimelineItem } from "@/lib/special-education-data";
+import {
+  loadStructuredObservations,
+  type ObservationEffect,
+  type StructuredObservation,
+} from "@/lib/special-observation-data";
+
+const effectLabel: Record<ObservationEffect, string> = {
+  helped: "Pomohlo",
+  no_clear_change: "Bez jasné změny",
+  worse: "Zhoršilo situaci",
+  unclear: "Nelze zatím určit",
+};
+
+const effectClass: Record<ObservationEffect, string> = {
+  helped: "bg-emerald-100 text-emerald-800",
+  no_clear_change: "bg-slate-200 text-slate-700",
+  worse: "bg-rose-100 text-rose-800",
+  unclear: "bg-amber-100 text-amber-800",
+};
 
 export function CaseTimeline({
   items,
@@ -8,8 +29,25 @@ export function CaseTimeline({
   items: TimelineItem[];
   catalog: SupportAreaCatalogItem[];
 }) {
+  const params = useParams({ strict: false });
+  const caseId = typeof params.caseId === "string" ? params.caseId : "";
+  const [structured, setStructured] = useState<StructuredObservation[]>([]);
+
+  useEffect(() => {
+    if (!caseId) return;
+    void loadStructuredObservations(caseId)
+      .then(setStructured)
+      .catch(() => setStructured([]));
+  }, [caseId]);
+
+  const structuredById = useMemo(
+    () => new Map(structured.map((item) => [item.id, item])),
+    [structured],
+  );
+
   const labelFor = (code: string | null) =>
     code ? (catalog.find((x) => x.code === code)?.label ?? code) : null;
+
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm">
       <div className="mb-5">
@@ -36,6 +74,8 @@ export function CaseTimeline({
                       ? BookOpenCheck
                       : CalendarClock;
             const area = labelFor(item.areaCode);
+            const observationId = item.kind === "observation" ? item.id.replace(/^o:/, "") : null;
+            const detail = observationId ? structuredById.get(observationId) : undefined;
             return (
               <div key={item.id} className="relative flex gap-4 py-3">
                 <div className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-200 bg-white">
@@ -50,6 +90,31 @@ export function CaseTimeline({
                   </div>
                   {area && <div className="mt-1 text-xs font-medium text-violet-700">{area}</div>}
                   <p className="mt-2 text-sm leading-6 text-slate-700">{item.detail}</p>
+                  {detail && (detail.supportUsed || detail.immediateResponse || detail.responseEffect) && (
+                    <div className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
+                      {detail.supportUsed && (
+                        <div>
+                          <span className="font-semibold text-slate-700">Použitá podpora:</span>{" "}
+                          <span className="text-slate-600">{detail.supportUsed}</span>
+                        </div>
+                      )}
+                      {detail.immediateResponse && (
+                        <div>
+                          <span className="font-semibold text-slate-700">Bezprostřední reakce:</span>{" "}
+                          <span className="text-slate-600">{detail.immediateResponse}</span>
+                        </div>
+                      )}
+                      {detail.responseEffect && (
+                        <div>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 font-semibold ${effectClass[detail.responseEffect]}`}
+                          >
+                            Efekt: {effectLabel[detail.responseEffect]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
