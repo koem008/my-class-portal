@@ -15,15 +15,14 @@ create table if not exists public.special_education_cases (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
   class_id uuid not null,
-  student_alias_id uuid not null,
+  student_alias_id uuid not null references public.student_aliases(id) on delete cascade,
   status text not null default 'active' check (status in ('active','monitoring','closed')),
   focus_summary text,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (school_id, student_alias_id),
-  foreign key (student_alias_id, class_id, school_id)
-    references public.student_aliases(id, class_id, school_id) on delete cascade
+  foreign key (class_id, school_id) references public.classes(id, school_id) on delete cascade
 );
 
 create table if not exists public.special_education_observations (
@@ -116,22 +115,40 @@ as $$
   );
 $$;
 
-revoke all on function public.has_special_education_access(uuid) from public;
-grant execute on function public.has_special_education_access(uuid) to authenticated;
+create or replace function public.special_education_alias_belongs_to_case_tenant(p_alias_id uuid, p_class_id uuid, p_school_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.student_aliases a
+    where a.id = p_alias_id and a.class_id = p_class_id and a.school_id = p_school_id and a.is_active = true
+  );
+$$;
 
--- A user can see only their own practitioner grant. Grant management is intentionally
--- not exposed by permissive client policies; school-admin provisioning will use a
--- separately reviewed server/RPC path.
+revoke all on function public.has_special_education_access(uuid) from public;
+revoke all on function public.special_education_alias_belongs_to_case_tenant(uuid,uuid,uuid) from public;
+grant execute on function public.has_special_education_access(uuid) to authenticated;
+grant execute on function public.special_education_alias_belongs_to_case_tenant(uuid,uuid,uuid) to authenticated;
+
 create policy special_practitioner_self_read on public.special_education_practitioners
-for select to authenticated
-using (user_id = auth.uid());
+for select to authenticated using (user_id = auth.uid());
 
 create policy special_cases_authorized_read on public.special_education_cases
 for select to authenticated using (public.has_special_education_access(school_id));
 create policy special_cases_authorized_insert on public.special_education_cases
-for insert to authenticated with check (public.has_special_education_access(school_id) and created_by = auth.uid());
+for insert to authenticated with check (
+  public.has_special_education_access(school_id)
+  and created_by = auth.uid()
+  and public.special_education_alias_belongs_to_case_tenant(student_alias_id, class_id, school_id)
+);
 create policy special_cases_authorized_update on public.special_education_cases
-for update to authenticated using (public.has_special_education_access(school_id)) with check (public.has_special_education_access(school_id));
+for update to authenticated using (public.has_special_education_access(school_id)) with check (
+  public.has_special_education_access(school_id)
+  and public.special_education_alias_belongs_to_case_tenant(student_alias_id, class_id, school_id)
+);
 
 create policy special_observations_authorized_all on public.special_education_observations
 for all to authenticated using (public.has_special_education_access(school_id)) with check (public.has_special_education_access(school_id) and created_by = auth.uid());
