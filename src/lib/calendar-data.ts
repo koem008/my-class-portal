@@ -26,8 +26,8 @@ export type CalendarItem = {
 export type CalendarStudentAlias = { id: string; alias: string; avatar_key: string | null };
 
 export async function loadCalendarRange(classInfo: AccessibleClass, startDate: string, endDate: string) {
-  const rangeStart = `${startDate}T00:00:00`;
-  const rangeEndExclusive = `${addDays(endDate, 1)}T00:00:00`;
+  const rangeStart = pragueMidnightIso(startDate);
+  const rangeEndExclusive = pragueMidnightIso(addDays(endDate, 1));
 
   const [customResult, systemResult, aliasesResult] = await Promise.all([
     db.from("calendar_events")
@@ -53,7 +53,8 @@ export async function loadCalendarRange(classInfo: AccessibleClass, startDate: s
     kind: String(row.kind),
     note: row.note ?? null,
     startsOn: localDate(row.starts_at),
-    endsOn: localDate(row.ends_at),
+    // Stored all-day end is exclusive, so present it as the final included local date.
+    endsOn: row.all_day ? addDays(localDate(row.ends_at), -1) : localDate(row.ends_at),
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     allDay: Boolean(row.all_day),
@@ -101,13 +102,8 @@ export async function createClassCalendarEvent(classInfo: AccessibleClass, input
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   if (!authData.user) throw new Error("Pro vytvoření události je potřeba být přihlášená.");
+  if ((input.kind === "birthday" || input.kind === "name_day") && !input.studentAliasId) throw new Error("Vyberte pseudonym žáka.");
 
-  if ((input.kind === "birthday" || input.kind === "name_day") && !input.studentAliasId) {
-    throw new Error("Vyberte pseudonym žáka.");
-  }
-
-  const startsAt = `${input.startDate}T00:00:00+02:00`;
-  const endsAt = `${addDays(endDate, 1)}T00:00:00+02:00`;
   const { error } = await db.from("calendar_events").insert({
     school_id: classInfo.school_id,
     academic_year_id: classInfo.academic_year_id,
@@ -118,8 +114,8 @@ export async function createClassCalendarEvent(classInfo: AccessibleClass, input
     kind: input.kind,
     title,
     note: input.note?.trim() || null,
-    starts_at: startsAt,
-    ends_at: endsAt,
+    starts_at: pragueMidnightIso(input.startDate),
+    ends_at: pragueMidnightIso(addDays(endDate, 1)),
     all_day: true,
     affects_schedule: Boolean(input.affectsSchedule || input.blocksLessons),
     blocks_lessons: Boolean(input.blocksLessons),
@@ -133,14 +129,22 @@ export async function deleteClassCalendarEvent(eventId: string) {
   if (error) throw error;
 }
 
-export function itemsForDate(items: CalendarItem[], date: string) {
-  return items.filter((item) => item.startsOn <= date && item.endsOn >= date);
-}
+export function itemsForDate(items: CalendarItem[], date: string) { return items.filter((item) => item.startsOn <= date && item.endsOn >= date); }
 
 function localDate(value: string) {
   const d = new Date(value);
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(d);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+// Converts a local Prague midnight to an absolute UTC instant without assuming +01/+02.
+function pragueMidnightIso(isoDate: string) {
+  const guess = new Date(`${isoDate}T00:00:00.000Z`);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(guess);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const representedLocalAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  const offsetMs = representedLocalAsUtc - guess.getTime();
+  return new Date(guess.getTime() - offsetMs).toISOString();
 }
 function addDays(iso: string, amount: number) { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate()+amount); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
