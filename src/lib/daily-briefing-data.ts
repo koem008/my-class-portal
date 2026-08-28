@@ -8,7 +8,8 @@ const db = supabase as unknown as SupabaseClient<any>;
 export type DailyEvent = { id: string | null; title: string; kind: string; starts_at?: string; ends_at?: string; all_day?: boolean; blocks_lessons: boolean; source: "calendar" | "system" };
 export type DailyLesson = LessonInstance & { prepared: boolean; materialCount: number };
 export type DailyCarryOver = { lessonId: string; subject: string; lessonDate: string; unfinished: string; nextNote: string | null };
-export type DailyBriefing = { date: string; teacherDisplayName: string | null; classInfo: AccessibleClass; lessons: DailyLesson[]; events: DailyEvent[]; carryOvers: DailyCarryOver[]; readyCount: number; missingPreparationCount: number; blocked: boolean };
+export type RecommendedAction = { id:string; priority:"high"|"medium"|"low"; title:string; detail:string; kind:"art_studio"|"lesson"|"carry_over"; to:string; lessonId?:string };
+export type DailyBriefing = { date: string; teacherDisplayName: string | null; classInfo: AccessibleClass; lessons: DailyLesson[]; events: DailyEvent[]; carryOvers: DailyCarryOver[]; recommendedActions:RecommendedAction[]; readyCount: number; missingPreparationCount: number; blocked: boolean };
 
 export async function loadDailyBriefing(classInfo: AccessibleClass, date: string): Promise<DailyBriefing> {
   const dayStart = `${date}T00:00:00`;
@@ -53,6 +54,14 @@ export async function loadDailyBriefing(classInfo: AccessibleClass, date: string
     ...(systemResult.data ?? []).map((e: any) => ({ id: null, title: e.title, kind: String(e.kind), blocks_lessons: Boolean(e.blocks_lessons), source: "system" as const })),
   ];
 
+  const recommendedActions:RecommendedAction[]=[];
+  for(const lesson of dailyLessons){
+    if(lesson.status==="cancelled"||lesson.prepared) continue;
+    const isArt=/výtvar|vfv|art/i.test(lesson.subject_name);
+    recommendedActions.push({id:`prep:${lesson.id}`,priority:"high",title:isArt?"Připravit výtvarnou výchovu":"Doplnit přípravu",detail:`${lesson.slot_order}. hodina · ${lesson.subject_name}`,kind:isArt?"art_studio":"lesson",to:isArt?"/vytvarna-vychova":`/hodina/${lesson.id}`,lessonId:lesson.id});
+  }
+  for(const carry of carryOvers.slice(0,3)) recommendedActions.push({id:`carry:${carry.lessonId}`,priority:"medium",title:`Navázat: ${carry.subject}`,detail:carry.unfinished,kind:"carry_over",to:`/hodina/${carry.lessonId}`,lessonId:carry.lessonId});
+
   return {
     date,
     teacherDisplayName: profileResult.data?.display_name?.trim() || null,
@@ -60,6 +69,7 @@ export async function loadDailyBriefing(classInfo: AccessibleClass, date: string
     lessons: dailyLessons,
     events,
     carryOvers,
+    recommendedActions,
     readyCount: dailyLessons.filter((l) => l.prepared).length,
     missingPreparationCount: dailyLessons.filter((l) => !l.prepared && l.status !== "cancelled").length,
     blocked: events.some((e) => e.blocks_lessons),
