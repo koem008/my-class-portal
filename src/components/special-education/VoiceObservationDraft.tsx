@@ -20,6 +20,19 @@ const effectLabels: Record<ObservationEffect, string> = {
   unclear: "Nelze zatím určit",
 };
 
+function evidenceStatus(item: SupportInsight) {
+  if (item.total < 2) {
+    return { label: "Málo dat", className: "bg-slate-200 text-slate-700" };
+  }
+  if (item.worse > 0 && item.helped === 0) {
+    return { label: "Vyžaduje opatrnost", className: "bg-rose-100 text-rose-800" };
+  }
+  if (item.helped >= 2 && item.helped > item.worse + item.noClearChange) {
+    return { label: "Spíše se osvědčuje", className: "bg-emerald-100 text-emerald-800" };
+  }
+  return { label: "Smíšené výsledky", className: "bg-amber-100 text-amber-800" };
+}
+
 export function VoiceObservationDraft({
   areas,
 }: {
@@ -226,31 +239,39 @@ export function VoiceObservationDraft({
           </div>
         ) : (
           <div className="mt-3 space-y-3">
-            {insights.slice(0, 6).map((item) => (
-              <div
-                key={item.supportUsed.toLocaleLowerCase("cs-CZ")}
-                className="rounded-2xl bg-slate-50 p-4"
-              >
-                <div className="font-medium text-slate-900">{item.supportUsed}</div>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800">
-                    Pomohlo {item.helped}×
-                  </span>
-                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-slate-700">
-                    Bez změny {item.noClearChange}×
-                  </span>
-                  <span className="rounded-full bg-rose-100 px-2.5 py-1 text-rose-800">
-                    Zhoršení {item.worse}×
-                  </span>
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">
-                    Nejasné {item.unclear}×
-                  </span>
+            {insights.slice(0, 6).map((item) => {
+              const status = evidenceStatus(item);
+              return (
+                <div
+                  key={item.supportUsed.toLocaleLowerCase("cs-CZ")}
+                  className="rounded-2xl bg-slate-50 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium text-slate-900">{item.supportUsed}</div>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.className}`}>
+                      {status.label}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800">
+                      Pomohlo {item.helped}×
+                    </span>
+                    <span className="rounded-full bg-slate-200 px-2.5 py-1 text-slate-700">
+                      Bez změny {item.noClearChange}×
+                    </span>
+                    <span className="rounded-full bg-rose-100 px-2.5 py-1 text-rose-800">
+                      Zhoršení {item.worse}×
+                    </span>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">
+                      Nejasné {item.unclear}×
+                    </span>
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    Celkem {item.total} potvrzených použití · stav evidence je pouze mechanický souhrn.
+                  </div>
                 </div>
-                <div className="mt-2 text-[11px] text-slate-500">
-                  Celkem {item.total} potvrzených použití · nejde o automatické doporučení.
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
