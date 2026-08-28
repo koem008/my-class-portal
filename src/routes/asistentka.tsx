@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertCircle, CalendarDays, CheckCircle2, ChevronRight, Clock3, Heart, Loader2, Mic, MoonStar, Settings2, Sparkles, SunMedium, WandSparkles } from "lucide-react";
+import { AlertCircle, Brain, CalendarDays, CheckCircle2, ChevronRight, Clock3, Heart, Loader2, Mic, MoonStar, Settings2, Sparkles, SunMedium, WandSparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { buildMorningMessage, loadDailyBriefing, type DailyBriefing } from "@/lib/daily-briefing-data";
 import { loadAccessibleClasses, loadWeekLessons, mondayOf } from "@/lib/schedule-data";
+import { loadSpecialAttention, type SpecialAttentionItem } from "@/lib/special-education-data";
 
 export const Route = createFileRoute("/asistentka")({ component: AssistantPage });
 type Tone = "Přátelská" | "Klidná" | "Efektivní";
@@ -13,6 +14,7 @@ function AssistantPage() {
   const [listening, setListening] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
+  const [specialAttention,setSpecialAttention]=useState<SpecialAttentionItem[]>([]);
   const [error, setError] = useState("");
   const now = useMemo(() => new Date(), []);
   const todayIso = useMemo(() => `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`, [now]);
@@ -21,12 +23,13 @@ function AssistantPage() {
   async function reload() {
     setLoadState("loading"); setError("");
     try {
+      const specialPromise=loadSpecialAttention().catch(()=>[] as SpecialAttentionItem[]);
       const classes = await loadAccessibleClasses();
-      if (!classes.length) { setLoadState("empty"); setBriefing(null); return; }
+      if (!classes.length) { setSpecialAttention(await specialPromise); setLoadState("empty"); setBriefing(null); return; }
       const selectedClass = classes[0];
       await loadWeekLessons(selectedClass.id, mondayOf(now));
-      const data = await loadDailyBriefing(selectedClass, todayIso);
-      setBriefing(data); setLoadState("ready");
+      const [data,special]=await Promise.all([loadDailyBriefing(selectedClass, todayIso),specialPromise]);
+      setBriefing(data);setSpecialAttention(special);setLoadState("ready");
     } catch (e) { setError(e instanceof Error ? e.message : "Ranní přehled se nepodařilo načíst."); setLoadState("error"); }
   }
   useEffect(() => { void reload(); }, []);
@@ -44,6 +47,8 @@ function AssistantPage() {
     </section>
 
     {briefing && briefing.recommendedActions.length>0 && <section className="mt-5 rounded-[30px] border border-[#e8e3d9] bg-white p-5 shadow-sm md:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#f1ecff] text-[#6f5da8]"><WandSparkles className="h-5 w-5"/></div><div><h2 className="font-bold">Co bych udělala teď</h2><p className="mt-1 text-xs text-[#83908f]">Návrhy skládám ze skutečného rozvrhu a reflexí. Bez AI nákladů.</p></div></div><div className="mt-4 grid gap-2 md:grid-cols-2">{briefing.recommendedActions.slice(0,6).map(a=> a.kind==="art_studio" ? <Link key={a.id} to="/vytvarna-vychova" className="group flex items-center justify-between rounded-2xl border border-[#ece8df] bg-[#fffaf4] p-4 hover:border-[#e4d6c5]"><div><div className="text-sm font-bold">{a.title}</div><div className="mt-1 text-xs text-[#7a8887]">{a.detail}</div></div><ChevronRight className="h-4 w-4 text-[#9a8d80] transition group-hover:translate-x-0.5"/></Link> : <Link key={a.id} to="/hodina/$lessonId" params={{lessonId:a.lessonId!}} className="group flex items-center justify-between rounded-2xl border border-[#ece8df] bg-[#fbfdfb] p-4 hover:border-[#d9e7df]"><div><div className="text-sm font-bold">{a.title}</div><div className="mt-1 text-xs text-[#7a8887]">{a.detail}</div></div><ChevronRight className="h-4 w-4 text-[#7f918b] transition group-hover:translate-x-0.5"/></Link>)}</div></section>}
+
+    {specialAttention.length>0&&<section className="mt-5 rounded-[30px] border border-violet-100 bg-white p-5 shadow-sm md:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700"><Brain className="h-5 w-5"/></div><div><h2 className="font-bold">Speciální pedagogika — potřebuje pozornost</h2><p className="mt-1 text-xs text-[#83908f]">Jen termíny a pseudonymy, ke kterým máš výslovné oprávnění.</p></div></div><div className="mt-4 grid gap-2 md:grid-cols-2">{specialAttention.slice(0,6).map(item=><Link key={item.id} to="/specialni-pedagogika/$caseId" params={{caseId:item.caseId}} className={`group flex items-center justify-between rounded-2xl border p-4 ${item.overdue?"border-rose-100 bg-rose-50/60":"border-violet-100 bg-violet-50/40"}`}><div><div className="text-sm font-bold">{item.alias}{item.overdue?" · po termínu":""}</div><div className="mt-1 text-xs text-[#6e7775]">{item.note}</div><div className="mt-2 text-[11px] font-semibold text-violet-700">Kontrola {new Date(`${item.dueOn}T12:00:00`).toLocaleDateString("cs-CZ")}</div></div><ChevronRight className="h-4 w-4 text-violet-500 transition group-hover:translate-x-0.5"/></Link>)}</div></section>}
 
     {briefing && <div className="mt-5 grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
       <section className="rounded-[30px] border border-[#e9e5dd] bg-white p-5 md:p-7"><div className="flex items-center justify-between"><div><h2 className="font-bold">Dnešní hodiny</h2><p className="mt-1 text-xs text-[#83908f]">Skutečný stav příprav z databáze.</p></div><Link to="/rozvrh" className="text-xs font-bold text-[#276765]">Celý rozvrh →</Link></div><div className="mt-5 space-y-2">{briefing.lessons.map(l=><Link key={l.id} to="/hodina/$lessonId" params={{lessonId:l.id}} className="flex items-center justify-between gap-3 rounded-2xl border border-[#ece8df] bg-[#fffefa] p-4 hover:bg-[#f7fbf8]"><div><div className="text-xs text-[#87928f]">{l.starts_at?.slice(0,5) ?? "—"} · {l.slot_order}. hodina</div><div className="mt-1 font-bold">{l.subject_name}</div><div className="mt-1 text-xs text-[#7a8887]">{l.topic || l.title || "Téma zatím není doplněné"}</div></div><div className={`rounded-full px-3 py-1 text-xs font-bold ${l.prepared?"bg-[#e8f4ef] text-[#276765]":"bg-[#fff1e8] text-[#946449]"}`}>{l.prepared?"Připraveno":"Chybí příprava"}</div></Link>)}{briefing.lessons.length===0&&<div className="rounded-2xl border border-dashed border-[#ddd8ce] p-5 text-sm text-[#7b8989]">Dnes nejsou v rozvrhu žádné běžné hodiny.</div>}</div>
