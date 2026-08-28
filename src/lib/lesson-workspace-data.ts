@@ -17,8 +17,62 @@ export type LessonProgress = { id: string; lesson_id: string; state: ProgressSta
 export type StudentAlias = { id: string; alias: string; avatar_key: string | null; };
 export type LearningSignal = { id: string; lesson_id: string; student_alias_id: string; kind: LearningSignalKind; curriculum_outcome_id: string | null; topic: string | null; note: string | null; active: boolean; created_at: string; student_alias?: StudentAlias; };
 export type ContinuitySuggestion = { priority: "high" | "medium" | "low"; title: string; detail: string; alias?: string; source: "current_reflection" | "previous_lesson" | "learning_signal"; };
+export type CurriculumOutcome = { id: string; official_code: string | null; title: string; description: string | null; target_grade: number | null; source_locator: string | null; };
+export type CurriculumContext = {
+  linked: boolean;
+  classGrade: number | null;
+  subject: { id: string; code: string; name: string } | null;
+  topic: { id: string; code: string | null; name: string; description: string | null } | null;
+  outcomes: CurriculumOutcome[];
+  version: { id: string; code: string; name: string; status: string } | null;
+  source: { authority: string; title: string; source_url: string; source_version: string | null } | null;
+};
 
 const db = supabase as unknown as SupabaseClient<any>;
+
+async function loadCurriculumContext(lesson: LessonInstance): Promise<CurriculumContext> {
+  const classResult = await db.from("classes").select("grade").eq("id", lesson.class_id).single();
+  if (classResult.error) throw classResult.error;
+  const classGrade = typeof classResult.data?.grade === "number" ? classResult.data.grade : null;
+
+  if (!lesson.curriculum_subject_id) return { linked: false, classGrade, subject: null, topic: null, outcomes: [], version: null, source: null };
+
+  const subjectResult = await db.from("curriculum_subjects").select("id,code,name,curriculum_version_id,source_id").eq("id", lesson.curriculum_subject_id).maybeSingle();
+  if (subjectResult.error) throw subjectResult.error;
+  if (!subjectResult.data) return { linked: false, classGrade, subject: null, topic: null, outcomes: [], version: null, source: null };
+
+  const subject = { id: subjectResult.data.id as string, code: subjectResult.data.code as string, name: subjectResult.data.name as string };
+  const topicPromise = lesson.curriculum_topic_id
+    ? db.from("curriculum_topics").select("id,code,name,description").eq("id", lesson.curriculum_topic_id).maybeSingle()
+    : Promise.resolve({ data: null, error: null });
+
+  let outcomesQuery = db.from("curriculum_outcomes").select("id,official_code,title,description,target_grade,source_locator").eq("subject_id", subject.id);
+  if (lesson.curriculum_topic_id) outcomesQuery = outcomesQuery.eq("topic_id", lesson.curriculum_topic_id);
+  if (classGrade) outcomesQuery = outcomesQuery.eq("target_grade", classGrade);
+
+  const [topicResult, outcomesResult, versionResult] = await Promise.all([
+    topicPromise,
+    outcomesQuery.order("sort_order", { ascending: true }).limit(50),
+    db.from("curriculum_versions").select("id,code,name,status,source_id").eq("id", subjectResult.data.curriculum_version_id).maybeSingle(),
+  ]);
+  for (const result of [topicResult, outcomesResult, versionResult]) if (result.error) throw result.error;
+
+  const sourceId = versionResult.data?.source_id ?? subjectResult.data.source_id;
+  const sourceResult = sourceId
+    ? await db.from("curriculum_sources").select("authority,title,source_url,source_version").eq("id", sourceId).maybeSingle()
+    : { data: null, error: null };
+  if (sourceResult.error) throw sourceResult.error;
+
+  return {
+    linked: true,
+    classGrade,
+    subject,
+    topic: topicResult.data ? { id: topicResult.data.id, code: topicResult.data.code, name: topicResult.data.name, description: topicResult.data.description } : null,
+    outcomes: (outcomesResult.data ?? []) as CurriculumOutcome[],
+    version: versionResult.data ? { id: versionResult.data.id, code: versionResult.data.code, name: versionResult.data.name, status: String(versionResult.data.status) } : null,
+    source: sourceResult.data ? { authority: sourceResult.data.authority, title: sourceResult.data.title, source_url: sourceResult.data.source_url, source_version: sourceResult.data.source_version } : null,
+  };
+}
 
 export async function loadLessonWorkspace(lessonId: string) {
   const lessonResult = await db.from("lesson_instances").select("id,school_id,class_id,academic_year_id,lesson_date,slot_order,starts_at,ends_at,subject_name,title,topic,status,curriculum_subject_id,curriculum_topic_id,teacher_note").eq("id", lessonId).single();
@@ -29,13 +83,14 @@ export async function loadLessonWorkspace(lessonId: string) {
   if (previousLessonResult.error) throw previousLessonResult.error;
   const previousLessonId = previousLessonResult.data?.id as string | undefined;
 
-  const [prepResult, materialsResult, progressResult, previousProgressResult, aliasesResult, signalsResult] = await Promise.all([
+  const [prepResult, materialsResult, progressResult, previousProgressResult, aliasesResult, signalsResult, curriculum] = await Promise.all([
     db.from("lesson_preparations").select("id,lesson_id,objective,learning_goals,timeline,teacher_notes,board_notes,homework,reflection,version").eq("lesson_id", lessonId).order("version", { ascending: false }).limit(1).maybeSingle(),
     db.from("lesson_materials").select("id,lesson_id,kind,title,content,difficulty,export_status").eq("lesson_id", lessonId).order("created_at", { ascending: true }),
     db.from("lesson_progress").select("id,lesson_id,state,completed_summary,unfinished_summary,next_lesson_note,teacher_reflection").eq("lesson_id", lessonId).maybeSingle(),
     previousLessonId ? db.from("lesson_progress").select("id,lesson_id,state,completed_summary,unfinished_summary,next_lesson_note,teacher_reflection").eq("lesson_id", previousLessonId).maybeSingle() : Promise.resolve({ data: null, error: null }),
     db.from("student_aliases").select("id,alias,avatar_key").eq("class_id", lesson.class_id).eq("is_active", true).order("alias", { ascending: true }),
     db.from("student_learning_signals").select("id,lesson_id,student_alias_id,kind,curriculum_outcome_id,topic,note,active,created_at").eq("class_id", lesson.class_id).eq("active", true).order("created_at", { ascending: false }).limit(100),
+    loadCurriculumContext(lesson),
   ]);
 
   for (const result of [prepResult, materialsResult, progressResult, previousProgressResult, aliasesResult, signalsResult]) if (result.error) throw result.error;
@@ -57,6 +112,7 @@ export async function loadLessonWorkspace(lessonId: string) {
     previousProgress,
     aliases,
     signals,
+    curriculum,
     continuity: buildContinuitySuggestions(continuitySource, signals, lesson.topic, continuitySourceType),
   };
 }
