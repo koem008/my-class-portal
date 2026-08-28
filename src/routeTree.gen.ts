@@ -4,6 +4,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AsistentkaRouteImport } from './routes/asistentka'
+import { Route as HlasRouteImport } from './routes/hlas'
 import { Route as HodinaLessonIdRouteImport } from './routes/hodina.$lessonId'
 import { Route as KalendarRouteImport } from './routes/kalendar'
 import { Route as RozvrhRouteImport } from './routes/rozvrh'
@@ -15,6 +16,7 @@ import { Route as SpecialniPedagogikaCaseIdRouteImport } from './routes/specialn
 import { Route as VytvarnaVychovaRouteImport } from './routes/vytvarna-vychova'
 const IndexRoute=IndexRouteImport.update({id:'/',path:'/',getParentRoute:()=>rootRouteImport} as any)
 const AsistentkaRoute=AsistentkaRouteImport.update({id:'/asistentka',path:'/asistentka',getParentRoute:()=>rootRouteImport} as any)
+const HlasRoute=HlasRouteImport.update({id:'/hlas',path:'/hlas',getParentRoute:()=>rootRouteImport} as any)
 const HodinaLessonIdRoute=HodinaLessonIdRouteImport.update({id:'/hodina/$lessonId',path:'/hodina/$lessonId',getParentRoute:()=>rootRouteImport} as any)
 const KalendarRoute=KalendarRouteImport.update({id:'/kalendar',path:'/kalendar',getParentRoute:()=>rootRouteImport} as any)
 const RozvrhRoute=RozvrhRouteImport.update({id:'/rozvrh',path:'/rozvrh',getParentRoute:()=>rootRouteImport} as any)
@@ -24,14 +26,15 @@ const PametRoute=PametRouteImport.update({id:'/pamet',path:'/pamet',getParentRou
 const SpecialniPedagogikaRoute=SpecialniPedagogikaRouteImport.update({id:'/specialni-pedagogika',path:'/specialni-pedagogika',getParentRoute:()=>rootRouteImport} as any)
 const SpecialniPedagogikaCaseIdRoute=SpecialniPedagogikaCaseIdRouteImport.update({id:'/specialni-pedagogika/$caseId',path:'/specialni-pedagogika/$caseId',getParentRoute:()=>rootRouteImport} as any)
 const VytvarnaVychovaRoute=VytvarnaVychovaRouteImport.update({id:'/vytvarna-vychova',path:'/vytvarna-vychova',getParentRoute:()=>rootRouteImport} as any)
-export interface FileRoutesByFullPath {'/':typeof IndexRoute;'/asistentka':typeof AsistentkaRoute;'/hodina/$lessonId':typeof HodinaLessonIdRoute;'/kalendar':typeof KalendarRoute;'/rozvrh':typeof RozvrhRoute;'/trida':typeof TridaRoute;'/zacatek':typeof ZacatekRoute;'/pamet':typeof PametRoute;'/specialni-pedagogika':typeof SpecialniPedagogikaRoute;'/specialni-pedagogika/$caseId':typeof SpecialniPedagogikaCaseIdRoute;'/vytvarna-vychova':typeof VytvarnaVychovaRoute}
+export interface FileRoutesByFullPath {'/':typeof IndexRoute;'/asistentka':typeof AsistentkaRoute;'/hlas':typeof HlasRoute;'/hodina/$lessonId':typeof HodinaLessonIdRoute;'/kalendar':typeof KalendarRoute;'/rozvrh':typeof RozvrhRoute;'/trida':typeof TridaRoute;'/zacatek':typeof ZacatekRoute;'/pamet':typeof PametRoute;'/specialni-pedagogika':typeof SpecialniPedagogikaRoute;'/specialni-pedagogika/$caseId':typeof SpecialniPedagogikaCaseIdRoute;'/vytvarna-vychova':typeof VytvarnaVychovaRoute}
 export interface FileRoutesByTo extends FileRoutesByFullPath {}
-export interface FileRoutesById {__root__:typeof rootRouteImport;'/':typeof IndexRoute;'/asistentka':typeof AsistentkaRoute;'/hodina/$lessonId':typeof HodinaLessonIdRoute;'/kalendar':typeof KalendarRoute;'/rozvrh':typeof RozvrhRoute;'/trida':typeof TridaRoute;'/zacatek':typeof ZacatekRoute;'/pamet':typeof PametRoute;'/specialni-pedagogika':typeof SpecialniPedagogikaRoute;'/specialni-pedagogika/$caseId':typeof SpecialniPedagogikaCaseIdRoute;'/vytvarna-vychova':typeof VytvarnaVychovaRoute}
-export interface FileRouteTypes {fileRoutesByFullPath:FileRoutesByFullPath;fullPaths:'/'|'/asistentka'|'/hodina/$lessonId'|'/kalendar'|'/rozvrh'|'/trida'|'/zacatek'|'/pamet'|'/specialni-pedagogika'|'/specialni-pedagogika/$caseId'|'/vytvarna-vychova';fileRoutesByTo:FileRoutesByTo;to:'/'|'/asistentka'|'/hodina/$lessonId'|'/kalendar'|'/rozvrh'|'/trida'|'/zacatek'|'/pamet'|'/specialni-pedagogika'|'/specialni-pedagogika/$caseId'|'/vytvarna-vychova';id:'__root__'|'/'|'/asistentka'|'/hodina/$lessonId'|'/kalendar'|'/rozvrh'|'/trida'|'/zacatek'|'/pamet'|'/specialni-pedagogika'|'/specialni-pedagogika/$caseId'|'/vytvarna-vychova';fileRoutesById:FileRoutesById}
-export interface RootRouteChildren {IndexRoute:typeof IndexRoute;AsistentkaRoute:typeof AsistentkaRoute;HodinaLessonIdRoute:typeof HodinaLessonIdRoute;KalendarRoute:typeof KalendarRoute;RozvrhRoute:typeof RozvrhRoute;TridaRoute:typeof TridaRoute;ZacatekRoute:typeof ZacatekRoute;PametRoute:typeof PametRoute;SpecialniPedagogikaRoute:typeof SpecialniPedagogikaRoute;SpecialniPedagogikaCaseIdRoute:typeof SpecialniPedagogikaCaseIdRoute;VytvarnaVychovaRoute:typeof VytvarnaVychovaRoute}
+export interface FileRoutesById {__root__:typeof rootRouteImport;'/':typeof IndexRoute;'/asistentka':typeof AsistentkaRoute;'/hlas':typeof HlasRoute;'/hodina/$lessonId':typeof HodinaLessonIdRoute;'/kalendar':typeof KalendarRoute;'/rozvrh':typeof RozvrhRoute;'/trida':typeof TridaRoute;'/zacatek':typeof ZacatekRoute;'/pamet':typeof PametRoute;'/specialni-pedagogika':typeof SpecialniPedagogikaRoute;'/specialni-pedagogika/$caseId':typeof SpecialniPedagogikaCaseIdRoute;'/vytvarna-vychova':typeof VytvarnaVychovaRoute}
+export interface FileRouteTypes {fileRoutesByFullPath:FileRoutesByFullPath;fullPaths:'/'|'/asistentka'|'/hlas'|'/hodina/$lessonId'|'/kalendar'|'/rozvrh'|'/trida'|'/zacatek'|'/pamet'|'/specialni-pedagogika'|'/specialni-pedagogika/$caseId'|'/vytvarna-vychova';fileRoutesByTo:FileRoutesByTo;to:'/'|'/asistentka'|'/hlas'|'/hodina/$lessonId'|'/kalendar'|'/rozvrh'|'/trida'|'/zacatek'|'/pamet'|'/specialni-pedagogika'|'/specialni-pedagogika/$caseId'|'/vytvarna-vychova';id:'__root__'|'/'|'/asistentka'|'/hlas'|'/hodina/$lessonId'|'/kalendar'|'/rozvrh'|'/trida'|'/zacatek'|'/pamet'|'/specialni-pedagogika'|'/specialni-pedagogika/$caseId'|'/vytvarna-vychova';fileRoutesById:FileRoutesById}
+export interface RootRouteChildren {IndexRoute:typeof IndexRoute;AsistentkaRoute:typeof AsistentkaRoute;HlasRoute:typeof HlasRoute;HodinaLessonIdRoute:typeof HodinaLessonIdRoute;KalendarRoute:typeof KalendarRoute;RozvrhRoute:typeof RozvrhRoute;TridaRoute:typeof TridaRoute;ZacatekRoute:typeof ZacatekRoute;PametRoute:typeof PametRoute;SpecialniPedagogikaRoute:typeof SpecialniPedagogikaRoute;SpecialniPedagogikaCaseIdRoute:typeof SpecialniPedagogikaCaseIdRoute;VytvarnaVychovaRoute:typeof VytvarnaVychovaRoute}
 declare module '@tanstack/react-router' {interface FileRoutesByPath {
 '/':{id:'/';path:'/';fullPath:'/';preLoaderRoute:typeof IndexRouteImport;parentRoute:typeof rootRouteImport};
 '/asistentka':{id:'/asistentka';path:'/asistentka';fullPath:'/asistentka';preLoaderRoute:typeof AsistentkaRouteImport;parentRoute:typeof rootRouteImport};
+'/hlas':{id:'/hlas';path:'/hlas';fullPath:'/hlas';preLoaderRoute:typeof HlasRouteImport;parentRoute:typeof rootRouteImport};
 '/hodina/$lessonId':{id:'/hodina/$lessonId';path:'/hodina/$lessonId';fullPath:'/hodina/$lessonId';preLoaderRoute:typeof HodinaLessonIdRouteImport;parentRoute:typeof rootRouteImport};
 '/kalendar':{id:'/kalendar';path:'/kalendar';fullPath:'/kalendar';preLoaderRoute:typeof KalendarRouteImport;parentRoute:typeof rootRouteImport};
 '/rozvrh':{id:'/rozvrh';path:'/rozvrh';fullPath:'/rozvrh';preLoaderRoute:typeof RozvrhRouteImport;parentRoute:typeof rootRouteImport};
@@ -42,7 +45,7 @@ declare module '@tanstack/react-router' {interface FileRoutesByPath {
 '/specialni-pedagogika/$caseId':{id:'/specialni-pedagogika/$caseId';path:'/specialni-pedagogika/$caseId';fullPath:'/specialni-pedagogika/$caseId';preLoaderRoute:typeof SpecialniPedagogikaCaseIdRouteImport;parentRoute:typeof rootRouteImport};
 '/vytvarna-vychova':{id:'/vytvarna-vychova';path:'/vytvarna-vychova';fullPath:'/vytvarna-vychova';preLoaderRoute:typeof VytvarnaVychovaRouteImport;parentRoute:typeof rootRouteImport}
 }}
-const rootRouteChildren:RootRouteChildren={IndexRoute,AsistentkaRoute,HodinaLessonIdRoute,KalendarRoute,RozvrhRoute,TridaRoute,ZacatekRoute,PametRoute,SpecialniPedagogikaRoute,SpecialniPedagogikaCaseIdRoute,VytvarnaVychovaRoute}
+const rootRouteChildren:RootRouteChildren={IndexRoute,AsistentkaRoute,HlasRoute,HodinaLessonIdRoute,KalendarRoute,RozvrhRoute,TridaRoute,ZacatekRoute,PametRoute,SpecialniPedagogikaRoute,SpecialniPedagogikaCaseIdRoute,VytvarnaVychovaRoute}
 export const routeTree=rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>()
 import type { getRouter } from './router.tsx'
 import type { startInstance } from './start.ts'
