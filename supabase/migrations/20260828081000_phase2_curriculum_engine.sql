@@ -20,9 +20,10 @@ create table public.curriculum_sources (
   checksum text,
   license_note text,
   metadata jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  unique (source_url, coalesce(source_version, ''))
+  created_at timestamptz not null default now()
 );
+create unique index curriculum_sources_url_version_uq
+  on public.curriculum_sources(source_url, coalesce(source_version, ''));
 
 create table public.curriculum_versions (
   id uuid primary key default gen_random_uuid(),
@@ -122,7 +123,7 @@ create table public.curriculum_dependencies (
 create table public.school_curriculum_versions (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
-  academic_year_id uuid not null references public.academic_years(id) on delete cascade,
+  academic_year_id uuid not null,
   base_curriculum_version_id uuid not null references public.curriculum_versions(id) on delete restrict,
   name text not null,
   status public.curriculum_status not null default 'draft',
@@ -130,7 +131,12 @@ create table public.school_curriculum_versions (
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (school_id, academic_year_id, name)
+  unique (id, school_id),
+  unique (school_id, academic_year_id, name),
+  constraint school_curriculum_year_same_school
+    foreign key (academic_year_id, school_id)
+    references public.academic_years(id, school_id)
+    on delete cascade
 );
 
 create table public.school_curriculum_mappings (
@@ -151,16 +157,24 @@ create table public.class_curriculum_selections (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
   class_id uuid not null,
-  academic_year_id uuid not null references public.academic_years(id) on delete cascade,
+  academic_year_id uuid not null,
   curriculum_version_id uuid not null references public.curriculum_versions(id) on delete restrict,
-  school_curriculum_version_id uuid references public.school_curriculum_versions(id) on delete restrict,
+  school_curriculum_version_id uuid,
   selected_by uuid references auth.users(id) on delete set null,
   selected_at timestamptz not null default now(),
   unique (class_id),
   constraint class_curriculum_class_same_school
     foreign key (class_id, school_id)
     references public.classes(id, school_id)
-    on delete cascade
+    on delete cascade,
+  constraint class_curriculum_year_same_school
+    foreign key (academic_year_id, school_id)
+    references public.academic_years(id, school_id)
+    on delete cascade,
+  constraint class_curriculum_school_version_same_school
+    foreign key (school_curriculum_version_id, school_id)
+    references public.school_curriculum_versions(id, school_id)
+    on delete restrict
 );
 
 create index curriculum_sources_authority_idx on public.curriculum_sources(authority);
@@ -181,7 +195,7 @@ for each row execute function public.set_updated_at();
 create trigger school_curriculum_mappings_set_updated_at before update on public.school_curriculum_mappings
 for each row execute function public.set_updated_at();
 
--- Global official curriculum tables are readable by authenticated users but never writable by them.
+-- Global official curriculum is non-sensitive reference data.
 alter table public.curriculum_sources enable row level security;
 alter table public.curriculum_versions enable row level security;
 alter table public.curriculum_areas enable row level security;
@@ -218,12 +232,11 @@ for select to authenticated using (exists (
 grant select on public.curriculum_sources, public.curriculum_versions, public.curriculum_areas,
   public.curriculum_subjects, public.curriculum_topics, public.curriculum_outcomes,
   public.curriculum_dependencies to authenticated;
-
 grant all on public.curriculum_sources, public.curriculum_versions, public.curriculum_areas,
   public.curriculum_subjects, public.curriculum_topics, public.curriculum_outcomes,
   public.curriculum_dependencies to service_role;
 
--- School-specific curriculum is tenant scoped.
+-- School-specific curriculum remains tenant-scoped and protected by RLS.
 alter table public.school_curriculum_versions enable row level security;
 alter table public.school_curriculum_mappings enable row level security;
 alter table public.class_curriculum_selections enable row level security;
@@ -257,8 +270,7 @@ create policy class_curriculum_select_accessible on public.class_curriculum_sele
 for select to authenticated using (public.can_access_class(class_id));
 create policy class_curriculum_insert_admin on public.class_curriculum_selections
 for insert to authenticated with check (
-  public.is_school_admin(school_id)
-  and public.can_access_class(class_id)
+  public.is_school_admin(school_id) and public.can_access_class(class_id)
 );
 create policy class_curriculum_update_admin on public.class_curriculum_selections
 for update to authenticated using (public.is_school_admin(school_id))
@@ -271,7 +283,7 @@ grant select, insert, update, delete on public.school_curriculum_versions,
 grant all on public.school_curriculum_versions, public.school_curriculum_mappings,
   public.class_curriculum_selections to service_role;
 
--- Seed only source/version metadata; no copied textbook content and no AI content.
+-- Seed source/version metadata only; no copied textbook content and no AI content.
 insert into public.curriculum_sources (authority, title, source_url, origin, source_version, license_note)
 values
 ('MŠMT', 'Rámcový vzdělávací program pro základní vzdělávání', 'https://msmt.gov.cz/vzdelavani/zakladni-vzdelavani/ramcovy-vzdelavaci-program-pro-zakladni-vzdelavani', 'official', 'transition-2026', 'Autoritativní zdroj verze a přechodového období.'),
