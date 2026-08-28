@@ -3,6 +3,7 @@ name: Migration Reset
 on:
   push:
     branches:
+      - main
       - safety-curriculum-import
       - feature/e2e-lesson-workflow
   workflow_dispatch:
