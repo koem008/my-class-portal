@@ -1,0 +1,28 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Brush, Clock3, ExternalLink, Layers3, Sparkles } from "lucide-react";
+import { artThemeToPreparation, loadArtOutcomeTitles, loadArtThemes, type ArtTheme } from "@/lib/art-education-data";
+
+export const Route=createFileRoute("/vytvarna-vychova")({component:ArtStudioPage});
+
+function ArtStudioPage(){
+  const[themes,setThemes]=useState<ArtTheme[]>([]);
+  const[selected,setSelected]=useState<ArtTheme|null>(null);
+  const[outcomes,setOutcomes]=useState<any[]>([]);
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState("");
+  useEffect(()=>{void init()},[]);
+  async function init(){setLoading(true);try{setThemes(await loadArtThemes(5))}catch(e:any){setError(e?.message??"Témata se nepodařilo načíst.")}finally{setLoading(false)}}
+  async function choose(theme:ArtTheme){setSelected(theme);try{setOutcomes(await loadArtOutcomeTitles(theme.outcome_codes))}catch{setOutcomes([])}}
+  return <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#fff0df,transparent_30%),radial-gradient(circle_at_top_right,#eee9ff,transparent_34%),#fbfaf7] px-4 py-6 text-slate-800 md:px-8 md:py-9"><div className="mx-auto max-w-7xl">
+    <div className="flex items-center justify-between gap-3"><Link to="/" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm shadow-sm"><ArrowLeft className="h-4 w-4"/>Dnes</Link><div className="rounded-full bg-white px-4 py-2 text-sm shadow-sm">5. ročník · 2026/2027</div></div>
+    <section className="mt-5 rounded-[34px] bg-white/90 p-6 shadow-[0_24px_70px_rgba(80,70,100,.1)] md:p-9"><div className="flex items-start gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-orange-100 text-orange-700"><Brush className="h-6 w-6"/></div><div><div className="text-xs font-bold uppercase tracking-[.16em] text-violet-700">Studio VV</div><h1 className="mt-2 text-3xl font-bold tracking-[-.03em]">Výtvarná a filmová výchova</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Pedagogické náměty pro 5. ročník navázané na oficiální výstupy revidovaného RVP. Témata jsou naše pracovní šablony, ne oficiální osnovy.</p></div></div></section>
+    {loading&&<div className="mt-5 rounded-3xl bg-white p-7 text-slate-500">Načítám témata…</div>}
+    {error&&<div className="mt-5 rounded-3xl bg-rose-50 p-6 text-rose-800">{error}</div>}
+    {!loading&&!error&&<div className="mt-5 grid gap-5 lg:grid-cols-[1fr_.9fr]"><section className="grid gap-4 sm:grid-cols-2">{themes.map(t=><button key={t.id} onClick={()=>void choose(t)} className={`rounded-3xl border p-5 text-left transition ${selected?.id===t.id?"border-violet-300 bg-violet-50/70 shadow-sm":"border-white bg-white hover:-translate-y-0.5 hover:shadow-md"}`}><div className="flex items-center justify-between"><span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-800">{t.suggested_minutes} min</span><Sparkles className="h-4 w-4 text-violet-500"/></div><h2 className="mt-4 text-lg font-semibold">{t.title}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{t.summary}</p><div className="mt-4 text-xs font-medium text-violet-700">{t.outcome_codes.length} vazby na RVP</div></button>)}</section>
+      <aside className="rounded-3xl bg-white p-6 shadow-sm">{!selected?<div className="grid min-h-[320px] place-items-center text-center text-slate-500"><div><Layers3 className="mx-auto h-8 w-8"/><p className="mt-3">Vyber téma a tady se zobrazí kompletní příprava.</p></div></div>:<ThemeDetail theme={selected} outcomes={outcomes}/>}</aside></div>}
+  </div></main>
+}
+
+function ThemeDetail({theme,outcomes}:{theme:ArtTheme;outcomes:any[]}){const prep=artThemeToPreparation(theme);return <div><div className="flex items-center justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-[.14em] text-violet-700">Příprava hodiny</div><h2 className="mt-1 text-2xl font-bold">{theme.title}</h2></div><div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs"><Clock3 className="h-3.5 w-3.5"/>{theme.suggested_minutes} min</div></div><div className="mt-5 space-y-5"><Block title="Cíle">{theme.learning_goals.map(x=><p key={x}>• {x}</p>)}</Block><Block title="Pomůcky"><p>{theme.materials.join(", ")}</p></Block><Block title="Průběh">{theme.activity_outline.map((x,i)=><p key={x}>{i+1}. {x}</p>)}</Block>{theme.differentiation_easy&&<Block title="Podpora"><p>{theme.differentiation_easy}</p></Block>}{theme.differentiation_advanced&&<Block title="Rozšíření"><p>{theme.differentiation_advanced}</p></Block>}{theme.reflection_prompt&&<Block title="Reflexe"><p>{theme.reflection_prompt}</p></Block>}<Block title="Vazba na RVP">{outcomes.length?outcomes.map(o=><div key={o.official_code} className="mb-3 rounded-xl bg-violet-50 p-3"><div className="text-xs font-bold text-violet-700">{o.official_code}</div><div className="mt-1 text-sm">{o.title}</div></div>):<p className="text-slate-500">Načítám ověřené výstupy…</p>}</Block></div><button onClick={()=>navigator.clipboard?.writeText(prep.preparation)} className="mt-6 w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white">Zkopírovat přípravu</button><p className="mt-3 text-center text-xs text-slate-500">Napojení „Použít přímo v konkrétní hodině“ doplníme přes lesson workspace.</p></div>}
+function Block({title,children}:{title:string;children:any}){return <section><h3 className="mb-2 text-sm font-semibold text-slate-900">{title}</h3><div className="space-y-1 text-sm leading-6 text-slate-600">{children}</div></section>}
