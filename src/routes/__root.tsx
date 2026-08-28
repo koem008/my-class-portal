@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AfternoonReflectionPrompt } from "@/components/AfternoonReflectionPrompt";
 
 function NotFoundComponent() {
   return (
@@ -127,6 +128,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <AfternoonReflectionPrompt />
       <Link
         to="/hlas"
         aria-label="Otevřít hlasovou reflexi"
