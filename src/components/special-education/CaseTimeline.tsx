@@ -45,6 +45,26 @@ export function CaseTimeline({
     [structured],
   );
 
+  const summary30 = useMemo(() => {
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    const recentItems = items.filter((item) => new Date(item.at).getTime() >= from.getTime());
+    const recentStructured = structured.filter(
+      (item) => new Date(item.observedAt).getTime() >= from.getTime(),
+    );
+    return {
+      observations: recentItems.filter((item) => item.kind === "observation").length,
+      interventions: recentItems.filter((item) => item.kind === "intervention").length,
+      reviews: recentItems.filter((item) => item.kind === "review").length,
+      followups: recentItems.filter((item) => item.kind === "followup").length,
+      helped: recentStructured.filter((item) => item.responseEffect === "helped").length,
+      noClearChange: recentStructured.filter((item) => item.responseEffect === "no_clear_change")
+        .length,
+      worse: recentStructured.filter((item) => item.responseEffect === "worse").length,
+      unclear: recentStructured.filter((item) => item.responseEffect === "unclear").length,
+    };
+  }, [items, structured]);
+
   const labelFor = (code: string | null) =>
     code ? (catalog.find((x) => x.code === code)?.label ?? code) : null;
 
@@ -56,6 +76,36 @@ export function CaseTimeline({
           Jedno místo pro pozorování, cíle, intervence, vyhodnocení a follow-up.
         </p>
       </div>
+
+      <div className="mb-5 rounded-2xl border border-violet-100 bg-violet-50/50 p-4">
+        <div className="text-xs font-bold uppercase tracking-[.12em] text-violet-700">
+          Posledních 30 dní
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <SummaryCell label="Pozorování" value={summary30.observations} />
+          <SummaryCell label="Intervence" value={summary30.interventions} />
+          <SummaryCell label="Vyhodnocení" value={summary30.reviews} />
+          <SummaryCell label="Follow-up" value={summary30.followups} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800">
+            Pomohlo {summary30.helped}×
+          </span>
+          <span className="rounded-full bg-slate-200 px-2.5 py-1 text-slate-700">
+            Bez změny {summary30.noClearChange}×
+          </span>
+          <span className="rounded-full bg-rose-100 px-2.5 py-1 text-rose-800">
+            Zhoršení {summary30.worse}×
+          </span>
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">
+            Nejasné {summary30.unclear}×
+          </span>
+        </div>
+        <p className="mt-3 text-[11px] leading-5 text-slate-500">
+          Jde pouze o mechanický souhrn potvrzených záznamů, nikoli automatické odborné hodnocení.
+        </p>
+      </div>
+
       {items.length === 0 ? (
         <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-500">
           Časová osa se začne skládat z potvrzených záznamů. Žádná ukázková data nevytváříme.
@@ -127,5 +177,14 @@ export function CaseTimeline({
         </div>
       )}
     </section>
+  );
+}
+
+function SummaryCell({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl bg-white p-3">
+      <div className="text-lg font-bold text-slate-900">{value}</div>
+      <div className="mt-0.5 text-[11px] text-slate-500">{label}</div>
+    </div>
   );
 }
