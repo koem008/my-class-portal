@@ -1,24 +1,47 @@
 import { AlertTriangle, CheckCircle2, Mic, ShieldCheck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useParams } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   canConfirmVoiceDraft,
   inspectVoiceDraft,
-  type SpecialPedagogyVoiceDraft,
 } from "@/lib/special-education-voice-contract";
-import type { SupportAreaCatalogItem } from "@/lib/special-education-data";
+import {
+  loadSpecialPedagogyAccess,
+  type SupportAreaCatalogItem,
+} from "@/lib/special-education-data";
+import {
+  addStructuredObservation,
+  loadSupportInsights,
+  type ObservationEffect,
+  type SupportInsight,
+} from "@/lib/special-observation-data";
+
+const effectLabels: Record<ObservationEffect, string> = {
+  helped: "Pomohlo",
+  no_clear_change: "Bez jasné změny",
+  worse: "Zhoršilo situaci",
+  unclear: "Nelze zatím určit",
+};
 
 export function VoiceObservationDraft({
   areas,
-  onConfirm,
 }: {
   areas: SupportAreaCatalogItem[];
-  onConfirm: (draft: { observation: string; context?: string; areaCode?: string }) => Promise<void>;
+  onConfirm?: (draft: { observation: string; context?: string; areaCode?: string }) => Promise<void>;
 }) {
+  const params = useParams({ strict: false });
+  const caseId = typeof params.caseId === "string" ? params.caseId : "";
   const [transcript, setTranscript] = useState("");
   const [observation, setObservation] = useState("");
   const [context, setContext] = useState("");
   const [areaCode, setAreaCode] = useState("");
+  const [supportUsed, setSupportUsed] = useState("");
+  const [immediateResponse, setImmediateResponse] = useState("");
+  const [responseEffect, setResponseEffect] = useState<ObservationEffect | "">("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [insights, setInsights] = useState<SupportInsight[]>([]);
+
   const inspected = useMemo(
     () =>
       inspectVoiceDraft({
@@ -31,33 +54,57 @@ export function VoiceObservationDraft({
     [transcript, observation, context, areaCode],
   );
   const confirmable = canConfirmVoiceDraft(inspected);
+
+  useEffect(() => {
+    if (!caseId) return;
+    void loadSupportInsights(caseId).then(setInsights).catch(() => setInsights([]));
+  }, [caseId]);
+
   async function confirm() {
-    if (!confirmable) return;
+    if (!confirmable || !caseId) return;
     setSaving(true);
+    setError("");
     try {
-      await onConfirm({
+      const access = await loadSpecialPedagogyAccess();
+      if (!access.length) throw new Error("Nemáte aktivní oprávnění pro speciální pedagogiku.");
+      const schoolId = access[0].school_id as string;
+      await addStructuredObservation({
+        caseId,
+        schoolId,
         observation: observation.trim(),
         context: context.trim() || undefined,
-        areaCode: areaCode || undefined,
+        supportArea: areaCode || undefined,
+        supportUsed: supportUsed.trim() || undefined,
+        immediateResponse: immediateResponse.trim() || undefined,
+        responseEffect,
       });
       setTranscript("");
       setObservation("");
       setContext("");
       setAreaCode("");
+      setSupportUsed("");
+      setImmediateResponse("");
+      setResponseEffect("");
+      setInsights(await loadSupportInsights(caseId));
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Pozorování se nepodařilo uložit.");
     } finally {
       setSaving(false);
     }
   }
+
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 font-semibold">
             <Mic className="h-4 w-4" />
-            Hlasová poznámka
+            Strukturované pozorování
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Hlasový provider zatím není připojený. Pro test workflow lze vložit přepis ručně.
+            Hlasový provider zatím není připojený. Přepis lze vložit ručně a před uložením vždy
+            zkontrolovat.
           </p>
         </div>
         <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
@@ -65,6 +112,7 @@ export function VoiceObservationDraft({
           Povinné potvrzení
         </span>
       </div>
+
       <div className="mt-4 grid gap-3">
         <textarea
           value={transcript}
@@ -86,7 +134,7 @@ export function VoiceObservationDraft({
         <input
           value={context}
           onChange={(e) => setContext(e.target.value)}
-          placeholder="Kontext, např. skupinová práce"
+          placeholder="Kontext, např. samostatná práce"
           className="rounded-xl border px-3 py-2.5"
         />
         <select
@@ -105,10 +153,35 @@ export function VoiceObservationDraft({
           value={observation}
           onChange={(e) => setObservation(e.target.value)}
           rows={4}
-          placeholder="Návrh faktického pozorování k potvrzení…"
+          placeholder="Co bylo skutečně pozorováno…"
           className="rounded-xl border px-3 py-2.5"
         />
+        <input
+          value={supportUsed}
+          onChange={(e) => setSupportUsed(e.target.value)}
+          placeholder="Jaká konkrétní podpora byla použita?"
+          className="rounded-xl border px-3 py-2.5"
+        />
+        <textarea
+          value={immediateResponse}
+          onChange={(e) => setImmediateResponse(e.target.value)}
+          rows={2}
+          placeholder="Jaká byla bezprostřední pozorovaná reakce?"
+          className="rounded-xl border px-3 py-2.5"
+        />
+        <select
+          value={responseEffect}
+          onChange={(e) => setResponseEffect(e.target.value as ObservationEffect | "")}
+          className="rounded-xl border px-3 py-2.5"
+        >
+          <option value="">Efekt zatím nehodnotit</option>
+          <option value="helped">Pomohlo</option>
+          <option value="no_clear_change">Bez jasné změny</option>
+          <option value="worse">Zhoršilo situaci</option>
+          <option value="unclear">Nelze zatím určit</option>
+        </select>
       </div>
+
       {inspected.warnings.length > 0 && (
         <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
           <div className="font-semibold">
@@ -122,6 +195,9 @@ export function VoiceObservationDraft({
           </ul>
         </div>
       )}
+
+      {error && <div className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
+
       <button
         disabled={saving || !confirmable}
         onClick={() => void confirm()}
@@ -130,6 +206,43 @@ export function VoiceObservationDraft({
         <CheckCircle2 className="h-4 w-4" />
         {saving ? "Ukládám…" : "Potvrdit a uložit pozorování"}
       </button>
+
+      <div className="mt-5 border-t pt-5">
+        <h3 className="text-sm font-semibold text-slate-800">Co se podle potvrzených záznamů opakuje</h3>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          Pouze součet lidsky potvrzených efektů. Nejde o diagnózu ani automatický závěr AI.
+        </p>
+        {insights.length === 0 ? (
+          <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+            Zatím není dost strukturovaných záznamů k porovnání podpory.
+          </div>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {insights.slice(0, 6).map((item) => (
+              <div key={item.supportUsed.toLocaleLowerCase("cs-CZ")} className="rounded-2xl bg-slate-50 p-4">
+                <div className="font-medium text-slate-900">{item.supportUsed}</div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800">
+                    Pomohlo {item.helped}×
+                  </span>
+                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-slate-700">
+                    Bez změny {item.noClearChange}×
+                  </span>
+                  <span className="rounded-full bg-rose-100 px-2.5 py-1 text-rose-800">
+                    Zhoršení {item.worse}×
+                  </span>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">
+                    Nejasné {item.unclear}×
+                  </span>
+                </div>
+                <div className="mt-2 text-[11px] text-slate-500">
+                  Celkem {item.total} potvrzených použití · nejde o automatické doporučení.
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
