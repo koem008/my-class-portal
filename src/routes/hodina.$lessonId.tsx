@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, CheckCircle2, ChevronLeft, FileText, Loader2, Mic, Plus, Save, Sparkles, UserRoundCheck, WandSparkles, X } from "lucide-react";
+import { BookMarked, BookOpen, CheckCircle2, ChevronLeft, ExternalLink, FileText, Loader2, Mic, Plus, Save, ShieldCheck, Sparkles, UserRoundCheck, WandSparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   createLearningSignal,
@@ -10,6 +10,7 @@ import {
   saveProgress,
   updateLessonStatus,
   type ContinuitySuggestion,
+  type CurriculumContext,
   type LearningSignal,
   type LearningSignalKind,
   type LessonInstance,
@@ -28,7 +29,6 @@ type LoadState = "loading" | "ready" | "error";
 const materialLabels: Record<MaterialKind, string> = {
   lesson_plan: "Příprava", board_notes: "Zápis na tabuli", worksheet: "Pracovní list", answer_key: "Řešení", quiz: "Kvíz", test: "Test", presentation: "Prezentace", activity: "Aktivita", differentiation: "Diferenciace", homework: "Domácí úkol", other: "Jiný materiál",
 };
-
 const signalLabels: Record<LearningSignalKind, string> = {
   needs_practice: "Potřebuje procvičit", improving: "Zlepšuje se", mastered: "Zvládnuto", advanced: "Je napřed", follow_up: "Vrátit se k tématu",
 };
@@ -44,6 +44,7 @@ function LessonWorkspacePage() {
   const [aliases, setAliases] = useState<StudentAlias[]>([]);
   const [signals, setSignals] = useState<LearningSignal[]>([]);
   const [continuity, setContinuity] = useState<ContinuitySuggestion[]>([]);
+  const [curriculum, setCurriculum] = useState<CurriculumContext | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -69,14 +70,13 @@ function LessonWorkspacePage() {
     setLoadState("loading"); setErrorMessage("");
     try {
       const data = await loadLessonWorkspace(lessonId);
-      setLesson(data.lesson); setPreparation(data.preparation); setMaterials(data.materials); setProgress(data.progress); setAliases(data.aliases); setSignals(data.signals); setContinuity(data.continuity);
+      setLesson(data.lesson); setPreparation(data.preparation); setMaterials(data.materials); setProgress(data.progress); setAliases(data.aliases); setSignals(data.signals); setContinuity(data.continuity); setCurriculum(data.curriculum);
       setObjective(data.preparation?.objective ?? ""); setTeacherNotes(data.preparation?.teacher_notes ?? ""); setBoardNotes(data.preparation?.board_notes ?? ""); setHomework(data.preparation?.homework ?? "");
       setProgressState(data.progress?.state ?? "not_started"); setCompletedSummary(data.progress?.completed_summary ?? ""); setUnfinishedSummary(data.progress?.unfinished_summary ?? ""); setNextLessonNote(data.progress?.next_lesson_note ?? ""); setTeacherReflection(data.progress?.teacher_reflection ?? "");
       if (!signalAliasId && data.aliases[0]) setSignalAliasId(data.aliases[0].id);
       setLoadState("ready");
     } catch (error) { setErrorMessage(error instanceof Error ? error.message : "Hodinu se nepodařilo načíst."); setLoadState("error"); }
   }
-
   useEffect(() => { void reload(); }, [lessonId]);
 
   async function handlePreparationSave() {
@@ -84,25 +84,21 @@ function LessonWorkspacePage() {
     try { await savePreparation(lesson, { objective, teacher_notes: teacherNotes, board_notes: boardNotes, homework }, preparation?.id); await updateLessonStatus(lesson.id, "prepared"); setNotice("Příprava je bezpečně uložená."); await reload(); }
     catch (error) { setNotice(error instanceof Error ? error.message : "Uložení se nepodařilo."); } finally { setSaving(false); }
   }
-
   async function handleMaterialCreate() {
     if (!lesson || !materialTitle.trim()) return; setSaving(true); setNotice("");
     try { await createMaterial(lesson, { kind: materialKind, title: materialTitle.trim(), text: materialText }); setMaterialTitle(""); setMaterialText(""); setNotice("Materiál je uložený jako koncept."); await reload(); }
     catch (error) { setNotice(error instanceof Error ? error.message : "Materiál se nepodařilo uložit."); } finally { setSaving(false); }
   }
-
   async function handleProgressSave() {
     if (!lesson) return; setSaving(true); setNotice("");
     try { await saveProgress(lesson, { state: progressState, completed_summary: completedSummary, unfinished_summary: unfinishedSummary, next_lesson_note: nextLessonNote, teacher_reflection: teacherReflection }, progress?.id); if (progressState === "completed") await updateLessonStatus(lesson.id, "completed"); setNotice("Reflexe je uložená. Návaznost další hodiny se přepočítala."); await reload(); }
     catch (error) { setNotice(error instanceof Error ? error.message : "Reflexi se nepodařilo uložit."); } finally { setSaving(false); }
   }
-
   async function handleSignalCreate() {
     if (!lesson || !signalAliasId) return; setSaving(true); setNotice("");
     try { await createLearningSignal(lesson, { studentAliasId: signalAliasId, kind: signalKind, note: signalNote, topic: lesson.topic ?? undefined }); setSignalNote(""); setNotice("Pedagogický signál je uložený pouze pod pseudonymem."); await reload(); }
     catch (error) { setNotice(error instanceof Error ? error.message : "Signál se nepodařilo uložit."); } finally { setSaving(false); }
   }
-
   async function handleSignalDeactivate(id: string) {
     setSaving(true); setNotice("");
     try { await deactivateLearningSignal(id); setNotice("Signál už nebude ovlivňovat další plánování."); await reload(); }
@@ -117,6 +113,14 @@ function LessonWorkspacePage() {
     {notice && <div className="mt-5 rounded-2xl border border-[#dcebe5] bg-[#f0f8f4] px-4 py-3 text-sm text-[#356862]">{notice}</div>}
 
     <div className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_.85fr]"><section className="space-y-5">
+      <Panel title="Učivo a RVP" subtitle="Používáme pouze zdrojovaná kurikulární data. Nic oficiálního AI nevymýšlí." icon={<BookMarked className="h-5 w-5"/>}>
+        {curriculum?.linked ? <>
+          <div className="flex flex-wrap gap-2"><span className="rounded-full bg-[#e8f4ef] px-3 py-1 text-xs font-bold text-[#276765]">{curriculum.classGrade}. ročník</span><span className="rounded-full bg-[#eef2fb] px-3 py-1 text-xs font-bold text-[#50638b]">{curriculum.subject?.name}</span>{curriculum.topic&&<span className="rounded-full bg-[#fff1e8] px-3 py-1 text-xs font-bold text-[#8f6748]">{curriculum.topic.name}</span>}</div>
+          <div className="rounded-2xl border border-[#e6ebe7] bg-[#f9fcfa] p-4"><div className="flex items-center gap-2 text-sm font-bold"><ShieldCheck className="h-4 w-4 text-[#39706a]"/>Ověřený zdroj</div><p className="mt-2 text-xs leading-5 text-[#758482]">{curriculum.version?.name ?? "Verze neuvedena"}{curriculum.source ? ` · ${curriculum.source.authority}` : ""}</p>{curriculum.source&&<a href={curriculum.source.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#276765]">Otevřít zdroj <ExternalLink className="h-3.5 w-3.5"/></a>}</div>
+          <div><div className="text-xs font-bold text-[#647775]">Relevantní očekávané výstupy</div>{curriculum.outcomes.length>0?<div className="mt-2 space-y-2">{curriculum.outcomes.map(outcome=><div key={outcome.id} className="rounded-2xl bg-[#fcfbf8] p-3"><div className="text-xs font-bold text-[#506b68]">{outcome.official_code || "Bez kódu"}</div><div className="mt-1 text-sm font-semibold">{outcome.title}</div>{outcome.description&&<p className="mt-1 text-xs leading-5 text-[#7d8b89]">{outcome.description}</p>}</div>)}</div>:<div className="mt-2 rounded-2xl border border-dashed border-[#ddd8cf] p-4 text-sm text-[#7c8988]">Pro toto konkrétní téma zatím není v databázi přiřazený výstup.</div>}</div>
+        </> : <div className="rounded-2xl bg-[#fff8ed] p-4 text-sm leading-6 text-[#786a53]">Hodina zatím není spárovaná s ověřeným kurikulem. Systém proto žádný oficiální výstup nedoplňuje automaticky.</div>}
+      </Panel>
+
       <Panel title="Příprava hodiny" subtitle="Vše je editovatelné. AI bude navrhovat, nikdy sama neuloží změnu." icon={<BookOpen className="h-5 w-5"/>}><Field label="Cíl hodiny" value={objective} onChange={setObjective} placeholder="Co mají žáci na konci hodiny umět nebo pochopit?"/><Field label="Poznámky pro učitele" value={teacherNotes} onChange={setTeacherNotes} multiline placeholder="Průběh, pomůcky, důležité body…"/><Field label="Zápis na tabuli" value={boardNotes} onChange={setBoardNotes} multiline/><Field label="Domácí úkol" value={homework} onChange={setHomework}/><div className="flex justify-end"><button disabled={saving} onClick={() => void handlePreparationSave()} className="inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"><Save className="h-4 w-4"/>{saving ? "Ukládám…" : "Uložit přípravu"}</button></div></Panel>
 
       <Panel title="Materiály" subtitle="Koncepty jsou uložené u této konkrétní hodiny." icon={<FileText className="h-5 w-5"/>}><div className="grid gap-3 sm:grid-cols-2">{materials.map(m=><div key={m.id} className="rounded-2xl border border-[#ece8df] bg-[#fcfbf8] p-4"><div className="text-xs font-bold uppercase tracking-[.12em] text-[#74908a]">{materialLabels[m.kind]}</div><div className="mt-2 font-bold">{m.title}</div><div className="mt-1 text-xs text-[#8a9594]">{m.export_status === "draft" ? "Koncept" : m.export_status}</div></div>)}{materials.length===0&&<div className="sm:col-span-2 rounded-2xl border border-dashed border-[#ddd8cf] p-5 text-sm text-[#7c8988]">Zatím tu nejsou žádné materiály.</div>}</div><div className="mt-5 rounded-[22px] bg-[#f8f7f3] p-4"><div className="grid gap-3 md:grid-cols-2"><select value={materialKind} onChange={e=>setMaterialKind(e.target.value as MaterialKind)} className="rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm">{Object.entries(materialLabels).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><input value={materialTitle} onChange={e=>setMaterialTitle(e.target.value)} placeholder="Název materiálu" className="rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm"/></div><textarea value={materialText} onChange={e=>setMaterialText(e.target.value)} placeholder="Obsah nebo pracovní poznámka…" className="mt-3 min-h-28 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-3 text-sm"/><div className="mt-3 flex justify-end"><button onClick={() => void handleMaterialCreate()} disabled={saving || !materialTitle.trim()} className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-[#276765] shadow-sm disabled:opacity-40"><Plus className="h-4 w-4"/>Uložit materiál</button></div></div></Panel>
@@ -128,7 +132,7 @@ function LessonWorkspacePage() {
 
     <aside className="space-y-5">
       <Panel title="Co navázat příště" subtitle="Tento přehled vzniká levně z databáze, bez volání AI." icon={<WandSparkles className="h-5 w-5"/>}>{continuity.length>0?<div className="space-y-2">{continuity.map((item,index)=><div key={`${item.title}-${index}`} className={`rounded-2xl p-4 ${item.priority==="high"?"bg-[#fff1ea]":item.priority==="medium"?"bg-[#fff8e8]":"bg-[#eef7f3]"}`}><div className="text-sm font-bold">{item.title}</div><p className="mt-1 text-xs leading-5 text-[#6f7d7d]">{item.detail}</p></div>)}</div>:<div className="rounded-2xl border border-dashed border-[#ddd8cf] p-4 text-sm text-[#7c8988]">Po potvrzení reflexe nebo pedagogického signálu se tady objeví automatická návaznost.</div>}</Panel>
-      <Panel title="AI asistentka hodiny" subtitle="Provider zatím není připojený. Žádný obsah se neposílá třetí straně." icon={<Sparkles className="h-5 w-5"/>}><div className="rounded-2xl bg-gradient-to-br from-[#eef8f3] to-[#fff8ed] p-4"><p className="text-sm leading-6 text-[#617474]">Až doplníme serverový API klíč, AI dostane jen kontext této hodiny, relevantní kurikulum, reflexi a pseudonymní pedagogické signály. Ne skutečné identity.</p><button disabled className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[#dfe9e5] px-4 py-2.5 text-sm font-bold text-[#78908b]"><Mic className="h-4 w-4"/>AI zatím není připojena</button></div></Panel>
+      <Panel title="AI asistentka hodiny" subtitle="Provider zatím není připojený. Žádný obsah se neposílá třetí straně." icon={<Sparkles className="h-5 w-5"/>}><div className="rounded-2xl bg-gradient-to-br from-[#eef8f3] to-[#fff8ed] p-4"><p className="text-sm leading-6 text-[#617474]">Až doplníme serverový API klíč, AI dostane jen kontext této hodiny, relevantní ověřené kurikulum, reflexi a pseudonymní pedagogické signály. Ne skutečné identity.</p><button disabled className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[#dfe9e5] px-4 py-2.5 text-sm font-bold text-[#78908b]"><Mic className="h-4 w-4"/>AI zatím není připojena</button></div></Panel>
       <Panel title="Po hodině" subtitle="Skutečný průběh je zdroj návaznosti další výuky." icon={<CheckCircle2 className="h-5 w-5"/>}><label className="text-xs font-bold text-[#647775]">Stav výuky<select value={progressState} onChange={e=>setProgressState(e.target.value as ProgressState)} className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"><option value="not_started">Neproběhla</option><option value="partial">Částečně</option><option value="completed">Dokončeno</option></select></label><Field label="Co se stihlo" value={completedSummary} onChange={setCompletedSummary} multiline/><Field label="Co se nestihlo" value={unfinishedSummary} onChange={setUnfinishedSummary} multiline/><Field label="Co navázat příště" value={nextLessonNote} onChange={setNextLessonNote} multiline/><Field label="Moje reflexe" value={teacherReflection} onChange={setTeacherReflection} multiline/><button onClick={() => void handleProgressSave()} disabled={saving} className="w-full rounded-2xl bg-[#276765] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? "Ukládám…" : "Potvrdit reflexi"}</button></Panel>
     </aside></div>
   </div></main>;
