@@ -80,7 +80,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Moje třída – AI pracovní prostor učitele" },
       {
         name: "description",
-        content: "Moje třída – bezpečný pracovní prostor pro plánování výuky, kurikulum, materiály a AI asistenci.",
+        content:
+          "Moje třída – bezpečný pracovní prostor pro plánování výuky, kurikulum, materiály a AI asistenci.",
       },
       { name: "author", content: "Moje třída" },
       { property: "og:title", content: "Moje třída" },

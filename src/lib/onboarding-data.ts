@@ -24,7 +24,9 @@ export async function completeFirstRun(input: OnboardingInput) {
   if (!user) throw new Error("Pro nastavení aplikace je potřeba být přihlášená.");
 
   if (displayName) {
-    const profile = await db.from("teacher_profiles").upsert({ user_id: user.id, display_name: displayName }, { onConflict: "user_id" });
+    const profile = await db
+      .from("teacher_profiles")
+      .upsert({ user_id: user.id, display_name: displayName }, { onConflict: "user_id" });
     if (profile.error) throw profile.error;
   }
 
@@ -37,15 +39,24 @@ export async function completeFirstRun(input: OnboardingInput) {
   if (tenant.error) throw tenant.error;
   const schoolId = String(tenant.data);
 
-  const year = await db.from("academic_years").select("id").eq("school_id", schoolId).eq("label", "2026/2027").single();
+  const year = await db
+    .from("academic_years")
+    .select("id")
+    .eq("school_id", schoolId)
+    .eq("label", "2026/2027")
+    .single();
   if (year.error) throw year.error;
 
-  const classInsert = await db.from("classes").insert({
-    school_id: schoolId,
-    academic_year_id: year.data.id,
-    name: className,
-    grade: 5,
-  }).select("id").single();
+  const classInsert = await db
+    .from("classes")
+    .insert({
+      school_id: schoolId,
+      academic_year_id: year.data.id,
+      name: className,
+      grade: 5,
+    })
+    .select("id")
+    .single();
   if (classInsert.error) throw classInsert.error;
 
   const membership = await db.from("class_memberships").insert({
@@ -56,16 +67,32 @@ export async function completeFirstRun(input: OnboardingInput) {
   if (membership.error) throw membership.error;
 
   if (input.isSpecialEducator) {
-    const grant = await db.rpc("grant_special_education_access", { p_school_id: schoolId, p_user_id: user.id, p_role: "special_educator" });
+    const grant = await db.rpc("grant_special_education_access", {
+      p_school_id: schoolId,
+      p_user_id: user.id,
+      p_role: "special_educator",
+    });
     if (grant.error) throw grant.error;
   }
 
   let artSubjectId: string | null = null;
   if (input.teachesArt) {
-    const subject = await db.from("curriculum_subjects").select("id").eq("code", "VFV").lte("grade_from", 5).gte("grade_to", 5).maybeSingle();
+    const subject = await db
+      .from("curriculum_subjects")
+      .select("id")
+      .eq("code", "VFV")
+      .lte("grade_from", 5)
+      .gte("grade_to", 5)
+      .maybeSingle();
     if (subject.error) throw subject.error;
     artSubjectId = subject.data?.id ?? null;
   }
 
-  return { schoolId, academicYearId: year.data.id as string, classId: classInsert.data.id as string, artSubjectId, specialEducationEnabled: input.isSpecialEducator };
+  return {
+    schoolId,
+    academicYearId: year.data.id as string,
+    classId: classInsert.data.id as string,
+    artSubjectId,
+    specialEducationEnabled: input.isSpecialEducator,
+  };
 }

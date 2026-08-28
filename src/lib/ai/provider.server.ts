@@ -60,6 +60,8 @@ export async function generateLessonAsset(
   return {
     title,
     content: content as Record<string, unknown>,
-    warnings: Array.isArray(warnings) ? warnings.filter((v): v is string => typeof v === "string") : [],
+    warnings: Array.isArray(warnings)
+      ? warnings.filter((v): v is string => typeof v === "string")
+      : [],
   };
 }

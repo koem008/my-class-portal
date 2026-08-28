@@ -28,27 +28,46 @@ export type TimetableSlot = {
   is_active: boolean;
 };
 
-export type CurriculumSubjectChoice = { id: string; code: string; name: string; curriculum_version_id: string };
+export type CurriculumSubjectChoice = {
+  id: string;
+  code: string;
+  name: string;
+  curriculum_version_id: string;
+};
 
 export async function loadAccessibleClasses(): Promise<AccessibleClass[]> {
-  const { data, error } = await db.from("classes").select("id,name,grade,school_id,academic_year_id").order("grade").order("name");
+  const { data, error } = await db
+    .from("classes")
+    .select("id,name,grade,school_id,academic_year_id")
+    .order("grade")
+    .order("name");
   if (error) throw error;
   return (data ?? []) as AccessibleClass[];
 }
 
 export async function loadTimetableSlots(classInfo: AccessibleClass): Promise<TimetableSlot[]> {
-  const { data, error } = await db.from("timetable_slots")
-    .select("id,school_id,class_id,academic_year_id,weekday,slot_order,starts_at,ends_at,subject_name,curriculum_subject_id,valid_from,valid_to,is_active")
-    .eq("class_id", classInfo.id).eq("academic_year_id", classInfo.academic_year_id).eq("is_active", true)
-    .order("weekday").order("slot_order");
+  const { data, error } = await db
+    .from("timetable_slots")
+    .select(
+      "id,school_id,class_id,academic_year_id,weekday,slot_order,starts_at,ends_at,subject_name,curriculum_subject_id,valid_from,valid_to,is_active",
+    )
+    .eq("class_id", classInfo.id)
+    .eq("academic_year_id", classInfo.academic_year_id)
+    .eq("is_active", true)
+    .order("weekday")
+    .order("slot_order");
   if (error) throw error;
   return (data ?? []) as TimetableSlot[];
 }
 
-export async function loadCurriculumSubjectChoices(grade: number): Promise<CurriculumSubjectChoice[]> {
-  const { data, error } = await db.from("curriculum_subjects")
+export async function loadCurriculumSubjectChoices(
+  grade: number,
+): Promise<CurriculumSubjectChoice[]> {
+  const { data, error } = await db
+    .from("curriculum_subjects")
     .select("id,code,name,curriculum_version_id")
-    .lte("grade_from", grade).gte("grade_to", grade)
+    .lte("grade_from", grade)
+    .gte("grade_to", grade)
     .order("name");
   if (error) throw error;
   const seen = new Set<string>();
@@ -62,18 +81,23 @@ export async function loadCurriculumSubjectChoices(grade: number): Promise<Curri
   return choices;
 }
 
-export async function saveTimetableSlot(classInfo: AccessibleClass, input: {
-  weekday: number;
-  slotOrder: number;
-  startsAt: string;
-  endsAt: string;
-  subjectName: string;
-  curriculumSubjectId?: string | null;
-}) {
+export async function saveTimetableSlot(
+  classInfo: AccessibleClass,
+  input: {
+    weekday: number;
+    slotOrder: number;
+    startsAt: string;
+    endsAt: string;
+    subjectName: string;
+    curriculumSubjectId?: string | null;
+  },
+) {
   if (input.weekday < 1 || input.weekday > 5) throw new Error("Vyberte pracovní den.");
-  if (input.slotOrder < 1 || input.slotOrder > 12) throw new Error("Pořadí hodiny musí být 1 až 12.");
+  if (input.slotOrder < 1 || input.slotOrder > 12)
+    throw new Error("Pořadí hodiny musí být 1 až 12.");
   if (!input.subjectName.trim()) throw new Error("Doplňte předmět.");
-  if (!input.startsAt || !input.endsAt || input.endsAt <= input.startsAt) throw new Error("Zkontrolujte čas hodiny.");
+  if (!input.startsAt || !input.endsAt || input.endsAt <= input.startsAt)
+    throw new Error("Zkontrolujte čas hodiny.");
 
   const payload = {
     school_id: classInfo.school_id,
@@ -90,7 +114,9 @@ export async function saveTimetableSlot(classInfo: AccessibleClass, input: {
     is_active: true,
     updated_at: new Date().toISOString(),
   };
-  const { error } = await db.from("timetable_slots").upsert(payload, { onConflict: "class_id,academic_year_id,weekday,slot_order" });
+  const { error } = await db
+    .from("timetable_slots")
+    .upsert(payload, { onConflict: "class_id,academic_year_id,weekday,slot_order" });
   if (error) throw error;
 }
 
@@ -99,18 +125,28 @@ export async function deleteTimetableSlot(slotId: string) {
   if (error) throw error;
 }
 
-export async function loadWeekLessons(classId: string, monday: string): Promise<{ lessons: LessonInstance[]; created: number }> {
+export async function loadWeekLessons(
+  classId: string,
+  monday: string,
+): Promise<{ lessons: LessonInstance[]; created: number }> {
   let created = 0;
-  const materialize = await db.rpc("materialize_lessons_for_week", { _class_id: classId, _week_start: monday });
+  const materialize = await db.rpc("materialize_lessons_for_week", {
+    _class_id: classId,
+    _week_start: monday,
+  });
   if (materialize.error) {
-    if (!String(materialize.error.message ?? "").includes("Teacher permission required")) throw materialize.error;
+    if (!String(materialize.error.message ?? "").includes("Teacher permission required"))
+      throw materialize.error;
   } else {
     created = Number(materialize.data ?? 0);
   }
 
   const end = addDays(monday, 4);
-  const { data, error } = await db.from("lesson_instances")
-    .select("id,school_id,class_id,academic_year_id,lesson_date,slot_order,starts_at,ends_at,subject_name,title,topic,status,curriculum_subject_id,curriculum_topic_id,teacher_note")
+  const { data, error } = await db
+    .from("lesson_instances")
+    .select(
+      "id,school_id,class_id,academic_year_id,lesson_date,slot_order,starts_at,ends_at,subject_name,title,topic,status,curriculum_subject_id,curriculum_topic_id,teacher_note",
+    )
     .eq("class_id", classId)
     .gte("lesson_date", monday)
     .lte("lesson_date", end)
@@ -134,7 +170,11 @@ export function addDays(iso: string, amount: number): string {
 }
 
 export function formatShortDay(iso: string): string {
-  return new Intl.DateTimeFormat("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" }).format(new Date(`${iso}T12:00:00`));
+  return new Intl.DateTimeFormat("cs-CZ", {
+    weekday: "short",
+    day: "numeric",
+    month: "numeric",
+  }).format(new Date(`${iso}T12:00:00`));
 }
 
 function isoDate(date: Date): string {

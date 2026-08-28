@@ -22,8 +22,18 @@ export type AssignedAlias = {
 
 export async function loadClassPseudonyms(classInfo: AccessibleClass) {
   const [catalogResult, assignedResult] = await Promise.all([
-    db.from("pseudonym_catalog").select("id,set_key,code,display_name,emoji,sort_order").eq("is_active", true).order("set_key").order("sort_order"),
-    db.from("student_aliases").select("id,alias,avatar_key,is_active").eq("class_id", classInfo.id).eq("is_active", true).order("alias"),
+    db
+      .from("pseudonym_catalog")
+      .select("id,set_key,code,display_name,emoji,sort_order")
+      .eq("is_active", true)
+      .order("set_key")
+      .order("sort_order"),
+    db
+      .from("student_aliases")
+      .select("id,alias,avatar_key,is_active")
+      .eq("class_id", classInfo.id)
+      .eq("is_active", true)
+      .order("alias"),
   ]);
   if (catalogResult.error) throw catalogResult.error;
   if (assignedResult.error) throw assignedResult.error;
@@ -34,11 +44,19 @@ export async function loadClassPseudonyms(classInfo: AccessibleClass) {
 }
 
 export async function assignPseudonym(classInfo: AccessibleClass, item: PseudonymCatalogItem) {
-  const existing = await db.from("student_aliases").select("id,is_active").eq("class_id", classInfo.id).eq("alias", item.display_name).maybeSingle();
+  const existing = await db
+    .from("student_aliases")
+    .select("id,is_active")
+    .eq("class_id", classInfo.id)
+    .eq("alias", item.display_name)
+    .maybeSingle();
   if (existing.error) throw existing.error;
   if (existing.data?.id) {
     if (existing.data.is_active) throw new Error("Tento pseudonym už je v této třídě obsazený.");
-    const { error } = await db.from("student_aliases").update({ is_active: true, avatar_key: item.code, updated_at: new Date().toISOString() }).eq("id", existing.data.id);
+    const { error } = await db
+      .from("student_aliases")
+      .update({ is_active: true, avatar_key: item.code, updated_at: new Date().toISOString() })
+      .eq("id", existing.data.id);
     if (error) throw error;
     return;
   }
@@ -53,6 +71,9 @@ export async function assignPseudonym(classInfo: AccessibleClass, item: Pseudony
 }
 
 export async function releasePseudonym(aliasId: string) {
-  const { error } = await db.from("student_aliases").update({ is_active: false, updated_at: new Date().toISOString() }).eq("id", aliasId);
+  const { error } = await db
+    .from("student_aliases")
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq("id", aliasId);
   if (error) throw error;
 }

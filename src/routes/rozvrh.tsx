@@ -1,59 +1,529 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Settings2, Trash2, X } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Settings2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { addDays, deleteTimetableSlot, formatShortDay, loadAccessibleClasses, loadCurriculumSubjectChoices, loadTimetableSlots, loadWeekLessons, mondayOf, saveTimetableSlot, type AccessibleClass, type CurriculumSubjectChoice, type TimetableSlot } from "@/lib/schedule-data";
+import {
+  addDays,
+  deleteTimetableSlot,
+  formatShortDay,
+  loadAccessibleClasses,
+  loadCurriculumSubjectChoices,
+  loadTimetableSlots,
+  loadWeekLessons,
+  mondayOf,
+  saveTimetableSlot,
+  type AccessibleClass,
+  type CurriculumSubjectChoice,
+  type TimetableSlot,
+} from "@/lib/schedule-data";
 import type { LessonInstance } from "@/lib/lesson-workspace-data";
 
 export const Route = createFileRoute("/rozvrh")({ component: SchedulePage });
-const dayLabels = ["Pondělí","Úterý","Středa","Čtvrtek","Pátek"];
+const dayLabels = ["Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek"];
 
 function SchedulePage() {
-  const [classes,setClasses]=useState<AccessibleClass[]>([]);
-  const [classId,setClassId]=useState("");
-  const [monday,setMonday]=useState(()=>mondayOf(new Date()));
-  const [lessons,setLessons]=useState<LessonInstance[]>([]);
-  const [slots,setSlots]=useState<TimetableSlot[]>([]);
-  const [subjectChoices,setSubjectChoices]=useState<CurriculumSubjectChoice[]>([]);
-  const [loading,setLoading]=useState(true);
-  const [error,setError]=useState("");
-  const [notice,setNotice]=useState("");
-  const [editor,setEditor]=useState(false);
-  const [weekday,setWeekday]=useState(1);
-  const [slotOrder,setSlotOrder]=useState(1);
-  const [startsAt,setStartsAt]=useState("08:00");
-  const [endsAt,setEndsAt]=useState("08:45");
-  const [subjectName,setSubjectName]=useState("");
-  const [curriculumSubjectId,setCurriculumSubjectId]=useState("");
-  const [saving,setSaving]=useState(false);
+  const [classes, setClasses] = useState<AccessibleClass[]>([]);
+  const [classId, setClassId] = useState("");
+  const [monday, setMonday] = useState(() => mondayOf(new Date()));
+  const [lessons, setLessons] = useState<LessonInstance[]>([]);
+  const [slots, setSlots] = useState<TimetableSlot[]>([]);
+  const [subjectChoices, setSubjectChoices] = useState<CurriculumSubjectChoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [editor, setEditor] = useState(false);
+  const [weekday, setWeekday] = useState(1);
+  const [slotOrder, setSlotOrder] = useState(1);
+  const [startsAt, setStartsAt] = useState("08:00");
+  const [endsAt, setEndsAt] = useState("08:45");
+  const [subjectName, setSubjectName] = useState("");
+  const [curriculumSubjectId, setCurriculumSubjectId] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  useEffect(()=>{let active=true;void loadAccessibleClasses().then(data=>{if(!active)return;setClasses(data);const preferred=data.find(c=>c.grade===5)??data[0];if(preferred)setClassId(preferred.id);else setLoading(false)}).catch(e=>{if(active){setError(e instanceof Error?e.message:"Třídy se nepodařilo načíst.");setLoading(false)}});return()=>{active=false}},[]);
-  useEffect(()=>{if(classId)void reload()},[classId,monday]);
+  useEffect(() => {
+    let active = true;
+    void loadAccessibleClasses()
+      .then((data) => {
+        if (!active) return;
+        setClasses(data);
+        const preferred = data.find((c) => c.grade === 5) ?? data[0];
+        if (preferred) setClassId(preferred.id);
+        else setLoading(false);
+      })
+      .catch((e) => {
+        if (active) {
+          setError(e instanceof Error ? e.message : "Třídy se nepodařilo načíst.");
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (classId) void reload();
+  }, [classId, monday]);
 
-  const selectedClass=classes.find(c=>c.id===classId)??null;
-  async function reload(){if(!selectedClass)return;setLoading(true);setError("");setNotice("");try{const [week,slotData,choices]=await Promise.all([loadWeekLessons(selectedClass.id,monday),loadTimetableSlots(selectedClass),loadCurriculumSubjectChoices(selectedClass.grade)]);setLessons(week.lessons);setSlots(slotData);setSubjectChoices(choices);if(week.created>0)setNotice(`Rozvrh vytvořil ${week.created} konkrétních hodin pro tento týden.`)}catch(e){setError(e instanceof Error?e.message:"Rozvrh se nepodařilo načíst.")}finally{setLoading(false)}}
+  const selectedClass = classes.find((c) => c.id === classId) ?? null;
+  async function reload() {
+    if (!selectedClass) return;
+    setLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      const [week, slotData, choices] = await Promise.all([
+        loadWeekLessons(selectedClass.id, monday),
+        loadTimetableSlots(selectedClass),
+        loadCurriculumSubjectChoices(selectedClass.grade),
+      ]);
+      setLessons(week.lessons);
+      setSlots(slotData);
+      setSubjectChoices(choices);
+      if (week.created > 0)
+        setNotice(`Rozvrh vytvořil ${week.created} konkrétních hodin pro tento týden.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rozvrh se nepodařilo načíst.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  function openNew(day=1){setWeekday(day);const existing=slots.filter(s=>s.weekday===day);setSlotOrder(existing.length?Math.max(...existing.map(s=>s.slot_order))+1:1);setStartsAt(existing.length?nextStart(existing[existing.length-1].ends_at):"08:00");setEndsAt(existing.length?nextEnd(existing[existing.length-1].ends_at):"08:45");setSubjectName("");setCurriculumSubjectId("");setEditor(true)}
-  function openSlot(slot:TimetableSlot){setWeekday(slot.weekday);setSlotOrder(slot.slot_order);setStartsAt(slot.starts_at.slice(0,5));setEndsAt(slot.ends_at.slice(0,5));setSubjectName(slot.subject_name);setCurriculumSubjectId(slot.curriculum_subject_id??"");setEditor(true)}
-  async function save(){if(!selectedClass)return;setSaving(true);setError("");try{await saveTimetableSlot(selectedClass,{weekday,slotOrder,startsAt,endsAt,subjectName,curriculumSubjectId:curriculumSubjectId||null});setEditor(false);await reload();setNotice("Pravidelná hodina je uložená. Konkrétní týdny se odteď vytvoří automaticky.")}catch(e){setError(e instanceof Error?e.message:"Hodinu se nepodařilo uložit.")}finally{setSaving(false)}}
-  async function remove(slotId:string){setSaving(true);setError("");try{await deleteTimetableSlot(slotId);await reload();setNotice("Pravidelná hodina byla odstraněná z rozvrhu.")}catch(e){setError(e instanceof Error?e.message:"Hodinu se nepodařilo odstranit.")}finally{setSaving(false)}}
-  const days=useMemo(()=>Array.from({length:5},(_,i)=>addDays(monday,i)),[monday]);
+  function openNew(day = 1) {
+    setWeekday(day);
+    const existing = slots.filter((s) => s.weekday === day);
+    setSlotOrder(existing.length ? Math.max(...existing.map((s) => s.slot_order)) + 1 : 1);
+    setStartsAt(existing.length ? nextStart(existing[existing.length - 1].ends_at) : "08:00");
+    setEndsAt(existing.length ? nextEnd(existing[existing.length - 1].ends_at) : "08:45");
+    setSubjectName("");
+    setCurriculumSubjectId("");
+    setEditor(true);
+  }
+  function openSlot(slot: TimetableSlot) {
+    setWeekday(slot.weekday);
+    setSlotOrder(slot.slot_order);
+    setStartsAt(slot.starts_at.slice(0, 5));
+    setEndsAt(slot.ends_at.slice(0, 5));
+    setSubjectName(slot.subject_name);
+    setCurriculumSubjectId(slot.curriculum_subject_id ?? "");
+    setEditor(true);
+  }
+  async function save() {
+    if (!selectedClass) return;
+    setSaving(true);
+    setError("");
+    try {
+      await saveTimetableSlot(selectedClass, {
+        weekday,
+        slotOrder,
+        startsAt,
+        endsAt,
+        subjectName,
+        curriculumSubjectId: curriculumSubjectId || null,
+      });
+      setEditor(false);
+      await reload();
+      setNotice("Pravidelná hodina je uložená. Konkrétní týdny se odteď vytvoří automaticky.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Hodinu se nepodařilo uložit.");
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function remove(slotId: string) {
+    setSaving(true);
+    setError("");
+    try {
+      await deleteTimetableSlot(slotId);
+      await reload();
+      setNotice("Pravidelná hodina byla odstraněná z rozvrhu.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Hodinu se nepodařilo odstranit.");
+    } finally {
+      setSaving(false);
+    }
+  }
+  const days = useMemo(() => Array.from({ length: 5 }, (_, i) => addDays(monday, i)), [monday]);
 
-  return <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#24343f] md:px-8 md:py-8"><div className="mx-auto max-w-[1500px]">
-    <header className="flex flex-wrap items-end justify-between gap-4"><div><Link to="/" className="text-xs font-bold text-[#39706a]">← Dnes</Link><div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf5f0] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#39706a]"><CalendarDays className="h-3.5 w-3.5"/>Skutečný rozvrh</div><h1 className="mt-3 text-3xl font-bold tracking-[-.03em]">Týden na jeden pohled</h1><p className="mt-1 text-sm text-[#7a8988]">Pravidelný rozvrh nastavíš jednou. Konkrétní hodiny pak vznikají automaticky a respektují kalendář.</p></div><div className="flex flex-wrap items-center gap-2">{classes.length>1&&<select value={classId} onChange={e=>setClassId(e.target.value)} className="rounded-2xl border border-[#e5e1d8] bg-white px-3 py-2.5 text-sm font-semibold">{classes.map(c=><option key={c.id} value={c.id}>{c.name} · {c.grade}. ročník</option>)}</select>}<button onClick={()=>openNew(1)} disabled={!selectedClass} className="inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"><Plus className="h-4 w-4"/>Přidat hodinu</button><button onClick={()=>void reload()} className="grid h-10 w-10 place-items-center rounded-2xl border border-[#e5e1d8] bg-white"><RefreshCw className="h-4 w-4"/></button></div></header>
-    {notice&&<div className="mt-4 rounded-2xl border border-[#d8e9e2] bg-[#eef8f3] px-4 py-3 text-sm text-[#356862]">{notice}</div>}{error&&<div className="mt-4 rounded-2xl border border-[#efd9d7] bg-[#fff4f2] px-4 py-3 text-sm text-[#955b58]">{error}</div>}
+  return (
+    <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#24343f] md:px-8 md:py-8">
+      <div className="mx-auto max-w-[1500px]">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <Link to="/" className="text-xs font-bold text-[#39706a]">
+              ← Dnes
+            </Link>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf5f0] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#39706a]">
+              <CalendarDays className="h-3.5 w-3.5" />
+              Skutečný rozvrh
+            </div>
+            <h1 className="mt-3 text-3xl font-bold tracking-[-.03em]">Týden na jeden pohled</h1>
+            <p className="mt-1 text-sm text-[#7a8988]">
+              Pravidelný rozvrh nastavíš jednou. Konkrétní hodiny pak vznikají automaticky a
+              respektují kalendář.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {classes.length > 1 && (
+              <select
+                value={classId}
+                onChange={(e) => setClassId(e.target.value)}
+                className="rounded-2xl border border-[#e5e1d8] bg-white px-3 py-2.5 text-sm font-semibold"
+              >
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {c.grade}. ročník
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={() => openNew(1)}
+              disabled={!selectedClass}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+            >
+              <Plus className="h-4 w-4" />
+              Přidat hodinu
+            </button>
+            <button
+              onClick={() => void reload()}
+              className="grid h-10 w-10 place-items-center rounded-2xl border border-[#e5e1d8] bg-white"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+        </header>
+        {notice && (
+          <div className="mt-4 rounded-2xl border border-[#d8e9e2] bg-[#eef8f3] px-4 py-3 text-sm text-[#356862]">
+            {notice}
+          </div>
+        )}
+        {error && (
+          <div className="mt-4 rounded-2xl border border-[#efd9d7] bg-[#fff4f2] px-4 py-3 text-sm text-[#955b58]">
+            {error}
+          </div>
+        )}
 
-    {classes.length===0&&!loading?<div className="mt-12 rounded-[28px] border border-dashed border-[#ddd8cf] bg-white p-8 text-center"><h2 className="font-bold">Zatím není nastavená třída</h2><p className="mt-2 text-sm text-[#7e8b89]">Začni krátkým prvním nastavením.</p><Link to="/zacatek" className="mt-4 inline-flex rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white">Nastavit třídu</Link></div>:<>
-      <section className="mt-6 rounded-[28px] border border-[#e9e5dd] bg-white p-5"><div className="flex items-center justify-between"><div><div className="flex items-center gap-2 font-bold"><Settings2 className="h-5 w-5 text-[#49736f]"/>Pravidelný rozvrh</div><p className="mt-1 text-xs text-[#83908e]">Toto je zdroj pro automatické vytváření jednotlivých školních dnů.</p></div><span className="rounded-full bg-[#eef7f3] px-3 py-1.5 text-xs font-bold text-[#39736a]">{slots.length} hodin týdně</span></div>{loading?<div className="mt-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin"/></div>:slots.length===0?<div className="mt-5 rounded-2xl border border-dashed border-[#ddd8cf] bg-[#fcfbf8] p-6 text-center"><h3 className="font-bold">Rozvrh je zatím prázdný</h3><p className="mt-2 text-sm text-[#7c8988]">Přidej první hodinu. Nic se nebude domýšlet.</p><button onClick={()=>openNew(1)} className="mt-4 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white">Přidat první hodinu</button></div>:<div className="mt-5 grid gap-3 md:grid-cols-5">{dayLabels.map((label,index)=>{const day=index+1;const daySlots=slots.filter(s=>s.weekday===day);return <div key={day} className="rounded-[22px] bg-[#fbfaf7] p-3"><div className="flex items-center justify-between"><div className="text-sm font-bold">{label}</div><button onClick={()=>openNew(day)} className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#276765]"><Plus className="h-3.5 w-3.5"/></button></div><div className="mt-3 space-y-2">{daySlots.map(slot=><div key={slot.id} className="rounded-2xl border border-[#e8e4dc] bg-white p-3"><button onClick={()=>openSlot(slot)} className="w-full text-left"><div className="flex items-center justify-between"><span className="text-xs font-bold text-[#607573]">{slot.slot_order}. hodina</span><span className="text-[10px] text-[#8e9997]">{slot.starts_at.slice(0,5)}–{slot.ends_at.slice(0,5)}</span></div><div className="mt-1.5 text-sm font-bold">{slot.subject_name}</div>{slot.curriculum_subject_id&&<div className="mt-1 text-[10px] font-semibold text-[#4f7a73]">Napojeno na kurikulum</div>}</button><button disabled={saving} onClick={()=>void remove(slot.id)} className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-[#9a6d67]"><Trash2 className="h-3 w-3"/>Odebrat</button></div>)}{!daySlots.length&&<div className="rounded-xl border border-dashed border-[#ddd9d0] p-3 text-center text-[11px] text-[#949d9b]">Bez hodin</div>}</div></div>})}</div>}</section>
+        {classes.length === 0 && !loading ? (
+          <div className="mt-12 rounded-[28px] border border-dashed border-[#ddd8cf] bg-white p-8 text-center">
+            <h2 className="font-bold">Zatím není nastavená třída</h2>
+            <p className="mt-2 text-sm text-[#7e8b89]">Začni krátkým prvním nastavením.</p>
+            <Link
+              to="/zacatek"
+              className="mt-4 inline-flex rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white"
+            >
+              Nastavit třídu
+            </Link>
+          </div>
+        ) : (
+          <>
+            <section className="mt-6 rounded-[28px] border border-[#e9e5dd] bg-white p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 font-bold">
+                    <Settings2 className="h-5 w-5 text-[#49736f]" />
+                    Pravidelný rozvrh
+                  </div>
+                  <p className="mt-1 text-xs text-[#83908e]">
+                    Toto je zdroj pro automatické vytváření jednotlivých školních dnů.
+                  </p>
+                </div>
+                <span className="rounded-full bg-[#eef7f3] px-3 py-1.5 text-xs font-bold text-[#39736a]">
+                  {slots.length} hodin týdně
+                </span>
+              </div>
+              {loading ? (
+                <div className="mt-6 flex justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : slots.length === 0 ? (
+                <div className="mt-5 rounded-2xl border border-dashed border-[#ddd8cf] bg-[#fcfbf8] p-6 text-center">
+                  <h3 className="font-bold">Rozvrh je zatím prázdný</h3>
+                  <p className="mt-2 text-sm text-[#7c8988]">
+                    Přidej první hodinu. Nic se nebude domýšlet.
+                  </p>
+                  <button
+                    onClick={() => openNew(1)}
+                    className="mt-4 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white"
+                  >
+                    Přidat první hodinu
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-5 grid gap-3 md:grid-cols-5">
+                  {dayLabels.map((label, index) => {
+                    const day = index + 1;
+                    const daySlots = slots.filter((s) => s.weekday === day);
+                    return (
+                      <div key={day} className="rounded-[22px] bg-[#fbfaf7] p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-bold">{label}</div>
+                          <button
+                            onClick={() => openNew(day)}
+                            className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#276765]"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {daySlots.map((slot) => (
+                            <div
+                              key={slot.id}
+                              className="rounded-2xl border border-[#e8e4dc] bg-white p-3"
+                            >
+                              <button onClick={() => openSlot(slot)} className="w-full text-left">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-[#607573]">
+                                    {slot.slot_order}. hodina
+                                  </span>
+                                  <span className="text-[10px] text-[#8e9997]">
+                                    {slot.starts_at.slice(0, 5)}–{slot.ends_at.slice(0, 5)}
+                                  </span>
+                                </div>
+                                <div className="mt-1.5 text-sm font-bold">{slot.subject_name}</div>
+                                {slot.curriculum_subject_id && (
+                                  <div className="mt-1 text-[10px] font-semibold text-[#4f7a73]">
+                                    Napojeno na kurikulum
+                                  </div>
+                                )}
+                              </button>
+                              <button
+                                disabled={saving}
+                                onClick={() => void remove(slot.id)}
+                                className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-[#9a6d67]"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Odebrat
+                              </button>
+                            </div>
+                          ))}
+                          {!daySlots.length && (
+                            <div className="rounded-xl border border-dashed border-[#ddd9d0] p-3 text-center text-[11px] text-[#949d9b]">
+                              Bez hodin
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
-      <div className="mt-6 flex items-center justify-between rounded-[22px] border border-[#e9e5dc] bg-white px-3 py-2.5"><button onClick={()=>setMonday(addDays(monday,-7))} className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold"><ChevronLeft className="h-4 w-4"/>Předchozí</button><div className="text-center"><div className="text-xs text-[#8a9695]">{selectedClass?.name??"Třída"}</div><div className="text-sm font-bold">{formatShortDay(monday)} – {formatShortDay(addDays(monday,4))}</div></div><button onClick={()=>setMonday(addDays(monday,7))} className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold">Další<ChevronRight className="h-4 w-4"/></button></div>
-      {loading?<div className="mt-12 flex justify-center gap-2 text-sm text-[#7d8988]"><Loader2 className="h-5 w-5 animate-spin"/>Načítám týden…</div>:<div className="mt-5 grid gap-3 xl:grid-cols-5">{days.map((day,index)=><DayColumn key={day} date={day} label={dayLabels[index]} lessons={lessons.filter(l=>l.lesson_date===day)}/>)}</div>}
-    </>}
+            <div className="mt-6 flex items-center justify-between rounded-[22px] border border-[#e9e5dc] bg-white px-3 py-2.5">
+              <button
+                onClick={() => setMonday(addDays(monday, -7))}
+                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Předchozí
+              </button>
+              <div className="text-center">
+                <div className="text-xs text-[#8a9695]">{selectedClass?.name ?? "Třída"}</div>
+                <div className="text-sm font-bold">
+                  {formatShortDay(monday)} – {formatShortDay(addDays(monday, 4))}
+                </div>
+              </div>
+              <button
+                onClick={() => setMonday(addDays(monday, 7))}
+                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold"
+              >
+                Další
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            {loading ? (
+              <div className="mt-12 flex justify-center gap-2 text-sm text-[#7d8988]">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Načítám týden…
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-3 xl:grid-cols-5">
+                {days.map((day, index) => (
+                  <DayColumn
+                    key={day}
+                    date={day}
+                    label={dayLabels[index]}
+                    lessons={lessons.filter((l) => l.lesson_date === day)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
 
-    {editor&&<div className="fixed inset-0 z-50 grid place-items-center bg-[#25312d]/35 p-4 backdrop-blur-sm"><div className="w-full max-w-lg rounded-[30px] bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><div><div className="text-xs font-bold uppercase tracking-[.14em] text-[#5f817d]">Pravidelný rozvrh</div><h2 className="mt-1 text-xl font-bold">Nastavit hodinu</h2></div><button onClick={()=>setEditor(false)} className="rounded-xl p-2"><X className="h-5 w-5"/></button></div><div className="mt-5 grid gap-4"><label className="text-xs font-bold">Den<select value={weekday} onChange={e=>setWeekday(Number(e.target.value))} className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal">{dayLabels.map((d,i)=><option key={d} value={i+1}>{d}</option>)}</select></label><label className="text-xs font-bold">Pořadí hodiny<input type="number" min={1} max={12} value={slotOrder} onChange={e=>setSlotOrder(Number(e.target.value))} className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal"/></label><div className="grid grid-cols-2 gap-3"><Field label="Začátek" value={startsAt} onChange={setStartsAt} type="time"/><Field label="Konec" value={endsAt} onChange={setEndsAt} type="time"/></div><label className="text-xs font-bold">Kurikulární předmět<select value={curriculumSubjectId} onChange={e=>{const id=e.target.value;setCurriculumSubjectId(id);const found=subjectChoices.find(s=>s.id===id);if(found)setSubjectName(found.name)}} className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal"><option value="">Bez napojení / vlastní název</option>{subjectChoices.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><Field label="Název předmětu" value={subjectName} onChange={setSubjectName}/></div><div className="mt-6 flex justify-end gap-2"><button onClick={()=>setEditor(false)} className="rounded-2xl px-4 py-2.5 text-sm font-bold text-[#788583]">Zrušit</button><button disabled={saving||!subjectName.trim()} onClick={()=>void save()} className="rounded-2xl bg-[#276765] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40">{saving?"Ukládám…":"Uložit hodinu"}</button></div></div></div>}
-  </div></main>;
+        {editor && (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-[#25312d]/35 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-[30px] bg-white p-6 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-[.14em] text-[#5f817d]">
+                    Pravidelný rozvrh
+                  </div>
+                  <h2 className="mt-1 text-xl font-bold">Nastavit hodinu</h2>
+                </div>
+                <button onClick={() => setEditor(false)} className="rounded-xl p-2">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="mt-5 grid gap-4">
+                <label className="text-xs font-bold">
+                  Den
+                  <select
+                    value={weekday}
+                    onChange={(e) => setWeekday(Number(e.target.value))}
+                    className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal"
+                  >
+                    {dayLabels.map((d, i) => (
+                      <option key={d} value={i + 1}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-bold">
+                  Pořadí hodiny
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={slotOrder}
+                    onChange={(e) => setSlotOrder(Number(e.target.value))}
+                    className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Začátek" value={startsAt} onChange={setStartsAt} type="time" />
+                  <Field label="Konec" value={endsAt} onChange={setEndsAt} type="time" />
+                </div>
+                <label className="text-xs font-bold">
+                  Kurikulární předmět
+                  <select
+                    value={curriculumSubjectId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setCurriculumSubjectId(id);
+                      const found = subjectChoices.find((s) => s.id === id);
+                      if (found) setSubjectName(found.name);
+                    }}
+                    className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal"
+                  >
+                    <option value="">Bez napojení / vlastní název</option>
+                    {subjectChoices.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Field label="Název předmětu" value={subjectName} onChange={setSubjectName} />
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setEditor(false)}
+                  className="rounded-2xl px-4 py-2.5 text-sm font-bold text-[#788583]"
+                >
+                  Zrušit
+                </button>
+                <button
+                  disabled={saving || !subjectName.trim()}
+                  onClick={() => void save()}
+                  className="rounded-2xl bg-[#276765] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+                >
+                  {saving ? "Ukládám…" : "Uložit hodinu"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
 }
 
-function DayColumn({date,label,lessons}:{date:string;label:string;lessons:LessonInstance[]}){return <section className="min-h-[300px] rounded-[26px] border border-[#e9e5dd] bg-white p-3.5"><div className="text-sm font-bold">{label}</div><div className="mt-0.5 text-xs text-[#8a9695]">{formatShortDay(date)}</div><div className="mt-3 space-y-2.5">{lessons.map(l=><Link key={l.id} to="/hodina/$lessonId" params={{lessonId:l.id}} className="block rounded-[20px] border border-[#ece7de] bg-gradient-to-br from-[#fffefa] to-[#f4faf7] p-3.5"><div className="flex justify-between gap-2"><div className="text-sm font-bold">{l.subject_name}</div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold">{l.status}</span></div><p className="mt-1.5 text-xs text-[#71817f]">{l.topic||l.title||"Téma zatím není doplněné"}</p><div className="mt-2 text-[11px] text-[#95a09e]">{l.starts_at?.slice(0,5)??"—"}–{l.ends_at?.slice(0,5)??"—"}</div></Link>)}{!lessons.length&&<div className="rounded-2xl border border-dashed border-[#ddd9d0] px-3 py-5 text-center text-xs text-[#8b9695]">Bez výuky</div>}</div></section>}
-function Field({label,value,onChange,type="text"}:{label:string;value:string;onChange:(s:string)=>void;type?:string}){return <label className="text-xs font-bold">{label}<input type={type} value={value} onChange={e=>onChange(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal"/></label>}
-function nextStart(end:string){const [h,m]=end.slice(0,5).split(":").map(Number);const d=new Date(2000,0,1,h,m+10);return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
-function nextEnd(end:string){const s=nextStart(end);const [h,m]=s.split(":").map(Number);const d=new Date(2000,0,1,h,m+45);return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
+function DayColumn({
+  date,
+  label,
+  lessons,
+}: {
+  date: string;
+  label: string;
+  lessons: LessonInstance[];
+}) {
+  return (
+    <section className="min-h-[300px] rounded-[26px] border border-[#e9e5dd] bg-white p-3.5">
+      <div className="text-sm font-bold">{label}</div>
+      <div className="mt-0.5 text-xs text-[#8a9695]">{formatShortDay(date)}</div>
+      <div className="mt-3 space-y-2.5">
+        {lessons.map((l) => (
+          <Link
+            key={l.id}
+            to="/hodina/$lessonId"
+            params={{ lessonId: l.id }}
+            className="block rounded-[20px] border border-[#ece7de] bg-gradient-to-br from-[#fffefa] to-[#f4faf7] p-3.5"
+          >
+            <div className="flex justify-between gap-2">
+              <div className="text-sm font-bold">{l.subject_name}</div>
+              <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold">
+                {l.status}
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs text-[#71817f]">
+              {l.topic || l.title || "Téma zatím není doplněné"}
+            </p>
+            <div className="mt-2 text-[11px] text-[#95a09e]">
+              {l.starts_at?.slice(0, 5) ?? "—"}–{l.ends_at?.slice(0, 5) ?? "—"}
+            </div>
+          </Link>
+        ))}
+        {!lessons.length && (
+          <div className="rounded-2xl border border-dashed border-[#ddd9d0] px-3 py-5 text-center text-xs text-[#8b9695]">
+            Bez výuky
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (s: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="text-xs font-bold">
+      {label}
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal"
+      />
+    </label>
+  );
+}
+function nextStart(end: string) {
+  const [h, m] = end.slice(0, 5).split(":").map(Number);
+  const d = new Date(2000, 0, 1, h, m + 10);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function nextEnd(end: string) {
+  const s = nextStart(end);
+  const [h, m] = s.split(":").map(Number);
+  const d = new Date(2000, 0, 1, h, m + 45);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}

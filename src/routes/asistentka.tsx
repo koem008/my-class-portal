@@ -1,7 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertCircle, Brain, CalendarDays, CheckCircle2, ChevronRight, Clock3, Heart, Loader2, Mic, MoonStar, Settings2, Sparkles, SunMedium, WandSparkles } from "lucide-react";
+import {
+  AlertCircle,
+  Brain,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  Heart,
+  Loader2,
+  Mic,
+  MoonStar,
+  Settings2,
+  Sparkles,
+  SunMedium,
+  WandSparkles,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { buildMorningMessage, loadDailyBriefing, type DailyBriefing } from "@/lib/daily-briefing-data";
+import {
+  buildMorningMessage,
+  loadDailyBriefing,
+  type DailyBriefing,
+} from "@/lib/daily-briefing-data";
 import { loadAccessibleClasses, loadWeekLessons, mondayOf } from "@/lib/schedule-data";
 import { loadSpecialAttention, type SpecialAttentionItem } from "@/lib/special-education-data";
 
@@ -14,52 +33,426 @@ function AssistantPage() {
   const [listening, setListening] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
-  const [specialAttention,setSpecialAttention]=useState<SpecialAttentionItem[]>([]);
+  const [specialAttention, setSpecialAttention] = useState<SpecialAttentionItem[]>([]);
   const [error, setError] = useState("");
   const now = useMemo(() => new Date(), []);
-  const todayIso = useMemo(() => `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`, [now]);
-  const today = useMemo(() => new Intl.DateTimeFormat("cs-CZ", { weekday: "long", day: "numeric", month: "long" }).format(now), [now]);
+  const todayIso = useMemo(
+    () =>
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+    [now],
+  );
+  const today = useMemo(
+    () =>
+      new Intl.DateTimeFormat("cs-CZ", { weekday: "long", day: "numeric", month: "long" }).format(
+        now,
+      ),
+    [now],
+  );
 
   async function reload() {
-    setLoadState("loading"); setError("");
+    setLoadState("loading");
+    setError("");
     try {
-      const specialPromise=loadSpecialAttention().catch(()=>[] as SpecialAttentionItem[]);
+      const specialPromise = loadSpecialAttention().catch(() => [] as SpecialAttentionItem[]);
       const classes = await loadAccessibleClasses();
-      if (!classes.length) { setSpecialAttention(await specialPromise); setLoadState("empty"); setBriefing(null); return; }
+      if (!classes.length) {
+        setSpecialAttention(await specialPromise);
+        setLoadState("empty");
+        setBriefing(null);
+        return;
+      }
       const selectedClass = classes[0];
       await loadWeekLessons(selectedClass.id, mondayOf(now));
-      const [data,special]=await Promise.all([loadDailyBriefing(selectedClass, todayIso),specialPromise]);
-      setBriefing(data);setSpecialAttention(special);setLoadState("ready");
-    } catch (e) { setError(e instanceof Error ? e.message : "Ranní přehled se nepodařilo načíst."); setLoadState("error"); }
+      const [data, special] = await Promise.all([
+        loadDailyBriefing(selectedClass, todayIso),
+        specialPromise,
+      ]);
+      setBriefing(data);
+      setSpecialAttention(special);
+      setLoadState("ready");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ranní přehled se nepodařilo načíst.");
+      setLoadState("error");
+    }
   }
-  useEffect(() => { void reload(); }, []);
+  useEffect(() => {
+    void reload();
+  }, []);
 
   const message = briefing ? buildMorningMessage(briefing) : "Dobré ráno.";
 
-  return <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#24343f] md:px-8 md:py-8"><div className="mx-auto max-w-6xl">
-    <header className="flex flex-wrap items-center justify-between gap-3"><div><Link to="/" className="text-xs font-semibold text-[#4e7772]">← Moje třída</Link><h1 className="mt-2 text-3xl font-bold tracking-[-.03em]">Moje asistentka</h1><p className="mt-1 text-sm capitalize text-[#82908f]">{today}</p></div><div className="flex rounded-2xl border border-[#e8e4dc] bg-white p-1">{(["Přátelská","Klidná","Efektivní"] as Tone[]).map(x=><button key={x} onClick={()=>setTone(x)} className={`rounded-xl px-3 py-2 text-xs font-semibold ${tone===x?"bg-[#e8f4ef] text-[#276765]":"text-[#7d898a]"}`}>{x}</button>)}</div></header>
+  return (
+    <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#24343f] md:px-8 md:py-8">
+      <div className="mx-auto max-w-6xl">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <Link to="/" className="text-xs font-semibold text-[#4e7772]">
+              ← Moje třída
+            </Link>
+            <h1 className="mt-2 text-3xl font-bold tracking-[-.03em]">Moje asistentka</h1>
+            <p className="mt-1 text-sm capitalize text-[#82908f]">{today}</p>
+          </div>
+          <div className="flex rounded-2xl border border-[#e8e4dc] bg-white p-1">
+            {(["Přátelská", "Klidná", "Efektivní"] as Tone[]).map((x) => (
+              <button
+                key={x}
+                onClick={() => setTone(x)}
+                className={`rounded-xl px-3 py-2 text-xs font-semibold ${tone === x ? "bg-[#e8f4ef] text-[#276765]" : "text-[#7d898a]"}`}
+              >
+                {x}
+              </button>
+            ))}
+          </div>
+        </header>
 
-    <section className="mt-6 rounded-[34px] border border-[#e8e3d9] bg-gradient-to-br from-white via-[#fffaf2] to-[#eaf6f0] p-6 shadow-[0_22px_70px_rgba(66,82,73,.1)] md:p-9">
-      {loadState==="loading" ? <div className="flex items-center gap-3 text-[#607572]"><Loader2 className="h-5 w-5 animate-spin"/>Skládám dnešní přehled ze skutečných dat…</div> : loadState==="error" ? <div className="flex items-start gap-3"><AlertCircle className="mt-0.5 h-5 w-5 text-[#b56562]"/><div><div className="font-bold">Dnešní přehled se nepodařilo načíst.</div><p className="mt-1 text-sm text-[#778685]">{error}</p><button onClick={()=>void reload()} className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#276765]">Zkusit znovu</button></div></div> : loadState==="empty" ? <div><div className="text-xs font-bold uppercase tracking-[.16em] text-[#5b817c]">Ranní briefing</div><h2 className="mt-2 text-2xl font-bold">Dobré ráno.</h2><p className="mt-3 text-sm leading-6 text-[#627477]">Zatím nemáš přiřazenou žádnou třídu. Jakmile ji nastavíš, tady se automaticky objeví skutečný rozvrh, události a návaznosti.</p><Link to="/zacatek" className="mt-4 inline-flex rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#276765] shadow-sm">Nastavit první pracovní prostor</Link></div> : briefing && <>
-        <div className="flex items-start gap-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-[#276765] text-white"><Sparkles className="h-6 w-6"/></div><div><div className="text-xs font-bold uppercase tracking-[.16em] text-[#5b817c]">Ranní briefing · {briefing.classInfo.name}</div><h2 className="mt-2 text-2xl font-bold">{message}</h2>{briefing.events.length>0&&<p className="mt-3 text-sm leading-6 text-[#627477]">Dnes eviduji také {briefing.events.length} {briefing.events.length===1?"událost":"události"}. {briefing.blocked ? "Některá z nich ovlivňuje běžnou výuku." : "Žádná z nich neblokuje celý školní den."}</p>}</div></div>
-        <div className="mt-6 grid gap-3 md:grid-cols-3"><Brief icon={CalendarDays} title="Dnešní plán" text={briefing.lessons.length ? `${briefing.lessons.length} hodin v rozvrhu` : "Bez běžných hodin"}/><Brief icon={CheckCircle2} title="Připraveno" text={briefing.lessons.length ? `${briefing.readyCount} z ${briefing.lessons.length} hodin má přípravu` : "Dnes není co připravovat"}/><Brief icon={Clock3} title="Návaznosti" text={briefing.carryOvers.length ? `${briefing.carryOvers.length} věcí z předchozí výuky` : "Bez nedodělků"}/></div>
-      </>}
-    </section>
+        <section className="mt-6 rounded-[34px] border border-[#e8e3d9] bg-gradient-to-br from-white via-[#fffaf2] to-[#eaf6f0] p-6 shadow-[0_22px_70px_rgba(66,82,73,.1)] md:p-9">
+          {loadState === "loading" ? (
+            <div className="flex items-center gap-3 text-[#607572]">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Skládám dnešní přehled ze skutečných dat…
+            </div>
+          ) : loadState === "error" ? (
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 text-[#b56562]" />
+              <div>
+                <div className="font-bold">Dnešní přehled se nepodařilo načíst.</div>
+                <p className="mt-1 text-sm text-[#778685]">{error}</p>
+                <button
+                  onClick={() => void reload()}
+                  className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#276765]"
+                >
+                  Zkusit znovu
+                </button>
+              </div>
+            </div>
+          ) : loadState === "empty" ? (
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[.16em] text-[#5b817c]">
+                Ranní briefing
+              </div>
+              <h2 className="mt-2 text-2xl font-bold">Dobré ráno.</h2>
+              <p className="mt-3 text-sm leading-6 text-[#627477]">
+                Zatím nemáš přiřazenou žádnou třídu. Jakmile ji nastavíš, tady se automaticky objeví
+                skutečný rozvrh, události a návaznosti.
+              </p>
+              <Link
+                to="/zacatek"
+                className="mt-4 inline-flex rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#276765] shadow-sm"
+              >
+                Nastavit první pracovní prostor
+              </Link>
+            </div>
+          ) : (
+            briefing && (
+              <>
+                <div className="flex items-start gap-4">
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-[#276765] text-white">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-[.16em] text-[#5b817c]">
+                      Ranní briefing · {briefing.classInfo.name}
+                    </div>
+                    <h2 className="mt-2 text-2xl font-bold">{message}</h2>
+                    {briefing.events.length > 0 && (
+                      <p className="mt-3 text-sm leading-6 text-[#627477]">
+                        Dnes eviduji také {briefing.events.length}{" "}
+                        {briefing.events.length === 1 ? "událost" : "události"}.{" "}
+                        {briefing.blocked
+                          ? "Některá z nich ovlivňuje běžnou výuku."
+                          : "Žádná z nich neblokuje celý školní den."}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  <Brief
+                    icon={CalendarDays}
+                    title="Dnešní plán"
+                    text={
+                      briefing.lessons.length
+                        ? `${briefing.lessons.length} hodin v rozvrhu`
+                        : "Bez běžných hodin"
+                    }
+                  />
+                  <Brief
+                    icon={CheckCircle2}
+                    title="Připraveno"
+                    text={
+                      briefing.lessons.length
+                        ? `${briefing.readyCount} z ${briefing.lessons.length} hodin má přípravu`
+                        : "Dnes není co připravovat"
+                    }
+                  />
+                  <Brief
+                    icon={Clock3}
+                    title="Návaznosti"
+                    text={
+                      briefing.carryOvers.length
+                        ? `${briefing.carryOvers.length} věcí z předchozí výuky`
+                        : "Bez nedodělků"
+                    }
+                  />
+                </div>
+              </>
+            )
+          )}
+        </section>
 
-    {briefing && briefing.recommendedActions.length>0 && <section className="mt-5 rounded-[30px] border border-[#e8e3d9] bg-white p-5 shadow-sm md:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#f1ecff] text-[#6f5da8]"><WandSparkles className="h-5 w-5"/></div><div><h2 className="font-bold">Co bych udělala teď</h2><p className="mt-1 text-xs text-[#83908f]">Návrhy skládám ze skutečného rozvrhu a reflexí. Bez AI nákladů.</p></div></div><div className="mt-4 grid gap-2 md:grid-cols-2">{briefing.recommendedActions.slice(0,6).map(a=> a.kind==="art_studio" ? <Link key={a.id} to="/vytvarna-vychova" className="group flex items-center justify-between rounded-2xl border border-[#ece8df] bg-[#fffaf4] p-4 hover:border-[#e4d6c5]"><div><div className="text-sm font-bold">{a.title}</div><div className="mt-1 text-xs text-[#7a8887]">{a.detail}</div></div><ChevronRight className="h-4 w-4 text-[#9a8d80] transition group-hover:translate-x-0.5"/></Link> : <Link key={a.id} to="/hodina/$lessonId" params={{lessonId:a.lessonId!}} className="group flex items-center justify-between rounded-2xl border border-[#ece8df] bg-[#fbfdfb] p-4 hover:border-[#d9e7df]"><div><div className="text-sm font-bold">{a.title}</div><div className="mt-1 text-xs text-[#7a8887]">{a.detail}</div></div><ChevronRight className="h-4 w-4 text-[#7f918b] transition group-hover:translate-x-0.5"/></Link>)}</div></section>}
+        {briefing && briefing.recommendedActions.length > 0 && (
+          <section className="mt-5 rounded-[30px] border border-[#e8e3d9] bg-white p-5 shadow-sm md:p-6">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#f1ecff] text-[#6f5da8]">
+                <WandSparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-bold">Co bych udělala teď</h2>
+                <p className="mt-1 text-xs text-[#83908f]">
+                  Návrhy skládám ze skutečného rozvrhu a reflexí. Bez AI nákladů.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              {briefing.recommendedActions.slice(0, 6).map((a) =>
+                a.kind === "art_studio" ? (
+                  <Link
+                    key={a.id}
+                    to="/vytvarna-vychova"
+                    className="group flex items-center justify-between rounded-2xl border border-[#ece8df] bg-[#fffaf4] p-4 hover:border-[#e4d6c5]"
+                  >
+                    <div>
+                      <div className="text-sm font-bold">{a.title}</div>
+                      <div className="mt-1 text-xs text-[#7a8887]">{a.detail}</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-[#9a8d80] transition group-hover:translate-x-0.5" />
+                  </Link>
+                ) : (
+                  <Link
+                    key={a.id}
+                    to="/hodina/$lessonId"
+                    params={{ lessonId: a.lessonId! }}
+                    className="group flex items-center justify-between rounded-2xl border border-[#ece8df] bg-[#fbfdfb] p-4 hover:border-[#d9e7df]"
+                  >
+                    <div>
+                      <div className="text-sm font-bold">{a.title}</div>
+                      <div className="mt-1 text-xs text-[#7a8887]">{a.detail}</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-[#7f918b] transition group-hover:translate-x-0.5" />
+                  </Link>
+                ),
+              )}
+            </div>
+          </section>
+        )}
 
-    {specialAttention.length>0&&<section className="mt-5 rounded-[30px] border border-violet-100 bg-white p-5 shadow-sm md:p-6"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700"><Brain className="h-5 w-5"/></div><div><h2 className="font-bold">Speciální pedagogika — potřebuje pozornost</h2><p className="mt-1 text-xs text-[#83908f]">Jen termíny a pseudonymy, ke kterým máš výslovné oprávnění.</p></div></div><div className="mt-4 grid gap-2 md:grid-cols-2">{specialAttention.slice(0,6).map(item=><Link key={item.id} to="/specialni-pedagogika/$caseId" params={{caseId:item.caseId}} className={`group flex items-center justify-between rounded-2xl border p-4 ${item.overdue?"border-rose-100 bg-rose-50/60":"border-violet-100 bg-violet-50/40"}`}><div><div className="text-sm font-bold">{item.alias}{item.overdue?" · po termínu":""}</div><div className="mt-1 text-xs text-[#6e7775]">{item.note}</div><div className="mt-2 text-[11px] font-semibold text-violet-700">Kontrola {new Date(`${item.dueOn}T12:00:00`).toLocaleDateString("cs-CZ")}</div></div><ChevronRight className="h-4 w-4 text-violet-500 transition group-hover:translate-x-0.5"/></Link>)}</div></section>}
+        {specialAttention.length > 0 && (
+          <section className="mt-5 rounded-[30px] border border-violet-100 bg-white p-5 shadow-sm md:p-6">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700">
+                <Brain className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-bold">Speciální pedagogika — potřebuje pozornost</h2>
+                <p className="mt-1 text-xs text-[#83908f]">
+                  Jen termíny a pseudonymy, ke kterým máš výslovné oprávnění.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              {specialAttention.slice(0, 6).map((item) => (
+                <Link
+                  key={item.id}
+                  to="/specialni-pedagogika/$caseId"
+                  params={{ caseId: item.caseId }}
+                  className={`group flex items-center justify-between rounded-2xl border p-4 ${item.overdue ? "border-rose-100 bg-rose-50/60" : "border-violet-100 bg-violet-50/40"}`}
+                >
+                  <div>
+                    <div className="text-sm font-bold">
+                      {item.alias}
+                      {item.overdue ? " · po termínu" : ""}
+                    </div>
+                    <div className="mt-1 text-xs text-[#6e7775]">{item.note}</div>
+                    <div className="mt-2 text-[11px] font-semibold text-violet-700">
+                      Kontrola {new Date(`${item.dueOn}T12:00:00`).toLocaleDateString("cs-CZ")}
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-violet-500 transition group-hover:translate-x-0.5" />
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
-    {briefing && <div className="mt-5 grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
-      <section className="rounded-[30px] border border-[#e9e5dd] bg-white p-5 md:p-7"><div className="flex items-center justify-between"><div><h2 className="font-bold">Dnešní hodiny</h2><p className="mt-1 text-xs text-[#83908f]">Skutečný stav příprav z databáze.</p></div><Link to="/rozvrh" className="text-xs font-bold text-[#276765]">Celý rozvrh →</Link></div><div className="mt-5 space-y-2">{briefing.lessons.map(l=><Link key={l.id} to="/hodina/$lessonId" params={{lessonId:l.id}} className="flex items-center justify-between gap-3 rounded-2xl border border-[#ece8df] bg-[#fffefa] p-4 hover:bg-[#f7fbf8]"><div><div className="text-xs text-[#87928f]">{l.starts_at?.slice(0,5) ?? "—"} · {l.slot_order}. hodina</div><div className="mt-1 font-bold">{l.subject_name}</div><div className="mt-1 text-xs text-[#7a8887]">{l.topic || l.title || "Téma zatím není doplněné"}</div></div><div className={`rounded-full px-3 py-1 text-xs font-bold ${l.prepared?"bg-[#e8f4ef] text-[#276765]":"bg-[#fff1e8] text-[#946449]"}`}>{l.prepared?"Připraveno":"Chybí příprava"}</div></Link>)}{briefing.lessons.length===0&&<div className="rounded-2xl border border-dashed border-[#ddd8ce] p-5 text-sm text-[#7b8989]">Dnes nejsou v rozvrhu žádné běžné hodiny.</div>}</div>
-        {briefing.carryOvers.length>0&&<div className="mt-6"><h3 className="text-sm font-bold">Co si neseme z minula</h3><div className="mt-3 space-y-2">{briefing.carryOvers.map(c=><Link key={c.lessonId} to="/hodina/$lessonId" params={{lessonId:c.lessonId}} className="block rounded-2xl bg-[#fff7ef] p-4"><div className="text-xs font-bold text-[#8b674f]">{c.subject} · {new Intl.DateTimeFormat("cs-CZ",{day:"numeric",month:"numeric"}).format(new Date(`${c.lessonDate}T12:00:00`))}</div><p className="mt-1 text-sm text-[#6e7775]">{c.unfinished}</p>{c.nextNote&&<p className="mt-1 text-xs text-[#8a9290]">Příště: {c.nextNote}</p>}</Link>)}</div></div>}
-      </section>
-      <aside className="space-y-4"><section className="rounded-[28px] border border-[#e9e5dd] bg-white p-5"><div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#6b817e]"/><h3 className="font-bold">Dnešní události</h3></div><div className="mt-3 space-y-2">{briefing.events.map((e,i)=><div key={`${e.id??e.title}-${i}`} className="rounded-2xl bg-[#f8f7f3] p-3"><div className="text-sm font-semibold">{e.title}</div><div className="mt-1 text-xs text-[#87918f]">{e.blocks_lessons?"Ovlivňuje výuku":"Bez blokace výuky"}</div></div>)}{briefing.events.length===0&&<p className="text-sm text-[#788684]">Dnes nejsou evidované žádné zvláštní události.</p>}</div></section><Mini icon={SunMedium} title="Ráno" text="Nejdřív jen to, co opravdu potřebuje pozornost."/><Mini icon={MoonStar} title="Po škole" text="Hlasová reflexe později připraví změny k potvrzení."/></aside>
-    </div>}
+        {briefing && (
+          <div className="mt-5 grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
+            <section className="rounded-[30px] border border-[#e9e5dd] bg-white p-5 md:p-7">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold">Dnešní hodiny</h2>
+                  <p className="mt-1 text-xs text-[#83908f]">Skutečný stav příprav z databáze.</p>
+                </div>
+                <Link to="/rozvrh" className="text-xs font-bold text-[#276765]">
+                  Celý rozvrh →
+                </Link>
+              </div>
+              <div className="mt-5 space-y-2">
+                {briefing.lessons.map((l) => (
+                  <Link
+                    key={l.id}
+                    to="/hodina/$lessonId"
+                    params={{ lessonId: l.id }}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-[#ece8df] bg-[#fffefa] p-4 hover:bg-[#f7fbf8]"
+                  >
+                    <div>
+                      <div className="text-xs text-[#87928f]">
+                        {l.starts_at?.slice(0, 5) ?? "—"} · {l.slot_order}. hodina
+                      </div>
+                      <div className="mt-1 font-bold">{l.subject_name}</div>
+                      <div className="mt-1 text-xs text-[#7a8887]">
+                        {l.topic || l.title || "Téma zatím není doplněné"}
+                      </div>
+                    </div>
+                    <div
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${l.prepared ? "bg-[#e8f4ef] text-[#276765]" : "bg-[#fff1e8] text-[#946449]"}`}
+                    >
+                      {l.prepared ? "Připraveno" : "Chybí příprava"}
+                    </div>
+                  </Link>
+                ))}
+                {briefing.lessons.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-[#ddd8ce] p-5 text-sm text-[#7b8989]">
+                    Dnes nejsou v rozvrhu žádné běžné hodiny.
+                  </div>
+                )}
+              </div>
+              {briefing.carryOvers.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-bold">Co si neseme z minula</h3>
+                  <div className="mt-3 space-y-2">
+                    {briefing.carryOvers.map((c) => (
+                      <Link
+                        key={c.lessonId}
+                        to="/hodina/$lessonId"
+                        params={{ lessonId: c.lessonId }}
+                        className="block rounded-2xl bg-[#fff7ef] p-4"
+                      >
+                        <div className="text-xs font-bold text-[#8b674f]">
+                          {c.subject} ·{" "}
+                          {new Intl.DateTimeFormat("cs-CZ", {
+                            day: "numeric",
+                            month: "numeric",
+                          }).format(new Date(`${c.lessonDate}T12:00:00`))}
+                        </div>
+                        <p className="mt-1 text-sm text-[#6e7775]">{c.unfinished}</p>
+                        {c.nextNote && (
+                          <p className="mt-1 text-xs text-[#8a9290]">Příště: {c.nextNote}</p>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+            <aside className="space-y-4">
+              <section className="rounded-[28px] border border-[#e9e5dd] bg-white p-5">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-[#6b817e]" />
+                  <h3 className="font-bold">Dnešní události</h3>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {briefing.events.map((e, i) => (
+                    <div key={`${e.id ?? e.title}-${i}`} className="rounded-2xl bg-[#f8f7f3] p-3">
+                      <div className="text-sm font-semibold">{e.title}</div>
+                      <div className="mt-1 text-xs text-[#87918f]">
+                        {e.blocks_lessons ? "Ovlivňuje výuku" : "Bez blokace výuky"}
+                      </div>
+                    </div>
+                  ))}
+                  {briefing.events.length === 0 && (
+                    <p className="text-sm text-[#788684]">
+                      Dnes nejsou evidované žádné zvláštní události.
+                    </p>
+                  )}
+                </div>
+              </section>
+              <Mini
+                icon={SunMedium}
+                title="Ráno"
+                text="Nejdřív jen to, co opravdu potřebuje pozornost."
+              />
+              <Mini
+                icon={MoonStar}
+                title="Po škole"
+                text="Hlasová reflexe později připraví změny k potvrzení."
+              />
+            </aside>
+          </div>
+        )}
 
-    <div className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_.65fr]"><section className="rounded-[30px] border border-[#e9e5dd] bg-white p-5 md:p-7"><h2 className="font-bold">Řekni mi, co potřebuješ</h2><p className="mt-1 text-xs text-[#83908f]">Hlas se spouští pouze po stisknutí tlačítka.</p><button onClick={()=>setListening(!listening)} className={`mx-auto mt-8 grid h-28 w-28 place-items-center rounded-full text-white shadow-[0_18px_45px_rgba(39,103,101,.25)] transition ${listening?"scale-105 bg-[#b85f61]":"bg-[#276765] hover:scale-105"}`}><Mic className="h-9 w-9"/></button><p className="mt-4 text-center text-sm font-semibold text-[#53696a]">{listening?"Mikrofon zatím není připojený — klepnutím zavři":"Klepni pro hlasové zadání"}</p><div className="mt-6 rounded-2xl border border-dashed border-[#ddd8ce] bg-[#fcfbf8] p-4 text-xs leading-5 text-[#7b8989]"><strong>AI a hlas zatím nejsou připojené.</strong> Reálný pracovní kontext už aplikace sestavuje sama; až doplníme serverový API klíč, pošle se providerovi jen minimum nutných dat.</div></section><aside className="space-y-4"><Link to="/pamet" className="block rounded-[28px] border border-[#e9e5dd] bg-white p-5"><div className="flex items-center gap-2"><Settings2 className="h-5 w-5"/><h3 className="font-bold">Osobní paměť</h3></div><p className="mt-2 text-xs leading-5 text-[#7b8989]">Dobrovolné preference a osobní kontext spravuješ na jednom místě. Paměť je ve výchozím stavu vypnutá.</p><div className="mt-3 text-xs font-bold text-[#276765]">Co si o mně pamatuješ →</div></Link><Mini icon={Heart} title="Soukromí" text="Žáci jsou pro AI pouze pseudonymy. Skutečné identity se do kontextu neposílají."/></aside></div>
-  </div></main>;
+        <div className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_.65fr]">
+          <section className="rounded-[30px] border border-[#e9e5dd] bg-white p-5 md:p-7">
+            <h2 className="font-bold">Řekni mi, co potřebuješ</h2>
+            <p className="mt-1 text-xs text-[#83908f]">
+              Hlas se spouští pouze po stisknutí tlačítka.
+            </p>
+            <button
+              onClick={() => setListening(!listening)}
+              className={`mx-auto mt-8 grid h-28 w-28 place-items-center rounded-full text-white shadow-[0_18px_45px_rgba(39,103,101,.25)] transition ${listening ? "scale-105 bg-[#b85f61]" : "bg-[#276765] hover:scale-105"}`}
+            >
+              <Mic className="h-9 w-9" />
+            </button>
+            <p className="mt-4 text-center text-sm font-semibold text-[#53696a]">
+              {listening
+                ? "Mikrofon zatím není připojený — klepnutím zavři"
+                : "Klepni pro hlasové zadání"}
+            </p>
+            <div className="mt-6 rounded-2xl border border-dashed border-[#ddd8ce] bg-[#fcfbf8] p-4 text-xs leading-5 text-[#7b8989]">
+              <strong>AI a hlas zatím nejsou připojené.</strong> Reálný pracovní kontext už aplikace
+              sestavuje sama; až doplníme serverový API klíč, pošle se providerovi jen minimum
+              nutných dat.
+            </div>
+          </section>
+          <aside className="space-y-4">
+            <Link to="/pamet" className="block rounded-[28px] border border-[#e9e5dd] bg-white p-5">
+              <div className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
+                <h3 className="font-bold">Osobní paměť</h3>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-[#7b8989]">
+                Dobrovolné preference a osobní kontext spravuješ na jednom místě. Paměť je ve
+                výchozím stavu vypnutá.
+              </p>
+              <div className="mt-3 text-xs font-bold text-[#276765]">Co si o mně pamatuješ →</div>
+            </Link>
+            <Mini
+              icon={Heart}
+              title="Soukromí"
+              text="Žáci jsou pro AI pouze pseudonymy. Skutečné identity se do kontextu neposílají."
+            />
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
 }
 
-function Brief({icon:Icon,title,text}:{icon:any;title:string;text:string}){return <div className="rounded-2xl bg-white/75 p-4"><Icon className="h-5 w-5 text-[#39716c]"/><div className="mt-2 text-sm font-bold">{title}</div><p className="mt-1 text-xs leading-5 text-[#7a8989]">{text}</p></div>}
-function Mini({icon:Icon,title,text}:{icon:any;title:string;text:string}){return <section className="rounded-[28px] border border-[#e9e5dd] bg-white p-5"><div className="flex items-center gap-2"><Icon className="h-5 w-5 text-[#6b817e]"/><h3 className="font-bold">{title}</h3></div><p className="mt-2 text-sm leading-6 text-[#718082]">{text}</p></section>}
+function Brief({ icon: Icon, title, text }: { icon: any; title: string; text: string }) {
+  return (
+    <div className="rounded-2xl bg-white/75 p-4">
+      <Icon className="h-5 w-5 text-[#39716c]" />
+      <div className="mt-2 text-sm font-bold">{title}</div>
+      <p className="mt-1 text-xs leading-5 text-[#7a8989]">{text}</p>
+    </div>
+  );
+}
+function Mini({ icon: Icon, title, text }: { icon: any; title: string; text: string }) {
+  return (
+    <section className="rounded-[28px] border border-[#e9e5dd] bg-white p-5">
+      <div className="flex items-center gap-2">
+        <Icon className="h-5 w-5 text-[#6b817e]" />
+        <h3 className="font-bold">{title}</h3>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#718082]">{text}</p>
+    </section>
+  );
+}

@@ -4,7 +4,20 @@ import type { AccessibleClass } from "@/lib/schedule-data";
 
 const db = supabase as unknown as SupabaseClient<any>;
 
-export type CalendarEventKind = "meeting" | "trip" | "excursion" | "school_event" | "holiday" | "director_day_off" | "birthday" | "name_day" | "test" | "project" | "training" | "absence" | "other";
+export type CalendarEventKind =
+  | "meeting"
+  | "trip"
+  | "excursion"
+  | "school_event"
+  | "holiday"
+  | "director_day_off"
+  | "birthday"
+  | "name_day"
+  | "test"
+  | "project"
+  | "training"
+  | "absence"
+  | "other";
 export type CalendarItem = {
   id: string;
   title: string;
@@ -25,27 +38,41 @@ export type CalendarItem = {
 
 export type CalendarStudentAlias = { id: string; alias: string; avatar_key: string | null };
 
-export async function loadCalendarRange(classInfo: AccessibleClass, startDate: string, endDate: string) {
+export async function loadCalendarRange(
+  classInfo: AccessibleClass,
+  startDate: string,
+  endDate: string,
+) {
   const rangeStart = pragueMidnightIso(startDate);
   const rangeEndExclusive = pragueMidnightIso(addDays(endDate, 1));
 
   const [customResult, systemResult, aliasesResult] = await Promise.all([
-    db.from("calendar_events")
-      .select("id,title,kind,note,starts_at,ends_at,all_day,affects_schedule,blocks_lessons,scope,class_id,student_alias_id")
+    db
+      .from("calendar_events")
+      .select(
+        "id,title,kind,note,starts_at,ends_at,all_day,affects_schedule,blocks_lessons,scope,class_id,student_alias_id",
+      )
       .eq("school_id", classInfo.school_id)
       .lt("starts_at", rangeEndExclusive)
       .gt("ends_at", rangeStart)
       .or(`class_id.eq.${classInfo.id},scope.eq.school,scope.eq.private`)
       .order("starts_at", { ascending: true }),
-    db.from("system_calendar_days")
+    db
+      .from("system_calendar_days")
       .select("id,title,kind,starts_on,ends_on,blocks_lessons,source_name,source_url")
       .lte("starts_on", endDate)
       .gte("ends_on", startDate)
       .order("starts_on", { ascending: true }),
-    db.from("student_aliases").select("id,alias,avatar_key").eq("class_id", classInfo.id).eq("is_active", true).order("alias"),
+    db
+      .from("student_aliases")
+      .select("id,alias,avatar_key")
+      .eq("class_id", classInfo.id)
+      .eq("is_active", true)
+      .order("alias"),
   ]);
 
-  for (const result of [customResult, systemResult, aliasesResult]) if (result.error) throw result.error;
+  for (const result of [customResult, systemResult, aliasesResult])
+    if (result.error) throw result.error;
 
   const custom: CalendarItem[] = (customResult.data ?? []).map((row: any) => ({
     id: row.id,
@@ -81,19 +108,25 @@ export async function loadCalendarRange(classInfo: AccessibleClass, startDate: s
     sourceUrl: row.source_url ?? null,
   }));
 
-  return { items: [...system, ...custom].sort((a,b) => a.startsOn.localeCompare(b.startsOn)), aliases: (aliasesResult.data ?? []) as CalendarStudentAlias[] };
+  return {
+    items: [...system, ...custom].sort((a, b) => a.startsOn.localeCompare(b.startsOn)),
+    aliases: (aliasesResult.data ?? []) as CalendarStudentAlias[],
+  };
 }
 
-export async function createClassCalendarEvent(classInfo: AccessibleClass, input: {
-  title: string;
-  kind: CalendarEventKind;
-  startDate: string;
-  endDate?: string;
-  note?: string;
-  blocksLessons?: boolean;
-  affectsSchedule?: boolean;
-  studentAliasId?: string | null;
-}) {
+export async function createClassCalendarEvent(
+  classInfo: AccessibleClass,
+  input: {
+    title: string;
+    kind: CalendarEventKind;
+    startDate: string;
+    endDate?: string;
+    note?: string;
+    blocksLessons?: boolean;
+    affectsSchedule?: boolean;
+    studentAliasId?: string | null;
+  },
+) {
   const title = input.title.trim();
   if (!title) throw new Error("Doplňte název události.");
   const endDate = input.endDate || input.startDate;
@@ -102,7 +135,8 @@ export async function createClassCalendarEvent(classInfo: AccessibleClass, input
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   if (!authData.user) throw new Error("Pro vytvoření události je potřeba být přihlášená.");
-  if ((input.kind === "birthday" || input.kind === "name_day") && !input.studentAliasId) throw new Error("Vyberte pseudonym žáka.");
+  if ((input.kind === "birthday" || input.kind === "name_day") && !input.studentAliasId)
+    throw new Error("Vyberte pseudonym žáka.");
 
   const { error } = await db.from("calendar_events").insert({
     school_id: classInfo.school_id,
@@ -129,11 +163,18 @@ export async function deleteClassCalendarEvent(eventId: string) {
   if (error) throw error;
 }
 
-export function itemsForDate(items: CalendarItem[], date: string) { return items.filter((item) => item.startsOn <= date && item.endsOn >= date); }
+export function itemsForDate(items: CalendarItem[], date: string) {
+  return items.filter((item) => item.startsOn <= date && item.endsOn >= date);
+}
 
 function localDate(value: string) {
   const d = new Date(value);
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(d);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Prague",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
@@ -141,10 +182,30 @@ function localDate(value: string) {
 // Converts a local Prague midnight to an absolute UTC instant without assuming +01/+02.
 function pragueMidnightIso(isoDate: string) {
   const guess = new Date(`${isoDate}T00:00:00.000Z`);
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(guess);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Prague",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(guess);
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
-  const representedLocalAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  const representedLocalAsUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour"),
+    get("minute"),
+    get("second"),
+  );
   const offsetMs = representedLocalAsUtc - guess.getTime();
   return new Date(guess.getTime() - offsetMs).toISOString();
 }
-function addDays(iso: string, amount: number) { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate()+amount); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function addDays(iso: string, amount: number) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + amount);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}

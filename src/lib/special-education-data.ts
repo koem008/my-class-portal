@@ -1,37 +1,614 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-const db=supabase as unknown as SupabaseClient<any>;
-export type SpecialCase={id:string;school_id:string;class_id:string;student_alias_id:string;status:"active"|"monitoring"|"closed";focus_summary:string|null;alias:string;avatar_key:string|null};
-export type SpecialObservation={id:string;observed_at:string;context:string|null;observation:string;support_area:string|null};
-export type SupportGoal={id:string;area_code:string|null;title:string;description:string|null;status:"active"|"achieved"|"paused"|"closed";target_date:string|null;created_at:string};
-export type Intervention={id:string;area_code:string|null;goal_id:string|null;planned_for:string|null;performed_at:string|null;strategy:string;observed_effect:string|null;status:"planned"|"completed"|"cancelled";created_at:string};
-export type Followup={id:string;case_id:string;due_on:string;note:string;completed_at?:string|null;created_at?:string};
-export type AuditEntry={id:string;action:string;entity_type:string;entity_id:string|null;created_at:string};
-export type SupportAreaCatalogItem={code:string;label:string;description:string;sort_order:number};
-export type CaseSupportArea={area_code:string;status:"active"|"monitoring"|"resolved";note:string|null;label:string;description:string};
-export type ProgressReview={id:string;area_code:string|null;reviewed_on:string;change_level:"worse"|"unchanged"|"slight_progress"|"clear_progress"|"goal_met";evidence:string;next_step:string|null;created_at:string};
-export type TimelineItem={id:string;kind:"observation"|"goal"|"intervention"|"review"|"followup";at:string;title:string;detail:string;areaCode:string|null};
-export type StrategyCatalogItem={id:string;area_code:string;title:string;summary:string;implementation_steps:string[];source_kind:"official_framework"|"methodical_source"|"editorial_template";source_label:string|null;source_url:string|null;age_note:string|null;contraindication_note:string|null;sort_order:number};
-export type SpecialAttentionItem={id:string;caseId:string;alias:string;dueOn:string;note:string;overdue:boolean};
-async function authUserId(){const{data,error}=await supabase.auth.getUser();if(error)throw error;if(!data.user)throw new Error("Pro tuto akci je nutné přihlášení.");return data.user.id}
-async function writeAudit(schoolId:string,caseId:string|null,action:string,entityType:string,entityId:string|null){const userId=await authUserId();const{error}=await db.from("special_education_audit_log").insert({school_id:schoolId,actor_user_id:userId,case_id:caseId,action,entity_type:entityType,entity_id:entityId});if(error)throw error}
-export async function loadSpecialPedagogyAccess(){const{data:auth,error:authError}=await supabase.auth.getUser();if(authError)throw authError;if(!auth.user)return[];const{data,error}=await db.from("special_education_practitioners").select("school_id,role,is_active").eq("user_id",auth.user.id).eq("is_active",true);if(error)throw error;return data??[]}
-export async function loadSpecialCases(schoolId:string):Promise<SpecialCase[]>{const{data:cases,error}=await db.from("special_education_cases").select("id,school_id,class_id,student_alias_id,status,focus_summary").eq("school_id",schoolId).neq("status","closed").order("updated_at",{ascending:false});if(error)throw error;if(!cases?.length)return[];const aliasIds=cases.map((r:any)=>r.student_alias_id);const{data:aliases,error:ae}=await db.from("student_aliases").select("id,alias,avatar_key").in("id",aliasIds);if(ae)throw ae;const m=new Map((aliases??[]).map((a:any)=>[a.id,a]));return cases.map((r:any)=>({...r,alias:m.get(r.student_alias_id)?.alias??"Pseudonym",avatar_key:m.get(r.student_alias_id)?.avatar_key??null}))}
-export async function loadSpecialAttention(daysAhead=7):Promise<SpecialAttentionItem[]>{const access=await loadSpecialPedagogyAccess();if(!access.length)return[];const schoolId=access[0].school_id as string;const today=new Date();const todayIso=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;const until=new Date(today);until.setDate(until.getDate()+daysAhead);const untilIso=`${until.getFullYear()}-${String(until.getMonth()+1).padStart(2,"0")}-${String(until.getDate()).padStart(2,"0")}`;const[{data:followups,error:fe},cases]=await Promise.all([db.from("special_education_followups").select("id,case_id,due_on,note").eq("school_id",schoolId).is("completed_at",null).lte("due_on",untilIso).order("due_on",{ascending:true}),loadSpecialCases(schoolId)]);if(fe)throw fe;const caseMap=new Map(cases.map(c=>[c.id,c]));return(followups??[]).map((f:any)=>({id:f.id,caseId:f.case_id,alias:caseMap.get(f.case_id)?.alias??"Pseudonym",dueOn:f.due_on,note:f.note,overdue:f.due_on<todayIso})).filter((x:SpecialAttentionItem)=>caseMap.has(x.caseId))}
-export async function createSpecialCase(input:{schoolId:string;classId:string;studentAliasId:string;focusSummary?:string}){const u=await authUserId();const{data,error}=await db.from("special_education_cases").insert({school_id:input.schoolId,class_id:input.classId,student_alias_id:input.studentAliasId,focus_summary:input.focusSummary?.trim()||null,created_by:u}).select("id").single();if(error)throw error;await writeAudit(input.schoolId,data.id,"case_created","case",data.id);return data.id as string}
-export async function updateCaseStatus(input:{caseId:string;schoolId:string;status:"active"|"monitoring"|"closed"}){const{error}=await db.from("special_education_cases").update({status:input.status,updated_at:new Date().toISOString()}).eq("id",input.caseId).eq("school_id",input.schoolId);if(error)throw error;await writeAudit(input.schoolId,input.caseId,"case_status_changed","case",input.caseId)}
-export async function loadSupportAreaCatalog():Promise<SupportAreaCatalogItem[]>{const{data,error}=await db.from("special_education_support_area_catalog").select("code,label,description,sort_order").eq("is_active",true).order("sort_order");if(error)throw error;return(data??[])as SupportAreaCatalogItem[]}
-export async function loadStrategyCatalog(areaCodes?:string[]):Promise<StrategyCatalogItem[]>{let query=db.from("special_education_strategy_catalog").select("id,area_code,title,summary,implementation_steps,source_kind,source_label,source_url,age_note,contraindication_note,sort_order").eq("is_active",true).order("area_code").order("sort_order");if(areaCodes?.length)query=query.in("area_code",areaCodes);const{data,error}=await query;if(error)throw error;return(data??[])as StrategyCatalogItem[]}
-export async function loadCaseSupportAreas(caseId:string):Promise<CaseSupportArea[]>{const[{data:links,error},{data:catalog,error:ce}]=await Promise.all([db.from("special_education_case_support_areas").select("area_code,status,note").eq("case_id",caseId),db.from("special_education_support_area_catalog").select("code,label,description").eq("is_active",true)]);if(error)throw error;if(ce)throw ce;const m=new Map((catalog??[]).map((r:any)=>[r.code,r]));return(links??[]).map((r:any)=>({area_code:r.area_code,status:r.status,note:r.note??null,label:m.get(r.area_code)?.label??r.area_code,description:m.get(r.area_code)?.description??""}))}
-export async function setCaseSupportArea(input:{caseId:string;schoolId:string;areaCode:string;status?:"active"|"monitoring"|"resolved";note?:string}){const u=await authUserId();const{error}=await db.from("special_education_case_support_areas").upsert({case_id:input.caseId,school_id:input.schoolId,area_code:input.areaCode,status:input.status??"active",note:input.note?.trim()||null,created_by:u,updated_at:new Date().toISOString()},{onConflict:"case_id,area_code"});if(error)throw error;await writeAudit(input.schoolId,input.caseId,"support_area_updated","support_area",null)}
-export async function removeCaseSupportArea(input:{caseId:string;schoolId:string;areaCode:string}){const{error}=await db.from("special_education_case_support_areas").delete().eq("case_id",input.caseId).eq("school_id",input.schoolId).eq("area_code",input.areaCode);if(error)throw error;await writeAudit(input.schoolId,input.caseId,"support_area_removed","support_area",null)}
-export async function loadCaseWorkspace(caseId:string){const[observations,goals,interventions,followups,audit,supportAreas,reviews]=await Promise.all([db.from("special_education_observations").select("id,observed_at,context,observation,support_area").eq("case_id",caseId).order("observed_at",{ascending:false}),db.from("special_education_support_goals").select("id,area_code,title,description,status,target_date,created_at").eq("case_id",caseId).order("created_at",{ascending:false}),db.from("special_education_interventions").select("id,area_code,goal_id,planned_for,performed_at,strategy,observed_effect,status,created_at").eq("case_id",caseId).order("created_at",{ascending:false}),db.from("special_education_followups").select("id,case_id,due_on,note,completed_at,created_at").eq("case_id",caseId).order("due_on",{ascending:true}),db.from("special_education_audit_log").select("id,action,entity_type,entity_id,created_at").eq("case_id",caseId).order("created_at",{ascending:false}).limit(50),loadCaseSupportAreas(caseId),db.from("special_education_progress_reviews").select("id,area_code,reviewed_on,change_level,evidence,next_step,created_at").eq("case_id",caseId).order("reviewed_on",{ascending:false})]);for(const r of[observations,goals,interventions,followups,audit,reviews])if((r as any).error)throw(r as any).error;const ws={observations:(observations.data??[])as SpecialObservation[],goals:(goals.data??[])as SupportGoal[],interventions:(interventions.data??[])as Intervention[],followups:(followups.data??[])as Followup[],audit:(audit.data??[])as AuditEntry[],supportAreas,reviews:(reviews.data??[])as ProgressReview[]};return{...ws,timeline:buildTimeline(ws)}}
-function buildTimeline(ws:{observations:SpecialObservation[];goals:SupportGoal[];interventions:Intervention[];followups:Followup[];reviews:ProgressReview[]}):TimelineItem[]{const items:TimelineItem[]=[];for(const o of ws.observations)items.push({id:`o:${o.id}`,kind:"observation",at:o.observed_at,title:"Pozorování",detail:o.observation,areaCode:o.support_area});for(const g of ws.goals)items.push({id:`g:${g.id}`,kind:"goal",at:g.created_at,title:"Cíl podpory",detail:g.title,areaCode:g.area_code});for(const i of ws.interventions)items.push({id:`i:${i.id}`,kind:"intervention",at:i.performed_at||i.planned_for||i.created_at,title:i.status==="completed"?"Provedená intervence":"Plánovaná intervence",detail:i.strategy,areaCode:i.area_code});for(const r of ws.reviews)items.push({id:`r:${r.id}`,kind:"review",at:`${r.reviewed_on}T12:00:00`,title:"Vyhodnocení vývoje",detail:r.evidence,areaCode:r.area_code});for(const f of ws.followups)items.push({id:`f:${f.id}`,kind:"followup",at:`${f.due_on}T12:00:00`,title:f.completed_at?"Dokončený follow-up":"Follow-up",detail:f.note,areaCode:null});return items.sort((a,b)=>new Date(b.at).getTime()-new Date(a.at).getTime())}
-export async function addFactualObservation(input:{caseId:string;schoolId:string;observation:string;context?:string;supportArea?:string}){const observation=input.observation.trim();if(!observation)throw new Error("Doplňte konkrétní pozorování.");const u=await authUserId();const{data,error}=await db.from("special_education_observations").insert({case_id:input.caseId,school_id:input.schoolId,observation,context:input.context?.trim()||null,support_area:input.supportArea?.trim()||null,created_by:u}).select("id").single();if(error)throw error;await writeAudit(input.schoolId,input.caseId,"observation_created","observation",data.id);return data.id as string}
-export async function createSupportGoal(input:{caseId:string;schoolId:string;title:string;description?:string;targetDate?:string;areaCode?:string|null}){const title=input.title.trim();if(!title)throw new Error("Doplňte cíl podpory.");const u=await authUserId();const{data,error}=await db.from("special_education_support_goals").insert({case_id:input.caseId,school_id:input.schoolId,area_code:input.areaCode||null,title,description:input.description?.trim()||null,target_date:input.targetDate||null,created_by:u}).select("id").single();if(error)throw error;await writeAudit(input.schoolId,input.caseId,"goal_created","goal",data.id);return data.id as string}
-export async function createIntervention(input:{caseId:string;schoolId:string;goalId?:string|null;areaCode?:string|null;strategy:string;plannedFor?:string}){const strategy=input.strategy.trim();if(!strategy)throw new Error("Doplňte plánovanou intervenci.");const u=await authUserId();const{data,error}=await db.from("special_education_interventions").insert({case_id:input.caseId,school_id:input.schoolId,area_code:input.areaCode||null,goal_id:input.goalId||null,strategy,planned_for:input.plannedFor||null,created_by:u}).select("id").single();if(error)throw error;await writeAudit(input.schoolId,input.caseId,"intervention_created","intervention",data.id);return data.id as string}
-export async function completeIntervention(input:{interventionId:string;caseId:string;schoolId:string;observedEffect?:string}){const{error}=await db.from("special_education_interventions").update({status:"completed",performed_at:new Date().toISOString(),observed_effect:input.observedEffect?.trim()||null,updated_at:new Date().toISOString()}).eq("id",input.interventionId).eq("school_id",input.schoolId);if(error)throw error;await writeAudit(input.schoolId,input.caseId,"intervention_completed","intervention",input.interventionId)}
-export async function createFollowup(input:{caseId:string;schoolId:string;dueOn:string;note:string}){const note=input.note.trim();if(!note)throw new Error("Doplňte navazující krok.");if(!input.dueOn)throw new Error("Vyberte termín kontroly.");const u=await authUserId();const{data,error}=await db.from("special_education_followups").insert({case_id:input.caseId,school_id:input.schoolId,due_on:input.dueOn,note,created_by:u}).select("id").single();if(error)throw error;await writeAudit(input.schoolId,input.caseId,"followup_created","followup",data.id);return data.id as string}
-export async function completeFollowup(input:{followupId:string;caseId:string;schoolId:string}){const{error}=await db.from("special_education_followups").update({completed_at:new Date().toISOString()}).eq("id",input.followupId).eq("school_id",input.schoolId);if(error)throw error;await writeAudit(input.schoolId,input.caseId,"followup_completed","followup",input.followupId)}
-export async function createProgressReview(input:{caseId:string;schoolId:string;areaCode?:string;changeLevel:ProgressReview["change_level"];evidence:string;nextStep?:string}){const evidence=input.evidence.trim();if(!evidence)throw new Error("Doplňte konkrétní podklad pro vyhodnocení.");const u=await authUserId();const{data,error}=await db.from("special_education_progress_reviews").insert({case_id:input.caseId,school_id:input.schoolId,area_code:input.areaCode||null,change_level:input.changeLevel,evidence,next_step:input.nextStep?.trim()||null,created_by:u}).select("id").single();if(error)throw error;await writeAudit(input.schoolId,input.caseId,"progress_review_created","progress_review",data.id);return data.id as string}
-export async function loadOpenFollowups(schoolId:string){const{data,error}=await db.from("special_education_followups").select("id,case_id,due_on,note,completed_at").eq("school_id",schoolId).is("completed_at",null).order("due_on",{ascending:true});if(error)throw error;return(data??[])as Followup[]}
+const db = supabase as unknown as SupabaseClient<any>;
+export type SpecialCase = {
+  id: string;
+  school_id: string;
+  class_id: string;
+  student_alias_id: string;
+  status: "active" | "monitoring" | "closed";
+  focus_summary: string | null;
+  alias: string;
+  avatar_key: string | null;
+};
+export type SpecialObservation = {
+  id: string;
+  observed_at: string;
+  context: string | null;
+  observation: string;
+  support_area: string | null;
+};
+export type SupportGoal = {
+  id: string;
+  area_code: string | null;
+  title: string;
+  description: string | null;
+  status: "active" | "achieved" | "paused" | "closed";
+  target_date: string | null;
+  created_at: string;
+};
+export type Intervention = {
+  id: string;
+  area_code: string | null;
+  goal_id: string | null;
+  planned_for: string | null;
+  performed_at: string | null;
+  strategy: string;
+  observed_effect: string | null;
+  status: "planned" | "completed" | "cancelled";
+  created_at: string;
+};
+export type Followup = {
+  id: string;
+  case_id: string;
+  due_on: string;
+  note: string;
+  completed_at?: string | null;
+  created_at?: string;
+};
+export type AuditEntry = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  created_at: string;
+};
+export type SupportAreaCatalogItem = {
+  code: string;
+  label: string;
+  description: string;
+  sort_order: number;
+};
+export type CaseSupportArea = {
+  area_code: string;
+  status: "active" | "monitoring" | "resolved";
+  note: string | null;
+  label: string;
+  description: string;
+};
+export type ProgressReview = {
+  id: string;
+  area_code: string | null;
+  reviewed_on: string;
+  change_level: "worse" | "unchanged" | "slight_progress" | "clear_progress" | "goal_met";
+  evidence: string;
+  next_step: string | null;
+  created_at: string;
+};
+export type TimelineItem = {
+  id: string;
+  kind: "observation" | "goal" | "intervention" | "review" | "followup";
+  at: string;
+  title: string;
+  detail: string;
+  areaCode: string | null;
+};
+export type StrategyCatalogItem = {
+  id: string;
+  area_code: string;
+  title: string;
+  summary: string;
+  implementation_steps: string[];
+  source_kind: "official_framework" | "methodical_source" | "editorial_template";
+  source_label: string | null;
+  source_url: string | null;
+  age_note: string | null;
+  contraindication_note: string | null;
+  sort_order: number;
+};
+export type SpecialAttentionItem = {
+  id: string;
+  caseId: string;
+  alias: string;
+  dueOn: string;
+  note: string;
+  overdue: boolean;
+};
+async function authUserId() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!data.user) throw new Error("Pro tuto akci je nutné přihlášení.");
+  return data.user.id;
+}
+async function writeAudit(
+  schoolId: string,
+  caseId: string | null,
+  action: string,
+  entityType: string,
+  entityId: string | null,
+) {
+  const userId = await authUserId();
+  const { error } = await db.from("special_education_audit_log").insert({
+    school_id: schoolId,
+    actor_user_id: userId,
+    case_id: caseId,
+    action,
+    entity_type: entityType,
+    entity_id: entityId,
+  });
+  if (error) throw error;
+}
+export async function loadSpecialPedagogyAccess() {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!auth.user) return [];
+  const { data, error } = await db
+    .from("special_education_practitioners")
+    .select("school_id,role,is_active")
+    .eq("user_id", auth.user.id)
+    .eq("is_active", true);
+  if (error) throw error;
+  return data ?? [];
+}
+export async function loadSpecialCases(schoolId: string): Promise<SpecialCase[]> {
+  const { data: cases, error } = await db
+    .from("special_education_cases")
+    .select("id,school_id,class_id,student_alias_id,status,focus_summary")
+    .eq("school_id", schoolId)
+    .neq("status", "closed")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  if (!cases?.length) return [];
+  const aliasIds = cases.map((r: any) => r.student_alias_id);
+  const { data: aliases, error: ae } = await db
+    .from("student_aliases")
+    .select("id,alias,avatar_key")
+    .in("id", aliasIds);
+  if (ae) throw ae;
+  const m = new Map((aliases ?? []).map((a: any) => [a.id, a]));
+  return cases.map((r: any) => ({
+    ...r,
+    alias: m.get(r.student_alias_id)?.alias ?? "Pseudonym",
+    avatar_key: m.get(r.student_alias_id)?.avatar_key ?? null,
+  }));
+}
+export async function loadSpecialAttention(daysAhead = 7): Promise<SpecialAttentionItem[]> {
+  const access = await loadSpecialPedagogyAccess();
+  if (!access.length) return [];
+  const schoolId = access[0].school_id as string;
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const until = new Date(today);
+  until.setDate(until.getDate() + daysAhead);
+  const untilIso = `${until.getFullYear()}-${String(until.getMonth() + 1).padStart(2, "0")}-${String(until.getDate()).padStart(2, "0")}`;
+  const [{ data: followups, error: fe }, cases] = await Promise.all([
+    db
+      .from("special_education_followups")
+      .select("id,case_id,due_on,note")
+      .eq("school_id", schoolId)
+      .is("completed_at", null)
+      .lte("due_on", untilIso)
+      .order("due_on", { ascending: true }),
+    loadSpecialCases(schoolId),
+  ]);
+  if (fe) throw fe;
+  const caseMap = new Map(cases.map((c) => [c.id, c]));
+  return (followups ?? [])
+    .map((f: any) => ({
+      id: f.id,
+      caseId: f.case_id,
+      alias: caseMap.get(f.case_id)?.alias ?? "Pseudonym",
+      dueOn: f.due_on,
+      note: f.note,
+      overdue: f.due_on < todayIso,
+    }))
+    .filter((x: SpecialAttentionItem) => caseMap.has(x.caseId));
+}
+export async function createSpecialCase(input: {
+  schoolId: string;
+  classId: string;
+  studentAliasId: string;
+  focusSummary?: string;
+}) {
+  const u = await authUserId();
+  const { data, error } = await db
+    .from("special_education_cases")
+    .insert({
+      school_id: input.schoolId,
+      class_id: input.classId,
+      student_alias_id: input.studentAliasId,
+      focus_summary: input.focusSummary?.trim() || null,
+      created_by: u,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(input.schoolId, data.id, "case_created", "case", data.id);
+  return data.id as string;
+}
+export async function updateCaseStatus(input: {
+  caseId: string;
+  schoolId: string;
+  status: "active" | "monitoring" | "closed";
+}) {
+  const { error } = await db
+    .from("special_education_cases")
+    .update({ status: input.status, updated_at: new Date().toISOString() })
+    .eq("id", input.caseId)
+    .eq("school_id", input.schoolId);
+  if (error) throw error;
+  await writeAudit(input.schoolId, input.caseId, "case_status_changed", "case", input.caseId);
+}
+export async function loadSupportAreaCatalog(): Promise<SupportAreaCatalogItem[]> {
+  const { data, error } = await db
+    .from("special_education_support_area_catalog")
+    .select("code,label,description,sort_order")
+    .eq("is_active", true)
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as SupportAreaCatalogItem[];
+}
+export async function loadStrategyCatalog(areaCodes?: string[]): Promise<StrategyCatalogItem[]> {
+  let query = db
+    .from("special_education_strategy_catalog")
+    .select(
+      "id,area_code,title,summary,implementation_steps,source_kind,source_label,source_url,age_note,contraindication_note,sort_order",
+    )
+    .eq("is_active", true)
+    .order("area_code")
+    .order("sort_order");
+  if (areaCodes?.length) query = query.in("area_code", areaCodes);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as StrategyCatalogItem[];
+}
+export async function loadCaseSupportAreas(caseId: string): Promise<CaseSupportArea[]> {
+  const [{ data: links, error }, { data: catalog, error: ce }] = await Promise.all([
+    db
+      .from("special_education_case_support_areas")
+      .select("area_code,status,note")
+      .eq("case_id", caseId),
+    db
+      .from("special_education_support_area_catalog")
+      .select("code,label,description")
+      .eq("is_active", true),
+  ]);
+  if (error) throw error;
+  if (ce) throw ce;
+  const m = new Map((catalog ?? []).map((r: any) => [r.code, r]));
+  return (links ?? []).map((r: any) => ({
+    area_code: r.area_code,
+    status: r.status,
+    note: r.note ?? null,
+    label: m.get(r.area_code)?.label ?? r.area_code,
+    description: m.get(r.area_code)?.description ?? "",
+  }));
+}
+export async function setCaseSupportArea(input: {
+  caseId: string;
+  schoolId: string;
+  areaCode: string;
+  status?: "active" | "monitoring" | "resolved";
+  note?: string;
+}) {
+  const u = await authUserId();
+  const { error } = await db.from("special_education_case_support_areas").upsert(
+    {
+      case_id: input.caseId,
+      school_id: input.schoolId,
+      area_code: input.areaCode,
+      status: input.status ?? "active",
+      note: input.note?.trim() || null,
+      created_by: u,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "case_id,area_code" },
+  );
+  if (error) throw error;
+  await writeAudit(input.schoolId, input.caseId, "support_area_updated", "support_area", null);
+}
+export async function removeCaseSupportArea(input: {
+  caseId: string;
+  schoolId: string;
+  areaCode: string;
+}) {
+  const { error } = await db
+    .from("special_education_case_support_areas")
+    .delete()
+    .eq("case_id", input.caseId)
+    .eq("school_id", input.schoolId)
+    .eq("area_code", input.areaCode);
+  if (error) throw error;
+  await writeAudit(input.schoolId, input.caseId, "support_area_removed", "support_area", null);
+}
+export async function loadCaseWorkspace(caseId: string) {
+  const [observations, goals, interventions, followups, audit, supportAreas, reviews] =
+    await Promise.all([
+      db
+        .from("special_education_observations")
+        .select("id,observed_at,context,observation,support_area")
+        .eq("case_id", caseId)
+        .order("observed_at", { ascending: false }),
+      db
+        .from("special_education_support_goals")
+        .select("id,area_code,title,description,status,target_date,created_at")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false }),
+      db
+        .from("special_education_interventions")
+        .select(
+          "id,area_code,goal_id,planned_for,performed_at,strategy,observed_effect,status,created_at",
+        )
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false }),
+      db
+        .from("special_education_followups")
+        .select("id,case_id,due_on,note,completed_at,created_at")
+        .eq("case_id", caseId)
+        .order("due_on", { ascending: true }),
+      db
+        .from("special_education_audit_log")
+        .select("id,action,entity_type,entity_id,created_at")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      loadCaseSupportAreas(caseId),
+      db
+        .from("special_education_progress_reviews")
+        .select("id,area_code,reviewed_on,change_level,evidence,next_step,created_at")
+        .eq("case_id", caseId)
+        .order("reviewed_on", { ascending: false }),
+    ]);
+  for (const r of [observations, goals, interventions, followups, audit, reviews])
+    if ((r as any).error) throw (r as any).error;
+  const ws = {
+    observations: (observations.data ?? []) as SpecialObservation[],
+    goals: (goals.data ?? []) as SupportGoal[],
+    interventions: (interventions.data ?? []) as Intervention[],
+    followups: (followups.data ?? []) as Followup[],
+    audit: (audit.data ?? []) as AuditEntry[],
+    supportAreas,
+    reviews: (reviews.data ?? []) as ProgressReview[],
+  };
+  return { ...ws, timeline: buildTimeline(ws) };
+}
+function buildTimeline(ws: {
+  observations: SpecialObservation[];
+  goals: SupportGoal[];
+  interventions: Intervention[];
+  followups: Followup[];
+  reviews: ProgressReview[];
+}): TimelineItem[] {
+  const items: TimelineItem[] = [];
+  for (const o of ws.observations)
+    items.push({
+      id: `o:${o.id}`,
+      kind: "observation",
+      at: o.observed_at,
+      title: "Pozorování",
+      detail: o.observation,
+      areaCode: o.support_area,
+    });
+  for (const g of ws.goals)
+    items.push({
+      id: `g:${g.id}`,
+      kind: "goal",
+      at: g.created_at,
+      title: "Cíl podpory",
+      detail: g.title,
+      areaCode: g.area_code,
+    });
+  for (const i of ws.interventions)
+    items.push({
+      id: `i:${i.id}`,
+      kind: "intervention",
+      at: i.performed_at || i.planned_for || i.created_at,
+      title: i.status === "completed" ? "Provedená intervence" : "Plánovaná intervence",
+      detail: i.strategy,
+      areaCode: i.area_code,
+    });
+  for (const r of ws.reviews)
+    items.push({
+      id: `r:${r.id}`,
+      kind: "review",
+      at: `${r.reviewed_on}T12:00:00`,
+      title: "Vyhodnocení vývoje",
+      detail: r.evidence,
+      areaCode: r.area_code,
+    });
+  for (const f of ws.followups)
+    items.push({
+      id: `f:${f.id}`,
+      kind: "followup",
+      at: `${f.due_on}T12:00:00`,
+      title: f.completed_at ? "Dokončený follow-up" : "Follow-up",
+      detail: f.note,
+      areaCode: null,
+    });
+  return items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+}
+export async function addFactualObservation(input: {
+  caseId: string;
+  schoolId: string;
+  observation: string;
+  context?: string;
+  supportArea?: string;
+}) {
+  const observation = input.observation.trim();
+  if (!observation) throw new Error("Doplňte konkrétní pozorování.");
+  const u = await authUserId();
+  const { data, error } = await db
+    .from("special_education_observations")
+    .insert({
+      case_id: input.caseId,
+      school_id: input.schoolId,
+      observation,
+      context: input.context?.trim() || null,
+      support_area: input.supportArea?.trim() || null,
+      created_by: u,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(input.schoolId, input.caseId, "observation_created", "observation", data.id);
+  return data.id as string;
+}
+export async function createSupportGoal(input: {
+  caseId: string;
+  schoolId: string;
+  title: string;
+  description?: string;
+  targetDate?: string;
+  areaCode?: string | null;
+}) {
+  const title = input.title.trim();
+  if (!title) throw new Error("Doplňte cíl podpory.");
+  const u = await authUserId();
+  const { data, error } = await db
+    .from("special_education_support_goals")
+    .insert({
+      case_id: input.caseId,
+      school_id: input.schoolId,
+      area_code: input.areaCode || null,
+      title,
+      description: input.description?.trim() || null,
+      target_date: input.targetDate || null,
+      created_by: u,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(input.schoolId, input.caseId, "goal_created", "goal", data.id);
+  return data.id as string;
+}
+export async function createIntervention(input: {
+  caseId: string;
+  schoolId: string;
+  goalId?: string | null;
+  areaCode?: string | null;
+  strategy: string;
+  plannedFor?: string;
+}) {
+  const strategy = input.strategy.trim();
+  if (!strategy) throw new Error("Doplňte plánovanou intervenci.");
+  const u = await authUserId();
+  const { data, error } = await db
+    .from("special_education_interventions")
+    .insert({
+      case_id: input.caseId,
+      school_id: input.schoolId,
+      area_code: input.areaCode || null,
+      goal_id: input.goalId || null,
+      strategy,
+      planned_for: input.plannedFor || null,
+      created_by: u,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(input.schoolId, input.caseId, "intervention_created", "intervention", data.id);
+  return data.id as string;
+}
+export async function completeIntervention(input: {
+  interventionId: string;
+  caseId: string;
+  schoolId: string;
+  observedEffect?: string;
+}) {
+  const { error } = await db
+    .from("special_education_interventions")
+    .update({
+      status: "completed",
+      performed_at: new Date().toISOString(),
+      observed_effect: input.observedEffect?.trim() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.interventionId)
+    .eq("school_id", input.schoolId);
+  if (error) throw error;
+  await writeAudit(
+    input.schoolId,
+    input.caseId,
+    "intervention_completed",
+    "intervention",
+    input.interventionId,
+  );
+}
+export async function createFollowup(input: {
+  caseId: string;
+  schoolId: string;
+  dueOn: string;
+  note: string;
+}) {
+  const note = input.note.trim();
+  if (!note) throw new Error("Doplňte navazující krok.");
+  if (!input.dueOn) throw new Error("Vyberte termín kontroly.");
+  const u = await authUserId();
+  const { data, error } = await db
+    .from("special_education_followups")
+    .insert({
+      case_id: input.caseId,
+      school_id: input.schoolId,
+      due_on: input.dueOn,
+      note,
+      created_by: u,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(input.schoolId, input.caseId, "followup_created", "followup", data.id);
+  return data.id as string;
+}
+export async function completeFollowup(input: {
+  followupId: string;
+  caseId: string;
+  schoolId: string;
+}) {
+  const { error } = await db
+    .from("special_education_followups")
+    .update({ completed_at: new Date().toISOString() })
+    .eq("id", input.followupId)
+    .eq("school_id", input.schoolId);
+  if (error) throw error;
+  await writeAudit(
+    input.schoolId,
+    input.caseId,
+    "followup_completed",
+    "followup",
+    input.followupId,
+  );
+}
+export async function createProgressReview(input: {
+  caseId: string;
+  schoolId: string;
+  areaCode?: string;
+  changeLevel: ProgressReview["change_level"];
+  evidence: string;
+  nextStep?: string;
+}) {
+  const evidence = input.evidence.trim();
+  if (!evidence) throw new Error("Doplňte konkrétní podklad pro vyhodnocení.");
+  const u = await authUserId();
+  const { data, error } = await db
+    .from("special_education_progress_reviews")
+    .insert({
+      case_id: input.caseId,
+      school_id: input.schoolId,
+      area_code: input.areaCode || null,
+      change_level: input.changeLevel,
+      evidence,
+      next_step: input.nextStep?.trim() || null,
+      created_by: u,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(
+    input.schoolId,
+    input.caseId,
+    "progress_review_created",
+    "progress_review",
+    data.id,
+  );
+  return data.id as string;
+}
+export async function loadOpenFollowups(schoolId: string) {
+  const { data, error } = await db
+    .from("special_education_followups")
+    .select("id,case_id,due_on,note,completed_at")
+    .eq("school_id", schoolId)
+    .is("completed_at", null)
+    .order("due_on", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Followup[];
+}
