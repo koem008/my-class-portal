@@ -199,7 +199,9 @@ function VoiceReflectionPage() {
   }
 
   if (loadState === "loading")
-    return <State title="Načítám hlasovou reflexi" icon={<Loader2 className="h-6 w-6 animate-spin" />} />;
+    return (
+      <State title="Načítám hlasovou reflexi" icon={<Loader2 className="h-6 w-6 animate-spin" />} />
+    );
 
   return (
     <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#24343f] md:px-8 md:py-8">
@@ -253,7 +255,9 @@ function VoiceReflectionPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="font-bold">1. Nadiktovat průběh</h2>
-                  <p className="mt-1 text-xs text-[#82908f]">Přepis zůstává konceptem, dokud ho nepotvrdíte.</p>
+                  <p className="mt-1 text-xs text-[#82908f]">
+                    Přepis zůstává konceptem, dokud ho nepotvrdíte.
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -289,7 +293,11 @@ function VoiceReflectionPage() {
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <ReflectionField label="Co se stihlo" value={completed} onChange={setCompleted} />
-                <ReflectionField label="Co se nestihlo" value={unfinished} onChange={setUnfinished} />
+                <ReflectionField
+                  label="Co se nestihlo"
+                  value={unfinished}
+                  onChange={setUnfinished}
+                />
                 <ReflectionField label="Co navázat příště" value={next} onChange={setNext} />
                 <ReflectionField label="Moje reflexe" value={reflection} onChange={setReflection} />
               </div>
@@ -311,7 +319,11 @@ function VoiceReflectionPage() {
                 disabled={saving || !selectedLesson}
                 className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#276765] px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
               >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
                 {saving ? "Ukládám…" : "Potvrdit a uložit reflexi"}
               </button>
             </section>
@@ -335,7 +347,8 @@ function structureTranscript(value: string): StructuredReflection {
   for (const sentence of sentences) {
     const normalized = sentence.toLocaleLowerCase("cs-CZ");
     if (/nestihl|nedokon|nezbyl|zbýv|zbyv/.test(normalized)) unfinished.push(sentence);
-    else if (/příště|priste|naváz|navaz|další hodin|dalsi hodin/.test(normalized)) next.push(sentence);
+    else if (/příště|priste|naváz|navaz|další hodin|dalsi hodin/.test(normalized))
+      next.push(sentence);
     else if (/stihl|probral|udělal|udelal|zvládl|zvladl|dokončil|dokonc/.test(normalized))
       completed.push(sentence);
     else reflection.push(sentence);
@@ -372,9 +385,11 @@ function ReflectionField({
 }
 
 function formatLesson(lesson: LessonInstance) {
-  const date = new Intl.DateTimeFormat("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" }).format(
-    new Date(`${lesson.lesson_date}T12:00:00`),
-  );
+  const date = new Intl.DateTimeFormat("cs-CZ", {
+    weekday: "short",
+    day: "numeric",
+    month: "numeric",
+  }).format(new Date(`${lesson.lesson_date}T12:00:00`));
   return `${date} · ${lesson.slot_order}. hodina · ${lesson.subject_name}${lesson.topic ? ` · ${lesson.topic}` : ""}`;
 }
 
