@@ -76,6 +76,7 @@ export function CaseTimeline({
             const area = labelFor(item.areaCode);
             const observationId = item.kind === "observation" ? item.id.replace(/^o:/, "") : null;
             const detail = observationId ? structuredById.get(observationId) : undefined;
+
             return (
               <div key={item.id} className="relative flex gap-4 py-3">
                 <div className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-200 bg-white">
@@ -90,31 +91,35 @@ export function CaseTimeline({
                   </div>
                   {area && <div className="mt-1 text-xs font-medium text-violet-700">{area}</div>}
                   <p className="mt-2 text-sm leading-6 text-slate-700">{item.detail}</p>
-                  {detail && (detail.supportUsed || detail.immediateResponse || detail.responseEffect) && (
-                    <div className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                      {detail.supportUsed && (
-                        <div>
-                          <span className="font-semibold text-slate-700">Použitá podpora:</span>{" "}
-                          <span className="text-slate-600">{detail.supportUsed}</span>
-                        </div>
-                      )}
-                      {detail.immediateResponse && (
-                        <div>
-                          <span className="font-semibold text-slate-700">Bezprostřední reakce:</span>{" "}
-                          <span className="text-slate-600">{detail.immediateResponse}</span>
-                        </div>
-                      )}
-                      {detail.responseEffect && (
-                        <div>
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 font-semibold ${effectClass[detail.responseEffect]}`}
-                          >
-                            Efekt: {effectLabel[detail.responseEffect]}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+
+                  {detail &&
+                    (detail.supportUsed || detail.immediateResponse || detail.responseEffect) && (
+                      <div className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
+                        {detail.supportUsed && (
+                          <div>
+                            <span className="font-semibold text-slate-700">Použitá podpora:</span>{" "}
+                            <span className="text-slate-600">{detail.supportUsed}</span>
+                          </div>
+                        )}
+                        {detail.immediateResponse && (
+                          <div>
+                            <span className="font-semibold text-slate-700">
+                              Bezprostřední reakce:
+                            </span>{" "}
+                            <span className="text-slate-600">{detail.immediateResponse}</span>
+                          </div>
+                        )}
+                        {detail.responseEffect && (
+                          <div>
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 font-semibold ${effectClass[detail.responseEffect]}`}
+                            >
+                              Efekt: {effectLabel[detail.responseEffect]}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                 </div>
               </div>
             );
