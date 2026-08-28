@@ -248,7 +248,9 @@ export function VoiceObservationDraft({
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-medium text-slate-900">{item.supportUsed}</div>
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.className}`}>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.className}`}
+                    >
                       {status.label}
                     </span>
                   </div>
@@ -267,7 +269,8 @@ export function VoiceObservationDraft({
                     </span>
                   </div>
                   <div className="mt-2 text-[11px] text-slate-500">
-                    Celkem {item.total} potvrzených použití · stav evidence je pouze mechanický souhrn.
+                    Celkem {item.total} potvrzených použití · stav evidence je pouze mechanický
+                    souhrn.
                   </div>
                 </div>
               );
