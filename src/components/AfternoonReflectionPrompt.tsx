@@ -8,6 +8,7 @@ import type { LessonInstance } from "@/lib/lesson-workspace-data";
 type PromptState = {
   lessons: LessonInstance[];
   missingReflectionIds: string[];
+  carryOverCount: number;
 };
 
 function localIsoDate(date: Date) {
@@ -50,16 +51,25 @@ export function AfternoonReflectionPrompt() {
         const lessonIds = lessons.map((lesson) => lesson.id);
         const { data, error } = await supabase
           .from("lesson_progress")
-          .select("lesson_id,state")
+          .select("lesson_id,state,unfinished_summary,next_lesson_note")
           .in("lesson_id", lessonIds);
         if (error) throw error;
+
         const reflectedIds = new Set(
           (data ?? []).filter((row) => row.state !== "not_started").map((row) => row.lesson_id),
         );
+        const carryOverCount = (data ?? []).filter(
+          (row) =>
+            row.state === "partial" ||
+            Boolean(row.unfinished_summary?.trim()) ||
+            Boolean(row.next_lesson_note?.trim()),
+        ).length;
+
         if (!active) return;
         setState({
           lessons,
           missingReflectionIds: lessonIds.filter((id) => !reflectedIds.has(id)),
+          carryOverCount,
         });
       } catch {
         // Fail quietly: afternoon assistance must never block the application.
@@ -71,7 +81,8 @@ export function AfternoonReflectionPrompt() {
     };
   }, [now]);
 
-  if (dismissed || !state || state.missingReflectionIds.length === 0) return null;
+  if (dismissed || !state) return null;
+  const allReflected = state.missingReflectionIds.length === 0;
   const firstMissing = state.missingReflectionIds[0];
 
   return (
@@ -85,36 +96,57 @@ export function AfternoonReflectionPrompt() {
         <X className="h-4 w-4" />
       </button>
       <div className="flex items-start gap-3 pr-8">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#f0ecff] text-[#6f5da8]">
-          <MoonStar className="h-5 w-5" />
+        <div
+          className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${allReflected ? "bg-[#e8f4ef] text-[#276765]" : "bg-[#f0ecff] text-[#6f5da8]"}`}
+        >
+          {allReflected ? <CheckCircle2 className="h-5 w-5" /> : <MoonStar className="h-5 w-5" />}
         </div>
         <div>
           <div className="text-xs font-bold uppercase tracking-[.14em] text-[#786aa0]">
             Po vyučování
           </div>
-          <h2 className="mt-1 text-lg font-bold text-[#24343f]">Jak to dnes dopadlo?</h2>
+          <h2 className="mt-1 text-lg font-bold text-[#24343f]">
+            {allReflected ? "Dnešek je uzavřený" : "Jak to dnes dopadlo?"}
+          </h2>
           <p className="mt-1 text-sm leading-5 text-[#758482]">
-            {state.missingReflectionIds.length === 1
-              ? "Jedna dnešní hodina ještě nemá potvrzenou reflexi."
-              : `${state.missingReflectionIds.length} dnešní hodiny ještě nemají potvrzenou reflexi.`}
+            {allReflected
+              ? state.carryOverCount > 0
+                ? `${state.lessons.length} hodin má potvrzenou reflexi. ${state.carryOverCount} návaznost se automaticky přenese do další výuky.`
+                : `${state.lessons.length} hodin má potvrzenou reflexi a nic nezůstává k přenesení.`
+              : state.missingReflectionIds.length === 1
+                ? "Jedna dnešní hodina ještě nemá potvrzenou reflexi."
+                : `${state.missingReflectionIds.length} dnešní hodiny ještě nemají potvrzenou reflexi.`}
           </p>
         </div>
       </div>
-      <Link
-        to="/hlas"
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#276765] px-4 py-3 text-sm font-bold text-white"
-      >
-        <Mic className="h-4 w-4" />
-        Nadiktovat, jak hodina dopadla
-      </Link>
-      <Link
-        to="/hodina/$lessonId"
-        params={{ lessonId: firstMissing }}
-        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#e5dfd4] px-4 py-2.5 text-xs font-bold text-[#5f7774]"
-      >
-        <CheckCircle2 className="h-4 w-4" />
-        Otevřít hodinu bez reflexe
-      </Link>
+
+      {allReflected ? (
+        <Link
+          to="/asistentka"
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#eef6f2] px-4 py-3 text-sm font-bold text-[#276765]"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          Zkontrolovat návaznosti
+        </Link>
+      ) : (
+        <>
+          <Link
+            to="/hlas"
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#276765] px-4 py-3 text-sm font-bold text-white"
+          >
+            <Mic className="h-4 w-4" />
+            Nadiktovat, jak hodina dopadla
+          </Link>
+          <Link
+            to="/hodina/$lessonId"
+            params={{ lessonId: firstMissing }}
+            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#e5dfd4] px-4 py-2.5 text-xs font-bold text-[#5f7774]"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Otevřít hodinu bez reflexe
+          </Link>
+        </>
+      )}
     </aside>
   );
 }
