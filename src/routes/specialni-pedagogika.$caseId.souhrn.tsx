@@ -168,7 +168,9 @@ function SpecialCaseSummaryPage() {
                     {item.dueOn && (
                       <div className="mt-2 text-[11px] text-slate-500">
                         Datum / poslední revize:{" "}
-                        {new Date(`${item.dueOn.slice(0, 10)}T12:00:00`).toLocaleDateString("cs-CZ")}
+                        {new Date(`${item.dueOn.slice(0, 10)}T12:00:00`).toLocaleDateString(
+                          "cs-CZ",
+                        )}
                       </div>
                     )}
                   </div>
