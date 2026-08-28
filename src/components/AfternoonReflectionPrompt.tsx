@@ -54,9 +54,7 @@ export function AfternoonReflectionPrompt() {
           .in("lesson_id", lessonIds);
         if (error) throw error;
         const reflectedIds = new Set(
-          (data ?? [])
-            .filter((row) => row.state !== "not_started")
-            .map((row) => row.lesson_id),
+          (data ?? []).filter((row) => row.state !== "not_started").map((row) => row.lesson_id),
         );
         if (!active) return;
         setState({
