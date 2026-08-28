@@ -7,6 +7,8 @@ export type OnboardingInput = {
   displayName: string;
   schoolName: string;
   className: string;
+  teachesArt: boolean;
+  isSpecialEducator: boolean;
 };
 
 export async function completeFirstRun(input: OnboardingInput) {
@@ -53,5 +55,17 @@ export async function completeFirstRun(input: OnboardingInput) {
   });
   if (membership.error) throw membership.error;
 
-  return { schoolId, academicYearId: year.data.id as string, classId: classInsert.data.id as string };
+  if (input.isSpecialEducator) {
+    const grant = await db.rpc("grant_special_education_access", { p_school_id: schoolId, p_user_id: user.id, p_role: "special_educator" });
+    if (grant.error) throw grant.error;
+  }
+
+  let artSubjectId: string | null = null;
+  if (input.teachesArt) {
+    const subject = await db.from("curriculum_subjects").select("id").eq("code", "VFV").lte("grade_from", 5).gte("grade_to", 5).maybeSingle();
+    if (subject.error) throw subject.error;
+    artSubjectId = subject.data?.id ?? null;
+  }
+
+  return { schoolId, academicYearId: year.data.id as string, classId: classInsert.data.id as string, artSubjectId, specialEducationEnabled: input.isSpecialEducator };
 }
