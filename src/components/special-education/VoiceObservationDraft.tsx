@@ -1,10 +1,7 @@
 import { AlertTriangle, CheckCircle2, Mic, ShieldCheck } from "lucide-react";
 import { useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  canConfirmVoiceDraft,
-  inspectVoiceDraft,
-} from "@/lib/special-education-voice-contract";
+import { canConfirmVoiceDraft, inspectVoiceDraft } from "@/lib/special-education-voice-contract";
 import {
   loadSpecialPedagogyAccess,
   type SupportAreaCatalogItem,
@@ -27,7 +24,11 @@ export function VoiceObservationDraft({
   areas,
 }: {
   areas: SupportAreaCatalogItem[];
-  onConfirm?: (draft: { observation: string; context?: string; areaCode?: string }) => Promise<void>;
+  onConfirm?: (draft: {
+    observation: string;
+    context?: string;
+    areaCode?: string;
+  }) => Promise<void>;
 }) {
   const params = useParams({ strict: false });
   const caseId = typeof params.caseId === "string" ? params.caseId : "";
@@ -57,7 +58,9 @@ export function VoiceObservationDraft({
 
   useEffect(() => {
     if (!caseId) return;
-    void loadSupportInsights(caseId).then(setInsights).catch(() => setInsights([]));
+    void loadSupportInsights(caseId)
+      .then(setInsights)
+      .catch(() => setInsights([]));
   }, [caseId]);
 
   async function confirm() {
@@ -175,10 +178,11 @@ export function VoiceObservationDraft({
           className="rounded-xl border px-3 py-2.5"
         >
           <option value="">Efekt zatím nehodnotit</option>
-          <option value="helped">Pomohlo</option>
-          <option value="no_clear_change">Bez jasné změny</option>
-          <option value="worse">Zhoršilo situaci</option>
-          <option value="unclear">Nelze zatím určit</option>
+          {Object.entries(effectLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -196,7 +200,9 @@ export function VoiceObservationDraft({
         </div>
       )}
 
-      {error && <div className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
+      {error && (
+        <div className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{error}</div>
+      )}
 
       <button
         disabled={saving || !confirmable}
@@ -208,7 +214,9 @@ export function VoiceObservationDraft({
       </button>
 
       <div className="mt-5 border-t pt-5">
-        <h3 className="text-sm font-semibold text-slate-800">Co se podle potvrzených záznamů opakuje</h3>
+        <h3 className="text-sm font-semibold text-slate-800">
+          Co se podle potvrzených záznamů opakuje
+        </h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">
           Pouze součet lidsky potvrzených efektů. Nejde o diagnózu ani automatický závěr AI.
         </p>
@@ -219,7 +227,10 @@ export function VoiceObservationDraft({
         ) : (
           <div className="mt-3 space-y-3">
             {insights.slice(0, 6).map((item) => (
-              <div key={item.supportUsed.toLocaleLowerCase("cs-CZ")} className="rounded-2xl bg-slate-50 p-4">
+              <div
+                key={item.supportUsed.toLocaleLowerCase("cs-CZ")}
+                className="rounded-2xl bg-slate-50 p-4"
+              >
                 <div className="font-medium text-slate-900">{item.supportUsed}</div>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800">
