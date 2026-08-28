@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Clock3, History, Mic, Plus, ShieldAlert, Target } from "lucide-react";
-import { addFactualObservation, completeFollowup, completeIntervention, createFollowup, createIntervention, createSupportGoal, loadCaseWorkspace, loadSpecialCases, type SpecialCase } from "@/lib/special-education-data";
-import { loadSpecialPedagogyAccess } from "@/lib/special-education-data";
+import { addFactualObservation, completeFollowup, completeIntervention, createFollowup, createIntervention, createSupportGoal, loadCaseWorkspace, loadSpecialCases, loadSpecialPedagogyAccess, loadSupportAreaCatalog, setCaseSupportArea, type SpecialCase, type SupportAreaCatalogItem } from "@/lib/special-education-data";
 
 export const Route = createFileRoute("/specialni-pedagogika/$caseId")({ component: SpecialCasePage });
 
@@ -10,6 +9,7 @@ function SpecialCasePage(){
   const { caseId } = Route.useParams();
   const [caseInfo,setCaseInfo]=useState<SpecialCase|null>(null);
   const [workspace,setWorkspace]=useState<any>(null);
+  const [catalog,setCatalog]=useState<SupportAreaCatalogItem[]>([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [observation,setObservation]=useState("");
@@ -22,9 +22,10 @@ function SpecialCasePage(){
   const [saving,setSaving]=useState(false);
 
   useEffect(()=>{ void reload(); },[caseId]);
-  async function reload(){ setLoading(true); setError(""); try{ const access=await loadSpecialPedagogyAccess(); if(!access.length) throw new Error("Nemáte aktivní oprávnění pro speciální pedagogiku."); const schoolId=access[0].school_id as string; const cases=await loadSpecialCases(schoolId); const current=cases.find(c=>c.id===caseId); if(!current) throw new Error("Případ nebyl nalezen nebo k němu nemáte přístup."); setCaseInfo(current); setWorkspace(await loadCaseWorkspace(caseId)); }catch(e:any){setError(e?.message??"Případ se nepodařilo načíst.");}finally{setLoading(false);} }
+  async function reload(){ setLoading(true); setError(""); try{ const access=await loadSpecialPedagogyAccess(); if(!access.length) throw new Error("Nemáte aktivní oprávnění pro speciální pedagogiku."); const schoolId=access[0].school_id as string; const cases=await loadSpecialCases(schoolId); const current=cases.find(c=>c.id===caseId); if(!current) throw new Error("Případ nebyl nalezen nebo k němu nemáte přístup."); setCaseInfo(current); const [ws,cat]=await Promise.all([loadCaseWorkspace(caseId),loadSupportAreaCatalog()]); setWorkspace(ws); setCatalog(cat); }catch(e:any){setError(e?.message??"Případ se nepodařilo načíst.");}finally{setLoading(false);} }
   const schoolId=caseInfo?.school_id;
   const openFollowups=useMemo(()=>workspace?.followups?.filter((f:any)=>!f.completed_at)??[],[workspace]);
+  const activeCodes=useMemo(()=>new Set((workspace?.supportAreas??[]).map((a:any)=>a.area_code)),[workspace]);
 
   async function run(action:()=>Promise<any>,clear?:()=>void){ if(!schoolId) return; setSaving(true); setError(""); try{await action(); clear?.(); await reload();}catch(e:any){setError(e?.message??"Změnu se nepodařilo uložit.");}finally{setSaving(false);} }
 
@@ -39,10 +40,18 @@ function SpecialCasePage(){
 
     {error&&<div className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
 
+    <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm">
+      <div className="mb-4"><h2 className="font-semibold">Oblasti podpory</h2><p className="mt-1 text-sm text-slate-500">Pedagogické oblasti, ne diagnózy. Aktivujte jen to, co je skutečně relevantní.</p></div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{catalog.map(area=>{
+        const linked=(workspace.supportAreas??[]).find((x:any)=>x.area_code===area.code);
+        return <div key={area.code} className={`rounded-2xl border p-4 ${linked?"border-violet-200 bg-violet-50/60":"border-slate-200 bg-white"}`}><div className="font-medium">{area.label}</div><p className="mt-1 text-xs leading-5 text-slate-500">{area.description}</p>{linked?<div className="mt-3 flex gap-2"><select value={linked.status} onChange={e=>void run(()=>setCaseSupportArea({caseId,schoolId:schoolId!,areaCode:area.code,status:e.target.value as any,note:linked.note??undefined}))} className="rounded-xl border bg-white px-2 py-2 text-xs"><option value="active">Aktivní</option><option value="monitoring">Sledování</option><option value="resolved">Vyřešeno</option></select></div>:<button disabled={saving} onClick={()=>void run(()=>setCaseSupportArea({caseId,schoolId:schoolId!,areaCode:area.code,status:"active"}))} className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900">Přidat oblast</button>}</div>
+      })}</div>
+    </section>
+
     <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
       <section className="space-y-5">
-        <Card title="Nové faktické pozorování"><div className="grid gap-3"><input value={context} onChange={e=>setContext(e.target.value)} placeholder="Kontext, např. samostatná práce" className="rounded-xl border px-3 py-2.5"/><input value={supportArea} onChange={e=>setSupportArea(e.target.value)} placeholder="Oblast podpory, např. pracovní tempo" className="rounded-xl border px-3 py-2.5"/><textarea value={observation} onChange={e=>setObservation(e.target.value)} rows={4} placeholder="Co bylo skutečně pozorováno…" className="rounded-xl border px-3 py-2.5"/><button disabled={saving||!observation.trim()} onClick={()=>void run(()=>addFactualObservation({caseId,schoolId:schoolId!,observation,context,supportArea}),()=>{setObservation("");setContext("");setSupportArea("");})} className="rounded-xl bg-slate-900 px-4 py-3 font-medium text-white disabled:opacity-40">Uložit pozorování</button></div></Card>
-        <Card title="Historie pozorování">{workspace.observations.length===0?<Empty text="Zatím bez pozorování."/>:<div className="space-y-3">{workspace.observations.map((o:any)=><div key={o.id} className="rounded-2xl bg-slate-50 p-4"><div className="text-xs text-slate-500">{new Date(o.observed_at).toLocaleString("cs-CZ")}{o.context?` · ${o.context}`:""}</div><div className="mt-2 text-sm leading-6">{o.observation}</div>{o.support_area&&<div className="mt-2 text-xs font-medium text-violet-700">{o.support_area}</div>}</div>)}</div>}</Card>
+        <Card title="Nové faktické pozorování"><div className="grid gap-3"><input value={context} onChange={e=>setContext(e.target.value)} placeholder="Kontext, např. samostatná práce" className="rounded-xl border px-3 py-2.5"/><select value={supportArea} onChange={e=>setSupportArea(e.target.value)} className="rounded-xl border px-3 py-2.5"><option value="">Bez přiřazení oblasti</option>{catalog.filter(a=>activeCodes.has(a.code)).map(a=><option key={a.code} value={a.code}>{a.label}</option>)}</select><textarea value={observation} onChange={e=>setObservation(e.target.value)} rows={4} placeholder="Co bylo skutečně pozorováno…" className="rounded-xl border px-3 py-2.5"/><button disabled={saving||!observation.trim()} onClick={()=>void run(()=>addFactualObservation({caseId,schoolId:schoolId!,observation,context,supportArea}),()=>{setObservation("");setContext("");setSupportArea("");})} className="rounded-xl bg-slate-900 px-4 py-3 font-medium text-white disabled:opacity-40">Uložit pozorování</button></div></Card>
+        <Card title="Historie pozorování">{workspace.observations.length===0?<Empty text="Zatím bez pozorování."/>:<div className="space-y-3">{workspace.observations.map((o:any)=><div key={o.id} className="rounded-2xl bg-slate-50 p-4"><div className="text-xs text-slate-500">{new Date(o.observed_at).toLocaleString("cs-CZ")}{o.context?` · ${o.context}`:""}</div><div className="mt-2 text-sm leading-6">{o.observation}</div>{o.support_area&&<div className="mt-2 text-xs font-medium text-violet-700">{catalog.find(a=>a.code===o.support_area)?.label??o.support_area}</div>}</div>)}</div>}</Card>
         <Card title="Intervence"><div className="grid gap-3"><textarea value={strategy} onChange={e=>setStrategy(e.target.value)} rows={3} placeholder="Co plánujeme pedagogicky vyzkoušet…" className="rounded-xl border px-3 py-2.5"/><button disabled={saving||!strategy.trim()} onClick={()=>void run(()=>createIntervention({caseId,schoolId:schoolId!,strategy}),()=>setStrategy(""))} className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 font-medium text-violet-900 disabled:opacity-40"><Plus className="mr-2 inline h-4 w-4"/>Přidat intervenci</button></div><div className="mt-4 space-y-3">{workspace.interventions.map((i:any)=><div key={i.id} className="rounded-2xl border p-4"><div className="text-sm font-medium">{i.strategy}</div><div className="mt-2 flex items-center justify-between gap-3"><span className="text-xs text-slate-500">{i.status==="planned"?"Plánováno":i.status==="completed"?"Dokončeno":"Zrušeno"}</span>{i.status==="planned"&&<button onClick={()=>void run(()=>completeIntervention({interventionId:i.id,caseId,schoolId:schoolId!}))} className="text-xs font-semibold text-emerald-700">Označit jako provedené</button>}</div></div>)}</div></Card>
       </section>
 
@@ -57,4 +66,4 @@ function SpecialCasePage(){
 
 function Card({title,children,icon}:{title:string;children:any;icon?:any}){return <section className="rounded-3xl bg-white p-5 shadow-sm"><div className="mb-4 flex items-center gap-2 font-semibold">{icon}{title}</div>{children}</section>}
 function Empty({text}:{text:string}){return <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">{text}</div>}
-function labelAction(a:string){return ({case_created:"Případ vytvořen",observation_created:"Pozorování uloženo",goal_created:"Cíl podpory vytvořen",intervention_created:"Intervence vytvořena",intervention_completed:"Intervence označena jako provedená",followup_created:"Follow-up vytvořen",followup_completed:"Follow-up dokončen",case_status_changed:"Stav případu změněn"} as Record<string,string>)[a]||a}
+function labelAction(a:string){return ({case_created:"Případ vytvořen",observation_created:"Pozorování uloženo",goal_created:"Cíl podpory vytvořen",intervention_created:"Intervence vytvořena",intervention_completed:"Intervence označena jako provedená",followup_created:"Follow-up vytvořen",followup_completed:"Follow-up dokončen",case_status_changed:"Stav případu změněn",support_area_updated:"Oblast podpory aktualizována",support_area_removed:"Oblast podpory odebrána"} as Record<string,string>)[a]||a}
