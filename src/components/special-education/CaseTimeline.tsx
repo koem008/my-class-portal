@@ -1,9 +1,11 @@
-import { BookOpenCheck, CalendarClock, Eye, Target, Wrench } from "lucide-react";
+import { AlertTriangle, BookOpenCheck, CalendarClock, Eye, Target, Wrench } from "lucide-react";
 import { useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import type { SupportAreaCatalogItem, TimelineItem } from "@/lib/special-education-data";
 import {
+  loadCaseContinuityWatch,
   loadStructuredObservations,
+  type ContinuityAlert,
   type ObservationEffect,
   type StructuredObservation,
 } from "@/lib/special-observation-data";
@@ -22,6 +24,12 @@ const effectClass: Record<ObservationEffect, string> = {
   unclear: "bg-amber-100 text-amber-800",
 };
 
+const alertClass: Record<ContinuityAlert["severity"], string> = {
+  high: "border-rose-200 bg-rose-50 text-rose-900",
+  medium: "border-amber-200 bg-amber-50 text-amber-900",
+  low: "border-slate-200 bg-slate-50 text-slate-700",
+};
+
 export function CaseTimeline({
   items,
   catalog,
@@ -32,12 +40,19 @@ export function CaseTimeline({
   const params = useParams({ strict: false });
   const caseId = typeof params.caseId === "string" ? params.caseId : "";
   const [structured, setStructured] = useState<StructuredObservation[]>([]);
+  const [continuity, setContinuity] = useState<ContinuityAlert[]>([]);
 
   useEffect(() => {
     if (!caseId) return;
-    void loadStructuredObservations(caseId)
-      .then(setStructured)
-      .catch(() => setStructured([]));
+    void Promise.all([loadStructuredObservations(caseId), loadCaseContinuityWatch(caseId)])
+      .then(([observations, alerts]) => {
+        setStructured(observations);
+        setContinuity(alerts);
+      })
+      .catch(() => {
+        setStructured([]);
+        setContinuity([]);
+      });
   }, [caseId]);
 
   const structuredById = useMemo(
@@ -74,6 +89,43 @@ export function CaseTimeline({
         <h2 className="font-semibold">Časová osa vývoje</h2>
         <p className="mt-1 text-sm text-slate-500">
           Jedno místo pro pozorování, cíle, intervence, vyhodnocení a follow-up.
+        </p>
+      </div>
+
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.12em] text-slate-700">
+          <AlertTriangle className="h-4 w-4" />
+          Kontinuita podpory
+        </div>
+        {continuity.length === 0 ? (
+          <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">
+            Aktuálně tu není žádný termín nebo revize, kterou by bylo potřeba připomenout.
+          </div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {continuity.slice(0, 8).map((alert) => (
+              <div
+                key={alert.id}
+                className={`rounded-xl border p-3 text-sm ${alertClass[alert.severity]}`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="font-semibold">{alert.title}</div>
+                    <div className="mt-1 text-xs opacity-80">{alert.detail}</div>
+                  </div>
+                  {alert.dueOn && (
+                    <span className="shrink-0 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold">
+                      {new Date(`${alert.dueOn.slice(0, 10)}T12:00:00`).toLocaleDateString("cs-CZ")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="mt-3 text-[11px] leading-5 text-slate-500">
+          Upozornění vznikají pouze z termínů a data poslední revize. Systém sám nemění cíle,
+          intervence ani odborné závěry.
         </p>
       </div>
 
