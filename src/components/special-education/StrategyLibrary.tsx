@@ -18,10 +18,13 @@ export function StrategyLibrary({
   onUse: (strategy: StrategyCatalogItem) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const active = new Set(areas.filter((a) => a.status !== "resolved").map((a) => a.area_code));
+  const active = useMemo(
+    () => new Set(areas.filter((a) => a.status !== "resolved").map((a) => a.area_code)),
+    [areas],
+  );
   const visible = useMemo(
     () => strategies.filter((s) => active.has(s.area_code)),
-    [strategies, areas],
+    [strategies, active],
   );
   if (!active.size)
     return (
