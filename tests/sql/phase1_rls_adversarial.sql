@@ -1,0 +1,35 @@
+-- MOJE TŘÍDA — PHASE 1 adversarial RLS test specification
+-- Intended for local/test Supabase only. Do not run against production data.
+--
+-- This file documents executable scenarios expected from the final Phase 1
+-- schema. It deliberately contains no real child identities.
+
+-- Required actors:
+-- school A admin, teacher A, school B admin, teacher B.
+-- Required data:
+-- school A/class A/alias 'Jezevec'
+-- school B/class B/alias 'Kometa'
+--
+-- Execute requests under authenticated JWTs for each actor and assert:
+--
+-- 1. teacher A SELECT class A => allowed
+-- 2. teacher A SELECT class B => 0 rows / denied
+-- 3. teacher A SELECT aliases class A => allowed
+-- 4. teacher A SELECT aliases class B => 0 rows / denied
+-- 5. teacher A INSERT alias into class A with matching school A => allowed
+-- 6. teacher A INSERT alias into class B => denied
+-- 7. teacher A INSERT alias with class A + school B => denied by FK/RLS
+-- 8. teacher A UPDATE alias A => allowed
+-- 9. teacher A UPDATE alias B => denied
+-- 10. teacher A DELETE alias B => denied
+-- 11. teacher A UPDATE school_membership role to school_admin => denied
+-- 12. anonymous SELECT schools/classes/student_aliases => denied
+-- 13. changing URL/UUID to foreign class id => denied
+-- 14. direct PostgREST access gives same result as UI route
+-- 15. school A admin cannot access school B without membership
+-- 16. no table containing child data has a policy with USING (true)
+-- 17. no child table contains full_name, birth_date, email, phone, address
+-- 18. student_alias UUID remains the technical identifier; alias is not PK
+--
+-- Phase 1 may not be marked complete until these scenarios are automated in
+-- the available test environment and all pass.
