@@ -51,6 +51,7 @@ export default tseslint.config(
       "src/lib/onboarding-data.ts",
       "src/lib/schedule-data.ts",
       "src/lib/special-education-data.ts",
+      "src/lib/special-observation-data.ts",
       "src/routes/asistentka.tsx",
       "src/routes/index.tsx",
       "src/routes/specialni-pedagogika.$caseId.tsx",
