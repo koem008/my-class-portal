@@ -213,12 +213,13 @@ function VoiceReflectionPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-[-.03em]">Hlas po hodině</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#758482]">
-              Nadiktujte, co se skutečně stalo. Zvuk se neukládá; do databáze se uloží až vámi
-              potvrzený text.
+              Nadiktujte, co se skutečně stalo. Aplikace sama audio nearchivuje a do databáze se
+              uloží až vámi potvrzený text. Samotný převod řeči může podle prohlížeče zajišťovat
+              jeho vlastní speech služba.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-2xl bg-[#eef6f2] px-3 py-2 text-xs font-bold text-[#276765]">
-            <ShieldCheck className="h-4 w-4" /> Bez audio archivu
+            <ShieldCheck className="h-4 w-4" /> Bez audio archivu v aplikaci
           </div>
         </div>
 
