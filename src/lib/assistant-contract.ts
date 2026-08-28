@@ -1,0 +1,38 @@
+export type AssistantMode = "morning" | "lesson" | "week" | "materials" | "reflection" | "companion";
+export type AssistantTone = "friendly" | "calm" | "efficient" | "custom";
+
+export type SafeStudentSignal = {
+  alias: string;
+  signal: "needs_practice" | "improving" | "mastered" | "advanced" | "follow_up";
+  note?: string;
+};
+
+export type AssistantContext = {
+  mode: AssistantMode;
+  date: string;
+  classId?: string;
+  lessonId?: string;
+  schedule?: Array<{ subject: string; startsAt?: string; preparationState?: string }>;
+  calendar?: Array<{ title: string; startsAt: string; blocksLessons?: boolean }>;
+  unfinished?: string[];
+  curriculumCodes?: string[];
+  studentSignals?: SafeStudentSignal[];
+  explicitTeacherPreferences?: string[];
+};
+
+const forbiddenKeys = /(^|_)(name|first_name|last_name|email|phone|address|birth_date|rodne_cislo|personal_id)($|_)/i;
+
+export function assertPrivacySafe(value: unknown, path = "context"): void {
+  if (Array.isArray(value)) return value.forEach((v, i) => assertPrivacySafe(v, `${path}[${i}]`));
+  if (!value || typeof value !== "object") return;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (forbiddenKeys.test(key)) throw new Error(`Privacy contract rejected forbidden field at ${path}.${key}`);
+    assertPrivacySafe(child, `${path}.${key}`);
+  }
+}
+
+export function buildAssistantRequest(context: AssistantContext, message: string) {
+  const payload = { context, message: message.trim().slice(0, 6000) };
+  assertPrivacySafe(payload);
+  return payload;
+}

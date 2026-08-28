@@ -1,0 +1,42 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { CalendarDays, CheckCircle2, ChevronRight, Heart, Mic, MoonStar, Settings2, Sparkles, SunMedium, Volume2 } from "lucide-react";
+import { useMemo, useState } from "react";
+
+export const Route = createFileRoute("/asistentka")({ component: AssistantPage });
+
+type Tone = "Přátelská" | "Klidná" | "Efektivní";
+
+function AssistantPage() {
+  const [tone, setTone] = useState<Tone>("Přátelská");
+  const [listening, setListening] = useState(false);
+  const [memory, setMemory] = useState(true);
+  const today = useMemo(() => new Intl.DateTimeFormat("cs-CZ", { weekday: "long", day: "numeric", month: "long" }).format(new Date()), []);
+
+  return <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#24343f] md:px-8 md:py-8">
+    <div className="mx-auto max-w-6xl">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div><Link to="/" className="text-xs font-semibold text-[#4e7772]">← Moje třída</Link><h1 className="mt-2 text-3xl font-bold tracking-[-.03em]">Moje asistentka</h1><p className="mt-1 text-sm capitalize text-[#82908f]">{today}</p></div>
+        <div className="flex rounded-2xl border border-[#e8e4dc] bg-white p-1">{(["Přátelská","Klidná","Efektivní"] as Tone[]).map(x=><button key={x} onClick={()=>setTone(x)} className={`rounded-xl px-3 py-2 text-xs font-semibold ${tone===x?"bg-[#e8f4ef] text-[#276765]":"text-[#7d898a]"}`}>{x}</button>)}</div>
+      </header>
+
+      <section className="mt-6 overflow-hidden rounded-[34px] border border-[#e8e3d9] bg-gradient-to-br from-white via-[#fffaf2] to-[#eaf6f0] p-6 shadow-[0_22px_70px_rgba(66,82,73,.1)] md:p-9">
+        <div className="flex items-start gap-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-[#276765] text-white shadow-lg"><Sparkles className="h-6 w-6"/></div><div><div className="text-xs font-bold uppercase tracking-[.16em] text-[#5b817c]">Ranní briefing</div><h2 className="mt-2 text-2xl font-bold">Dobré ráno, Káťo. Jak se dnes daří?</h2><p className="mt-3 max-w-3xl text-sm leading-6 text-[#627477]">Dnes nás čeká běžný školní den. Jakmile bude rozvrh napojený na data, shrnu tady připravené hodiny, chybějící materiály, porady, výlety i nedodělky z předchozí výuky. Osobní věci zmíním pouze tehdy, když mi je sama dovolíš pamatovat.</p></div></div>
+        <div className="mt-6 grid gap-3 md:grid-cols-3"><Brief icon={CalendarDays} title="Dnešní plán" text="Rozvrh, události a změny na jednom místě."/><Brief icon={CheckCircle2} title="Co je připravené" text="Přípravy a materiály bez hledání v menu."/><Brief icon={Heart} title="Soukromý kontext" text="Jen informace, které výslovně povolíš."/></div>
+      </section>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_.65fr]">
+        <section className="rounded-[30px] border border-[#e9e5dd] bg-white p-5 md:p-7"><div className="flex items-center justify-between"><div><h2 className="font-bold">Řekni mi, co potřebuješ</h2><p className="mt-1 text-xs text-[#83908f]">Hlas se spouští pouze po stisknutí tlačítka.</p></div><Volume2 className="h-5 w-5 text-[#77928e]"/></div>
+          <button onClick={()=>setListening(!listening)} className={`mx-auto mt-8 grid h-28 w-28 place-items-center rounded-full text-white shadow-[0_18px_45px_rgba(39,103,101,.25)] transition ${listening?"scale-105 bg-[#b85f61]":"bg-[#276765] hover:scale-105"}`}><Mic className="h-9 w-9"/></button><p className="mt-4 text-center text-sm font-semibold text-[#53696a]">{listening?"Poslouchám… klepnutím zastavíš":"Klepni a mluv přirozeně"}</p>
+          <div className="mt-7 grid gap-2 sm:grid-cols-2">{["Připrav mi zítřejší matematiku","Co ještě dnes musím dodělat?","Včera jsme nestihli zlomky","Vytvoř pracovní list k další hodině"].map(x=><button key={x} className="flex items-center justify-between rounded-2xl bg-[#f8f7f3] px-4 py-3 text-left text-sm text-[#5e7072] hover:bg-[#eef6f2]">{x}<ChevronRight className="h-4 w-4"/></button>)}</div>
+          <div className="mt-6 rounded-2xl border border-dashed border-[#ddd8ce] bg-[#fcfbf8] p-4 text-xs leading-5 text-[#7b8989]"><strong>AI zatím není připojena.</strong> Rozhraní je připravené pro externí provider. Dokud nebude serverově vložen API klíč, nic se neposílá třetí straně a tlačítka pouze ukazují připravený workflow.</div>
+        </section>
+
+        <aside className="space-y-4"><section className="rounded-[28px] border border-[#e9e5dd] bg-white p-5"><div className="flex items-center gap-2"><SunMedium className="h-5 w-5 text-[#c98a3e]"/><h3 className="font-bold">Ráno</h3></div><p className="mt-2 text-sm leading-6 text-[#718082]">Krátce projdeme den a připravíme jen to, co opravdu chybí.</p></section><section className="rounded-[28px] border border-[#e9e5dd] bg-white p-5"><div className="flex items-center gap-2"><MoonStar className="h-5 w-5 text-[#746ca3]"/><h3 className="font-bold">Po škole</h3></div><p className="mt-2 text-sm leading-6 text-[#718082]">Řekneš, co se stihlo. Já připravím reflexi, nedodělky a návrh zítřka k potvrzení.</p></section>
+          <section className="rounded-[28px] border border-[#e9e5dd] bg-white p-5"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><Settings2 className="h-5 w-5 text-[#5d7774]"/><h3 className="font-bold">Osobní paměť</h3></div><button onClick={()=>setMemory(!memory)} className={`h-7 w-12 rounded-full p-1 transition ${memory?"bg-[#276765]":"bg-[#d8dcda]"}`}><span className={`block h-5 w-5 rounded-full bg-white transition ${memory?"translate-x-5":""}`}/></button></div><p className="mt-2 text-xs leading-5 text-[#7b8989]">{memory?"Zapnutá. Uloží se jen to, co výslovně dovolíš pamatovat.":"Vypnutá. Asistentka používá pouze pracovní kontext."}</p><button className="mt-3 text-xs font-bold text-[#276765]">Co si o mně pamatuješ →</button></section>
+        </aside>
+      </div>
+    </div>
+  </main>;
+}
+
+function Brief({icon:Icon,title,text}:{icon:any;title:string;text:string}) { return <div className="rounded-2xl bg-white/75 p-4"><Icon className="h-5 w-5 text-[#39716c]"/><div className="mt-2 text-sm font-bold">{title}</div><p className="mt-1 text-xs leading-5 text-[#7a8989]">{text}</p></div> }
