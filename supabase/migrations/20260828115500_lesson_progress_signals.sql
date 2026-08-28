@@ -3,6 +3,8 @@ begin;
 create type public.lesson_progress_state as enum ('not_started','partial','completed');
 create type public.learning_signal_kind as enum ('needs_practice','improving','mastered','advanced','follow_up');
 
+create unique index if not exists student_aliases_school_id_id_uq on public.student_aliases(school_id,id);
+
 create table public.lesson_progress (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
