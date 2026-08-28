@@ -1,24 +1,61 @@
-# My Class Portal
+# Moje třída
 
-založ nový projekt Moje třída
+AI pracovní systém pro učitele 1. stupně základní školy.
 
-This project was built with [Lovable](https://lovable.dev).
+První produkční cíl:
 
-## Build with Lovable
+- 5. ročník ZŠ
+- školní rok 2026/2027
+- jedna konkrétní učitelka a jedna konkrétní třída
+- kompletní plán učiva a skutečný postup výuky
+- přípravy jednotlivých hodin
+- zápisy, pracovní listy, úkoly, testy a kreativní aktivity
+- hlasové zadávání se strukturovaným zpracováním
+- pseudonymní profily žáků bez skutečných identifikačních údajů
+- AI orchestrátor pracující nad ověřeným kurikulem
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/563d2b8e-9993-46c0-94c5-c3051e755612).
+## Zásadní bezpečnostní pravidla
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+- skutečná jména a data narození dětí nejsou součástí cílového AI systému
+- žák je reprezentován interním UUID a pseudonymem
+- převodní tabulka mezi skutečnou identitou a pseudonymem zůstává mimo aplikaci
+- každá škola a třída musí být databázově izolovaná
+- frontend není bezpečnostní hranice
+- citlivé tabulky nesmí mít univerzální `USING (true)` RLS policies
+- AI dostává pouze minimální kontext nutný pro konkrétní úlohu
+- kritické změny navrhuje AI, schvaluje učitel
+- hlasové audio je standardně dočasné a po zpracování se odstraní
 
-## Development
+## Aktuální stav
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Projekt je ve **Phase 0 — architektura a audit**.
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+Současný technický skeleton je použitelný, ale existující databázový model ještě nesplňuje cílové požadavky na pseudonymizaci a tenant isolation. Před vývojem kurikula, hlasu a AI musí proběhnout Phase 1 — bezpečná přestavba datové a autorizační vrstvy.
+
+Dokumentace:
+
+- `docs/PHASE-0-AUDIT.md`
+- `docs/ARCHITECTURE.md`
+- `docs/SECURITY.md`
+- `docs/ROADMAP.md`
+
+## Technologie
+
+- React 19
+- TypeScript
+- TanStack Start / TanStack Router
+- TanStack Query
+- Tailwind CSS
+- Supabase / PostgreSQL
+- Supabase Auth / Storage
+- Row Level Security
+- Zod
+- PWA v pozdější fázi
+- AI provider abstraction
+- speech-to-text vrstva pro češtinu
+
+## Vývoj
+
+`main` musí zůstávat stabilní. Každá významná fáze se vyvíjí v samostatné branch a kontroluje přes Pull Request.
+
+Projekt je propojený s Lovable; přepisování publikované Git historie force-pushem nebo rebasingem již publikovaných commitů se nepoužívá.
