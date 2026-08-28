@@ -1,10 +1,78 @@
-import { assertPrivacySafePayload, type LessonAiRequest, type LessonAiResult } from "./contracts";
+import {
+  assertPrivacySafePayload,
+  type LessonAiAction,
+  type LessonAiRequest,
+  type LessonAiResult,
+} from "./contracts";
 
 export type ExternalAiProviderConfig = {
   baseUrl: string;
   apiKey: string;
-  model: string;
+  model?: string;
+  economyModel?: string;
+  strongModel?: string;
 };
+
+export type ExternalAiRuntimeStatus =
+  | { configured: false; code: "AI_NOT_CONFIGURED"; message: string }
+  | {
+      configured: true;
+      provider: string;
+      economyModel: string;
+      strongModel: string;
+    };
+
+export function readExternalAiProviderConfigFromEnv(): ExternalAiProviderConfig | null {
+  const baseUrl = process.env.AI_BASE_URL?.trim();
+  const apiKey = process.env.AI_API_KEY?.trim();
+  const economyModel = process.env.AI_ECONOMY_MODEL?.trim();
+  const strongModel = process.env.AI_STRONG_MODEL?.trim();
+  const fallbackModel = process.env.AI_MODEL?.trim();
+
+  if (!baseUrl || !apiKey || (!fallbackModel && (!economyModel || !strongModel))) return null;
+  return {
+    baseUrl,
+    apiKey,
+    model: fallbackModel,
+    economyModel: economyModel || fallbackModel,
+    strongModel: strongModel || fallbackModel,
+  };
+}
+
+export function getExternalAiRuntimeStatus(): ExternalAiRuntimeStatus {
+  const config = readExternalAiProviderConfigFromEnv();
+  if (!config) {
+    return {
+      configured: false,
+      code: "AI_NOT_CONFIGURED",
+      message: "AI zatím není připojena.",
+    };
+  }
+  const provider = safeProviderName(config.baseUrl);
+  return {
+    configured: true,
+    provider,
+    economyModel: config.economyModel || config.model || "",
+    strongModel: config.strongModel || config.model || "",
+  };
+}
+
+export function chooseModelForLessonAction(
+  config: ExternalAiProviderConfig,
+  action: LessonAiAction,
+): string {
+  const strongActions = new Set<LessonAiAction>([
+    "lesson_plan",
+    "worksheet",
+    "presentation_outline",
+    "differentiation",
+  ]);
+  const selected = strongActions.has(action)
+    ? config.strongModel || config.model
+    : config.economyModel || config.model;
+  if (!selected) throw new Error("AI_NOT_CONFIGURED");
+  return selected;
+}
 
 export async function generateLessonAsset(
   config: ExternalAiProviderConfig,
@@ -13,10 +81,11 @@ export async function generateLessonAsset(
 ): Promise<LessonAiResult> {
   assertPrivacySafePayload(request);
 
-  if (!config.baseUrl || !config.apiKey || !config.model) {
-    throw new Error("External AI provider is not configured");
+  if (!config.baseUrl || !config.apiKey) {
+    throw new Error("AI_NOT_CONFIGURED");
   }
 
+  const model = chooseModelForLessonAction(config, request.action);
   const response = await fetch(config.baseUrl, {
     method: "POST",
     headers: {
@@ -24,7 +93,7 @@ export async function generateLessonAsset(
       authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify({
-      model: config.model,
+      model,
       response_format: "json",
       input: {
         system: [
@@ -61,7 +130,15 @@ export async function generateLessonAsset(
     title,
     content: content as Record<string, unknown>,
     warnings: Array.isArray(warnings)
-      ? warnings.filter((v): v is string => typeof v === "string")
+      ? warnings.filter((value): value is string => typeof value === "string")
       : [],
   };
+}
+
+function safeProviderName(baseUrl: string) {
+  try {
+    return new URL(baseUrl).hostname;
+  } catch {
+    return "external-provider";
+  }
 }
