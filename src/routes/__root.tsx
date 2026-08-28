@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AfternoonReflectionPrompt } from "@/components/AfternoonReflectionPrompt";
+import { SpecialContinuityAssistantCard } from "@/components/special-education/SpecialContinuityAssistantCard";
 
 function NotFoundComponent() {
   return (
@@ -128,6 +129,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <SpecialContinuityAssistantCard />
       <AfternoonReflectionPrompt />
       <Link
         to="/hlas"
