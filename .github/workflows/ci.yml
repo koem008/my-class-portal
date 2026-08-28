@@ -29,7 +29,19 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Lint
-        run: bun run lint
+        shell: bash
+        run: |
+          set -o pipefail
+          bun run lint 2>&1 | tee lint.log
+
+      - name: Upload lint log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-log
+          path: lint.log
+          if-no-files-found: ignore
+          retention-days: 2
 
       - name: Build
         run: bun run build
