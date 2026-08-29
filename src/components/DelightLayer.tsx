@@ -19,6 +19,8 @@ export function DelightLayer() {
 
   useEffect(() => {
     let hideTimer: number | undefined;
+    let ambientTimer: number | undefined;
+    let lastDetected = "";
 
     const show = (next: DelightDetail, oncePerDay = false) => {
       if (oncePerDay) {
@@ -34,17 +36,34 @@ export function DelightLayer() {
     const onDelight = (event: Event) => show((event as CustomEvent<DelightDetail>).detail);
     window.addEventListener(DELIGHT_EVENT, onDelight);
 
+    const inspectSuccessCopy = () => {
+      const text = document.body.innerText;
+      const signatures: Array<[string, DelightDetail]> = [
+        ["Připraveno na zítřek. ✓", { kind: "prep_ready" }],
+        ["Příprava je hotová a bezpečně uložená. ✓", { kind: "prep_ready" }],
+        [
+          "Reflexe je uložená. Návaznost další hodiny se přepočítala.",
+          { kind: "day_done", message: "Reflexe uložená. Pro dnešek může hlava vypnout." },
+        ],
+      ];
+
+      for (const [signature, next] of signatures) {
+        if (!text.includes(signature) || lastDetected === signature) continue;
+        lastDetected = signature;
+        show(next);
+        return;
+      }
+    };
+
+    const observer = new MutationObserver(() => inspectSuccessCopy());
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+
     const ambient = getDailyAmbientDelight();
-    if (ambient) {
-      const timer = window.setTimeout(() => show(ambient, true), 700);
-      return () => {
-        window.clearTimeout(timer);
-        if (hideTimer) window.clearTimeout(hideTimer);
-        window.removeEventListener(DELIGHT_EVENT, onDelight);
-      };
-    }
+    if (ambient) ambientTimer = window.setTimeout(() => show(ambient, true), 700);
 
     return () => {
+      observer.disconnect();
+      if (ambientTimer) window.clearTimeout(ambientTimer);
       if (hideTimer) window.clearTimeout(hideTimer);
       window.removeEventListener(DELIGHT_EVENT, onDelight);
     };
