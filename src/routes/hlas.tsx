@@ -110,7 +110,9 @@ function VoiceReflectionPage() {
   async function startDictation() {
     setNotice("");
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setNotice("Tento prohlížeč neumí bezpečně vytvořit hlasovou nahrávku. Text můžete zapsat ručně.");
+      setNotice(
+        "Tento prohlížeč neumí bezpečně vytvořit hlasovou nahrávku. Text můžete zapsat ručně.",
+      );
       return;
     }
     try {
@@ -167,7 +169,11 @@ function VoiceReflectionPage() {
     setTranscribing(true);
     setNotice("Přepisuji nahrávku…");
     try {
-      const extension = mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm";
+      const extension = mimeType.includes("ogg")
+        ? "ogg"
+        : mimeType.includes("mp4")
+          ? "m4a"
+          : "webm";
       const form = new FormData();
       form.append("audio", blob, `reflexe.${extension}`);
       const result = await transcribeVoice({ data: form });
@@ -277,8 +283,8 @@ function VoiceReflectionPage() {
                 <div>
                   <h2 className="font-bold">1. Nadiktovat průběh</h2>
                   <p className="mt-1 text-xs text-[#82908f]">
-                    Nahrávka opustí zařízení pouze kvůli přepisu. Přepis zůstává konceptem, dokud
-                    ho nepotvrdíte.
+                    Nahrávka opustí zařízení pouze kvůli přepisu. Přepis zůstává konceptem, dokud ho
+                    nepotvrdíte.
                   </p>
                 </div>
                 <button
@@ -294,7 +300,11 @@ function VoiceReflectionPage() {
                   ) : (
                     <Mic className="h-4 w-4" />
                   )}
-                  {transcribing ? "Přepisuji…" : listening ? "Zastavit a přepsat" : "Začít diktovat"}
+                  {transcribing
+                    ? "Přepisuji…"
+                    : listening
+                      ? "Zastavit a přepsat"
+                      : "Začít diktovat"}
                 </button>
               </div>
               <textarea
