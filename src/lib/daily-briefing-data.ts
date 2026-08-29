@@ -45,6 +45,15 @@ export type DailyBriefing = {
   blocked: boolean;
 };
 
+export type DayPhase = "morning" | "midday" | "afternoon" | "evening";
+export type TimeAwareGreeting = {
+  phase: DayPhase;
+  eyebrow: string;
+  greeting: string;
+  headline: string;
+  supportingText: string;
+};
+
 export async function loadDailyBriefing(
   classInfo: AccessibleClass,
   date: string,
@@ -211,35 +220,91 @@ export async function loadDailyBriefing(
   };
 }
 
-export function buildMorningMessage(briefing: DailyBriefing): string {
-  const greeting = briefing.teacherDisplayName
-    ? `Dobré ráno, ${briefing.teacherDisplayName}.`
-    : "Dobré ráno.";
-  if (briefing.blocked && briefing.lessons.length === 0) {
-    const blocker = briefing.events.find((e) => e.blocks_lessons)?.title;
-    return `${greeting} Dnes je ${blocker ? blocker.toLocaleLowerCase("cs-CZ") : "den bez běžné výuky"}. Běžné hodiny tedy neplánujeme.`;
+export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): TimeAwareGreeting {
+  const hour = now.getHours();
+  const phase: DayPhase = hour < 11 ? "morning" : hour < 14 ? "midday" : hour < 18 ? "afternoon" : "evening";
+  const name = briefing.teacherDisplayName ? `, ${briefing.teacherDisplayName}` : "";
+  const lessonCount = briefing.lessons.length;
+  const missing = briefing.missingPreparationCount;
+  const carry = briefing.carryOvers.length;
+  const blocker = briefing.events.find((e) => e.blocks_lessons)?.title;
+
+  if (briefing.blocked && lessonCount === 0) {
+    const greeting = phase === "morning" ? `Dobré ráno${name}.` : phase === "midday" ? `Hezké poledne${name}.` : phase === "afternoon" ? `Hezké odpoledne${name}.` : `Hezký večer${name}.`;
+    return {
+      phase,
+      eyebrow: phase === "evening" ? "Dnešek v klidu" : "Dnes je jiný rytmus",
+      greeting,
+      headline: `${greeting} ${blocker ? blocker : "Dnes"} mění běžný školní režim.`,
+      supportingText: "Běžné hodiny dnes neplánujeme. Můžeš si otevřít kalendář, připravit další den nebo si prostě nechat prostor.",
+    };
   }
-  const lessonText =
-    briefing.lessons.length === 0
-      ? "Dnes zatím nemáš v rozvrhu žádnou hodinu."
-      : `Dnes tě čeká ${briefing.lessons.length} ${lessonWord(briefing.lessons.length)}.`;
-  const prepText =
-    briefing.missingPreparationCount === 0 && briefing.lessons.length > 0
-      ? " Všechny dnešní hodiny mají uloženou přípravu."
-      : briefing.missingPreparationCount > 0
-        ? ` ${briefing.missingPreparationCount} ${prepWord(briefing.missingPreparationCount)} ještě chybí připravit.`
-        : "";
-  const carryText = briefing.carryOvers.length
-    ? ` Z předchozí výuky zůstává ${briefing.carryOvers.length} ${carryWord(briefing.carryOvers.length)} k navázání.`
-    : "";
-  return `${greeting} ${lessonText}${prepText}${carryText}`;
+
+  const lessonSummary = lessonCount === 0
+    ? "Dnes nemáš v rozvrhu žádnou běžnou hodinu."
+    : `Dnes máš ${lessonCount} ${lessonWord(lessonCount)}.`;
+  const prepSummary = missing > 0
+    ? `${missing} ${prepWord(missing)} ještě čeká na přípravu.`
+    : lessonCount > 0
+      ? "Přípravy na dnešek jsou hotové."
+      : "";
+  const carrySummary = carry > 0 ? `${carry} ${carryWord(carry)} si neseš z minula.` : "";
+
+  if (phase === "morning") {
+    const greeting = `Dobré ráno${name}.`;
+    return {
+      phase,
+      eyebrow: "Start dne",
+      greeting,
+      headline: `${greeting} ${lessonSummary} ${missing ? "Pojďme si uvolnit hlavu tím nejdůležitějším." : "Dnešek vypadá pěkně připraveně."}`,
+      supportingText: [prepSummary, carrySummary, "Když chceš, asistentka s tebou rychle projde, co má smysl řešit jako první."].filter(Boolean).join(" "),
+    };
+  }
+
+  if (phase === "midday") {
+    const greeting = `Hezké poledne${name}.`;
+    return {
+      phase,
+      eyebrow: "Jsme v půlce",
+      greeting,
+      headline: `${greeting} ${lessonSummary} Co už je za tebou, nemusíš držet v hlavě — soustřeďme se jen na další krok.`,
+      supportingText: [prepSummary, carrySummary].filter(Boolean).join(" ") || "Teď není potřeba nic honit. Otevři si jen to, co opravdu potřebuješ.",
+    };
+  }
+
+  if (phase === "afternoon") {
+    const greeting = `Hezké odpoledne${name}.`;
+    return {
+      phase,
+      eyebrow: "Jak to dnes šlo?",
+      greeting,
+      headline: `${greeting} Dnešek už je z velké části za tebou. Co stojí za zachycení, než to vypustíš z hlavy?`,
+      supportingText: carry > 0
+        ? `${carrySummary} Můžeš si je rovnou otevřít, nebo je probrat hlasem s asistentkou.`
+        : "Jestli chceš, stačí krátká hlasová reflexe. Nic se samo nezapíše bez tvého potvrzení.",
+    };
+  }
+
+  const greeting = `Hezký večer${name}.`;
+  return {
+    phase,
+    eyebrow: "Dnešek může zaklapnout",
+    greeting,
+    headline: `${greeting} Dnes už nemusíš všechno řešit. Stačí vědět, co je hotové a co může počkat na zítra.`,
+    supportingText: [carrySummary, missing > 0 ? `${prepSummary} Klidně až zítra.` : "Co šlo uzavřít, je uzavřené."].filter(Boolean).join(" "),
+  };
+}
+
+/** Backward-compatible wrapper for older callers. */
+export function buildMorningMessage(briefing: DailyBriefing): string {
+  return buildTimeAwareGreeting(briefing, new Date()).headline;
 }
 
 function lessonWord(count: number) {
-  return count === 1 ? "hodina" : count >= 2 && count <= 4 ? "hodiny" : "hodin";
+  return count === 1 ? "hodinu" : count >= 2 && count <= 4 ? "hodiny" : "hodin";
 }
 function prepWord(count: number) {
-  return count === 1 ? "hodinu" : count >= 2 && count <= 4 ? "hodiny" : "hodin";
+  return count === 1 ? "hodina" : count >= 2 && count <= 4 ? "hodiny" : "hodin";
 }
 function carryWord(count: number) {
   return count === 1 ? "věc" : count >= 2 && count <= 4 ? "věci" : "věcí";
