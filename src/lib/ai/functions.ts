@@ -63,9 +63,8 @@ export const runLessonAi = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(lessonAiRequestSchema)
   .handler(async ({ data }) => {
-    const { generateLessonAsset, readAnthropicTextProviderConfigFromEnv } = await import(
-      "./provider.server"
-    );
+    const { generateLessonAsset, readAnthropicTextProviderConfigFromEnv } =
+      await import("./provider.server");
     const config = readAnthropicTextProviderConfigFromEnv();
     if (!config) throw new Error("AI zatím není připojena.");
     return generateLessonAsset(config, data);
@@ -80,9 +79,8 @@ export const transcribeVoice = createServerFn({ method: "POST" })
     if (file.size <= 0) throw new Error("Nahrávka je prázdná.");
     if (file.size > 10 * 1024 * 1024) throw new Error("Nahrávka je příliš velká (max. 10 MB).");
 
-    const { readOpenAiTranscriptionConfigFromEnv, transcribeAudio } = await import(
-      "./provider.server"
-    );
+    const { readOpenAiTranscriptionConfigFromEnv, transcribeAudio } =
+      await import("./provider.server");
     const config = readOpenAiTranscriptionConfigFromEnv();
     if (!config) throw new Error("Hlas zatím není připojen.");
 
@@ -103,9 +101,8 @@ export const synthesizeAssistantVoice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(speechSynthesisSchema)
   .handler(async ({ data }) => {
-    const { readElevenLabsTtsConfigFromEnv, synthesizeSpeech } = await import(
-      "./provider.server"
-    );
+    const { readElevenLabsTtsConfigFromEnv, synthesizeSpeech } =
+      await import("./provider.server");
     const config = readElevenLabsTtsConfigFromEnv();
     if (!config) throw new Error("Hlas zatím není připojen.");
     const result = await synthesizeSpeech(config, data);
