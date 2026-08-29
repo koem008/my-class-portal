@@ -14,6 +14,7 @@ import {
   type SpeechTranscriptionRequest,
   type SpeechTranscriptionResult,
 } from "./contracts";
+import { parseCompanionPayload } from "./companion-policy";
 
 const DEFAULT_TIMEOUT_MS = 45_000;
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -318,10 +319,14 @@ export async function generateCompanionReply(
           "Buď přirozená, stručná a praktická. Nepředstírej vědomí, city ani skutečný osobní vztah.",
           "Používej pouze dodaný pracovní kontext a explicitně povolené osobní preference.",
           "Nikdy neodvozuj osobní fakta a nikdy nepožaduj skutečnou identitu dítěte.",
-          "Navigace v aplikaci je bezpečná a může proběhnout bez potvrzení.",
-          "Jakákoli změna pedagogických nebo osobních dat MUSÍ mít requiresConfirmation=true a pouze slovní proposedChange; žádnou změnu sama neprovádíš.",
-          "Vrať pouze validní JSON: reply, navigation volitelně {target, lessonId}, requiresConfirmation, proposedChange volitelně.",
-          "Povolené target: home, schedule, calendar, memory, art_studio, special_education, lesson.",
+          "Vždy zvol přesně jeden režim: conversation, navigate, propose.",
+          "conversation: běžná konverzace, dotaz, nejasný nebo nepodporovaný požadavek; bez navigation a proposal.",
+          "navigate: jen otevření existující obrazovky z pevného seznamu home, schedule, calendar, memory, art_studio, special_education, lesson. Pro lesson použij výhradně lessonId z availableLessons.",
+          "propose: jen když AKTUÁLNÍ message sama explicitně žádá změnu pedagogických dat. SameDayContext smí pomoci pochopit odkaz, ale nikdy nesmí být sám zdrojem návrhu zápisu.",
+          "Povolené proposal typy: save_preparation_note {lessonId,text}; mark_lesson_completed {lessonId,completedSummary?}. Změnu nikdy sama neprovádíš.",
+          "sameDayContext je dočasné shrnutí pouze dneška. Vrať volitelně sameDaySummary: stručné relevantní shrnutí pro další dnešní konverzaci, nikdy verbatim přepis a nikdy dlouhodobou osobní preferenci.",
+          "Pokud uživatel chce komplexní nový materiál nebo plnou AI přípravu, naviguj na konkrétní hodinu, je-li jednoznačná; jinak se doptávej.",
+          "Vrať pouze validní JSON: conversation={mode,reply,sameDaySummary?}; navigate={mode,reply,navigation,sameDaySummary?}; propose={mode,reply,proposal,sameDaySummary?}.",
         ].join("\n"),
         messages: [{ role: "user", content: JSON.stringify(request) }],
       }),
@@ -346,9 +351,7 @@ export async function generateCompanionReply(
       "MALFORMED_RESPONSE",
       "AI vrátila prázdnou odpověď.",
     );
-  // JSON.parse is the untyped provider boundary; fields are validated immediately below.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let parsed: any;
+  let parsed: unknown;
   try {
     parsed = JSON.parse(stripJsonFence(text));
   } catch {
@@ -358,40 +361,15 @@ export async function generateCompanionReply(
       "AI odpověď nemá očekávaný strukturovaný formát.",
     );
   }
-  assertPrivacySafePayload(parsed);
-  if (
-    !parsed ||
-    typeof parsed.reply !== "string" ||
-    typeof parsed.requiresConfirmation !== "boolean"
-  ) {
+  let result: Omit<CompanionResult, "usage">;
+  try {
+    result = parseCompanionPayload(parsed);
+  } catch {
     throw new ExternalAiProviderError("anthropic", "MALFORMED_RESPONSE", "AI odpověď je neplatná.");
   }
-  const allowed = new Set([
-    "home",
-    "schedule",
-    "calendar",
-    "memory",
-    "art_studio",
-    "special_education",
-    "lesson",
-  ]);
-  const nav =
-    parsed.navigation &&
-    typeof parsed.navigation === "object" &&
-    allowed.has(parsed.navigation.target)
-      ? {
-          target: parsed.navigation.target,
-          lessonId:
-            typeof parsed.navigation.lessonId === "string" ? parsed.navigation.lessonId : undefined,
-        }
-      : undefined;
   const usage = asRecord(raw.usage);
   return {
-    reply: parsed.reply.trim(),
-    navigation: nav,
-    requiresConfirmation: parsed.requiresConfirmation,
-    proposedChange:
-      typeof parsed.proposedChange === "string" ? parsed.proposedChange.trim() : undefined,
+    ...result,
     usage: {
       provider: "anthropic",
       model: config.economyModel,

@@ -67,16 +67,25 @@ export type CompanionRequest = {
   tone: CompanionTone;
   todaySummary?: string;
   continuitySummary?: string;
+  /** Minimal continuity summary for the current local calendar day only. */
+  sameDayContext?: string;
   personalPreferences?: string[];
   recentConversation?: CompanionConversationTurn[];
   availableLessons?: Array<{ lessonId: string; subject: string; topic?: string }>;
 };
 
+export type CompanionPedagogicalProposal =
+  | { type: "save_preparation_note"; lessonId: string; text: string }
+  | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string };
+
 export type CompanionResult = {
+  mode: "conversation" | "navigate" | "propose";
   reply: string;
   navigation?: { target: CompanionNavigationTarget; lessonId?: string };
+  proposal?: CompanionPedagogicalProposal;
+  /** Minimal carry-forward summary for today only; never a transcript. */
+  sameDaySummary?: string;
   requiresConfirmation: boolean;
-  proposedChange?: string;
   usage?: AiUsage;
 };
 

@@ -45,6 +45,7 @@ const companionRequestSchema = z.object({
   tone: z.enum(["friendly", "calm", "efficient", "custom"]),
   todaySummary: z.string().trim().max(8000).optional(),
   continuitySummary: z.string().trim().max(5000).optional(),
+  sameDayContext: z.string().trim().max(2000).optional(),
   personalPreferences: z.array(z.string().trim().max(500)).max(20).optional(),
   recentConversation: z
     .array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().max(2000) }))
@@ -61,6 +62,19 @@ const companionRequestSchema = z.object({
     .max(20)
     .optional(),
 });
+
+const companionProposalSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("save_preparation_note"),
+    lessonId: z.string().uuid(),
+    text: z.string().trim().min(1).max(8_000),
+  }),
+  z.object({
+    type: z.literal("mark_lesson_completed"),
+    lessonId: z.string().uuid(),
+    completedSummary: z.string().trim().max(4_000).optional(),
+  }),
+]);
 
 const speechSynthesisSchema = z.object({
   text: z.string().trim().min(1).max(10_000),
@@ -102,6 +116,80 @@ export const runCompanionAi = createServerFn({ method: "POST" })
     const config = readAnthropicTextProviderConfigFromEnv();
     if (!config) throw new Error("AI zatím není připojena.");
     return generateCompanionReply(config, data);
+  });
+
+export const confirmCompanionPedagogicalAction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(companionProposalSchema)
+  .handler(async ({ data, context }) => {
+    const lessonResult = await context.supabase
+      .from("lesson_instances")
+      .select("id,school_id,class_id")
+      .eq("id", data.lessonId)
+      .single();
+    if (lessonResult.error || !lessonResult.data)
+      throw lessonResult.error ?? new Error("Hodina není dostupná.");
+    const lesson = lessonResult.data;
+    if (data.type === "save_preparation_note") {
+      const existing = await context.supabase
+        .from("lesson_preparations")
+        .select("id")
+        .eq("lesson_id", lesson.id)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existing.error) throw existing.error;
+      if (existing.data?.id) {
+        const updated = await context.supabase
+          .from("lesson_preparations")
+          .update({ teacher_notes: data.text, updated_at: new Date().toISOString() })
+          .eq("id", existing.data.id)
+          .eq("lesson_id", lesson.id);
+        if (updated.error) throw updated.error;
+      } else {
+        const inserted = await context.supabase.from("lesson_preparations").insert({
+          school_id: lesson.school_id,
+          class_id: lesson.class_id,
+          lesson_id: lesson.id,
+          teacher_notes: data.text,
+        });
+        if (inserted.error) throw inserted.error;
+      }
+      return { ok: true, message: "Příprava byla uložena po vašem potvrzení." };
+    }
+    const progress = await context.supabase
+      .from("lesson_progress")
+      .select("id")
+      .eq("lesson_id", lesson.id)
+      .maybeSingle();
+    if (progress.error) throw progress.error;
+    if (progress.data?.id) {
+      const updated = await context.supabase
+        .from("lesson_progress")
+        .update({
+          state: "completed",
+          completed_summary: data.completedSummary ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", progress.data.id)
+        .eq("lesson_id", lesson.id);
+      if (updated.error) throw updated.error;
+    } else {
+      const inserted = await context.supabase.from("lesson_progress").insert({
+        school_id: lesson.school_id,
+        class_id: lesson.class_id,
+        lesson_id: lesson.id,
+        state: "completed",
+        completed_summary: data.completedSummary ?? null,
+      });
+      if (inserted.error) throw inserted.error;
+    }
+    const lessonUpdate = await context.supabase
+      .from("lesson_instances")
+      .update({ status: "completed", updated_at: new Date().toISOString() })
+      .eq("id", lesson.id);
+    if (lessonUpdate.error) throw lessonUpdate.error;
+    return { ok: true, message: "Hodina byla označena jako dokončená po vašem potvrzení." };
   });
 
 export const transcribeVoice = createServerFn({ method: "POST" })

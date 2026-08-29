@@ -18,7 +18,13 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { runCompanionAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";
+import {
+  confirmCompanionPedagogicalAction,
+  runCompanionAi,
+  synthesizeAssistantVoice,
+  transcribeVoice,
+} from "@/lib/ai/functions";
+import type { CompanionPedagogicalProposal } from "@/lib/ai/contracts";
 import { loadAssistantMemory } from "@/lib/assistant-memory-data";
 import {
   buildMorningMessage,
@@ -40,7 +46,7 @@ function AssistantPage() {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceReply, setVoiceReply] = useState("");
   const [voiceNotice, setVoiceNotice] = useState("");
-  const [proposedChange, setProposedChange] = useState("");
+  const [pendingProposal, setPendingProposal] = useState<CompanionPedagogicalProposal | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -100,7 +106,7 @@ function AssistantPage() {
       return;
     }
     setVoiceNotice("");
-    setProposedChange("");
+    setPendingProposal(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -169,6 +175,7 @@ function AssistantPage() {
             ({ Přátelská: "friendly", Klidná: "calm", Efektivní: "efficient" } as const)[tone],
           todaySummary,
           continuitySummary,
+          sameDayContext: readSameDayCompanionMemory(todayIso),
           personalPreferences: settings?.memory_enabled
             ? memories.map((m) => m.content)
             : undefined,
@@ -180,11 +187,8 @@ function AssistantPage() {
         },
       });
       setVoiceReply(result.reply);
-      setProposedChange(
-        result.requiresConfirmation
-          ? result.proposedChange || "Tato akce by změnila data a vyžaduje potvrzení."
-          : "",
-      );
+      setPendingProposal(result.mode === "propose" ? (result.proposal ?? null) : null);
+      writeSameDayCompanionMemory(todayIso, result.sameDaySummary);
       if (result.reply.trim()) {
         try {
           const speech = await synthesizeAssistantVoice({
@@ -195,7 +199,7 @@ function AssistantPage() {
           setVoiceNotice("Odpověď je připravená, hlasové přehrání zatím není dostupné.");
         }
       }
-      if (result.navigation && !result.requiresConfirmation) {
+      if (result.mode === "navigate" && result.navigation) {
         const nav = result.navigation;
         if (nav.target === "home") await navigate({ to: "/" });
         else if (nav.target === "schedule") await navigate({ to: "/rozvrh" });
@@ -207,13 +211,29 @@ function AssistantPage() {
         else if (nav.target === "lesson" && nav.lessonId)
           await navigate({ to: "/hodina/$lessonId", params: { lessonId: nav.lessonId } });
       }
-      if (!result.navigation)
-        setVoiceNotice(
-          result.requiresConfirmation ? "Navržená změna čeká na potvrzení." : "Hotovo.",
-        );
+      if (result.mode !== "navigate")
+        setVoiceNotice(result.mode === "propose" ? "Navržená změna čeká na potvrzení." : "Hotovo.");
     } catch (error) {
       setVoiceNotice(
         error instanceof Error ? error.message : "Hlasová asistentka zatím není připojena.",
+      );
+    } finally {
+      setVoiceBusy(false);
+    }
+  }
+
+  async function confirmPendingProposal() {
+    if (!pendingProposal) return;
+    setVoiceBusy(true);
+    setVoiceNotice("Ukládám potvrzenou změnu…");
+    try {
+      const result = await confirmCompanionPedagogicalAction({ data: pendingProposal });
+      setPendingProposal(null);
+      setVoiceNotice(result.message);
+      await reload();
+    } catch (error) {
+      setVoiceNotice(
+        error instanceof Error ? error.message : "Potvrzenou změnu se nepodařilo uložit.",
       );
     } finally {
       setVoiceBusy(false);
@@ -572,16 +592,40 @@ function AssistantPage() {
                     <p className="mt-1 text-sm leading-6">{voiceReply}</p>
                   </div>
                 )}
-                {proposedChange && (
+                {pendingProposal && (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                     <div className="text-xs font-bold text-amber-800">
                       Návrh změny — zatím neprovedeno
                     </div>
-                    <p className="mt-1 text-sm text-amber-900">{proposedChange}</p>
-                    <p className="mt-2 text-xs text-amber-700">
-                      Změny pedagogických dat se nikdy neprovedou jen hlasovým požadavkem bez
-                      výslovného potvrzení.
+                    <p className="mt-1 text-sm text-amber-900">
+                      {pendingProposal.type === "save_preparation_note"
+                        ? `Uložit jako poznámku k přípravě: ${pendingProposal.text}`
+                        : `Označit hodinu jako dokončenou${pendingProposal.completedSummary ? `: ${pendingProposal.completedSummary}` : "."}`}
                     </p>
+                    <p className="mt-2 text-xs text-amber-700">
+                      Mluvený požadavek sám nic nezapisuje.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void confirmPendingProposal()}
+                        disabled={voiceBusy}
+                        className="rounded-xl bg-amber-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        Potvrdit a uložit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingProposal(null);
+                          setVoiceNotice("Návrh byl zrušen. Nic se nezměnilo.");
+                        }}
+                        disabled={voiceBusy}
+                        className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-amber-800 disabled:opacity-50"
+                      >
+                        Zrušit
+                      </button>
+                    </div>
                   </div>
                 )}
                 {voiceNotice && <p className="text-center text-xs text-[#7b8989]">{voiceNotice}</p>}
@@ -614,6 +658,34 @@ function AssistantPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+const SAME_DAY_MEMORY_KEY = "my-class-portal:companion-same-day";
+function readSameDayCompanionMemory(date: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(SAME_DAY_MEMORY_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { date?: string; summary?: string };
+    if (parsed.date !== date) {
+      window.localStorage.removeItem(SAME_DAY_MEMORY_KEY);
+      return undefined;
+    }
+    return typeof parsed.summary === "string" && parsed.summary.trim()
+      ? parsed.summary.trim()
+      : undefined;
+  } catch {
+    window.localStorage.removeItem(SAME_DAY_MEMORY_KEY);
+    return undefined;
+  }
+}
+function writeSameDayCompanionMemory(date: string, summary?: string) {
+  if (typeof window === "undefined") return;
+  if (!summary?.trim()) return;
+  window.localStorage.setItem(
+    SAME_DAY_MEMORY_KEY,
+    JSON.stringify({ date, summary: summary.trim().slice(0, 2000) }),
   );
 }
 
