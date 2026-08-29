@@ -1,0 +1,34 @@
+name: Format Personal Welcome
+on:
+  push:
+    paths:
+      - '.github/workflows/format-personal-welcome.yml'
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bunx prettier --write src/components/FirstWelcome.tsx src/routes/zacatek.tsx
+      - run: bun run lint
+      - run: bun run build
+      - name: Commit formatted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/FirstWelcome.tsx src/routes/zacatek.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: format personal welcome redesign"
+            git push origin main
+          fi
+      - name: Remove one-shot workflow
+        run: |
+          git pull --rebase origin main
+          git rm .github/workflows/format-personal-welcome.yml
+          git commit -m "chore: remove personal welcome formatter"
+          git push origin main
