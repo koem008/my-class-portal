@@ -14,6 +14,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AfternoonReflectionPrompt } from "@/components/AfternoonReflectionPrompt";
+import { SeasonalAmbience } from "@/components/SeasonalAmbience";
 import { SpecialContinuityAssistantCard } from "@/components/special-education/SpecialContinuityAssistantCard";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -192,7 +193,10 @@ function AuthGate() {
 
   return (
     <>
-      <Outlet />
+      <SeasonalAmbience />
+      <div className="relative z-10">
+        <Outlet />
+      </div>
       <SpecialContinuityAssistantCard />
       <AfternoonReflectionPrompt />
       <Link
