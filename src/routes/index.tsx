@@ -11,11 +11,15 @@ import {
   Mic,
   Settings,
   Sparkles,
+  Sunrise,
+  SunMedium,
+  Sunset,
+  MoonStar,
   Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
-  buildMorningMessage,
+  buildTimeAwareGreeting,
   loadDailyBriefing,
   type DailyBriefing,
 } from "@/lib/daily-briefing-data";
@@ -36,7 +40,11 @@ function Index() {
   const [state, setState] = useState<LoadState>("loading");
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [error, setError] = useState("");
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const todayIso = useMemo(
     () =>
       `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
@@ -121,7 +129,37 @@ function Index() {
       />
     );
 
-  const message = buildMorningMessage(briefing);
+  const greeting = buildTimeAwareGreeting(briefing, now);
+  const phaseMeta = {
+    morning: {
+      icon: Sunrise,
+      hero: "from-[#fffdf7] via-[#fff9e9] to-[#eaf7f0]",
+      badge: "bg-[#fff0c9] text-[#80621f]",
+      glow: "bg-[#ffe9a9]",
+    },
+    midday: {
+      icon: SunMedium,
+      hero: "from-white via-[#fffdf5] to-[#eef8f3]",
+      badge: "bg-[#e9f5ed] text-[#39706a]",
+      glow: "bg-[#dff2e8]",
+    },
+    afternoon: {
+      icon: Sunset,
+      hero: "from-[#fffdf9] via-[#fff4ea] to-[#f0edfb]",
+      badge: "bg-[#fff0e7] text-[#9a6449]",
+      glow: "bg-[#ffd9c2]",
+    },
+    evening: {
+      icon: MoonStar,
+      hero: "from-[#fffefa] via-[#f6f3fb] to-[#edf2f5]",
+      badge: "bg-[#eeeafa] text-[#665a92]",
+      glow: "bg-[#ddd5f4]",
+    },
+  }[greeting.phase];
+  const PhaseIcon = phaseMeta.icon;
+  const timeLabel = new Intl.DateTimeFormat("cs-CZ", { hour: "2-digit", minute: "2-digit" }).format(
+    now,
+  );
   return (
     <main className="min-h-screen bg-[#fbfaf7] text-[#24343f]">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -188,18 +226,46 @@ function Index() {
           </header>
           <div className="px-4 pb-28 pt-6 md:px-7 xl:px-9 xl:pb-10">
             <div className="mx-auto max-w-[1370px]">
-              <section className="rounded-[34px] border border-[#ebe5da] bg-gradient-to-br from-white via-[#fffdf8] to-[#eef8f3] p-6 shadow-[0_18px_60px_rgba(70,84,75,.08)] md:p-8">
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#eaf6f0] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.15em] text-[#39706a]">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Dnešní přehled
+              <section
+                className={`relative overflow-hidden rounded-[34px] border border-[#ebe5da] bg-gradient-to-br ${phaseMeta.hero} p-6 shadow-[0_18px_60px_rgba(70,84,75,.08)] md:p-8`}
+              >
+                <div
+                  className={`pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full ${phaseMeta.glow} opacity-45 blur-3xl`}
+                />
+                <div className="relative">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.15em] ${phaseMeta.badge}`}
+                    >
+                      <PhaseIcon className="h-3.5 w-3.5" />
+                      {greeting.eyebrow}
+                    </div>
+                    <span className="rounded-full bg-white/65 px-3 py-1.5 text-[11px] font-semibold text-[#7b8987] backdrop-blur">
+                      {timeLabel} · právě teď
+                    </span>
+                  </div>
+                  <h1 className="mt-4 max-w-5xl text-3xl font-bold tracking-[-.04em] md:text-[40px] md:leading-[1.08]">
+                    {greeting.headline}
+                  </h1>
+                  <p className="mt-4 max-w-4xl text-sm leading-6 text-[#667a7b] md:text-[15px]">
+                    {greeting.supportingText}
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Link
+                      to="/asistentka"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5"
+                    >
+                      <Mic className="h-4 w-4" />
+                      Probrat to s asistentkou
+                    </Link>
+                    <Link
+                      to="/rozvrh"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-xs font-bold text-[#526866] backdrop-blur transition hover:bg-white"
+                    >
+                      Dnešní rozvrh <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
-                <h1 className="mt-4 max-w-4xl text-3xl font-bold tracking-[-.035em] md:text-[38px]">
-                  {message}
-                </h1>
-                <p className="mt-3 text-sm leading-6 text-[#718183]">
-                  Tento přehled vznikl z databáze bez AI tokenů. Asistentka později pouze přidá
-                  přirozenější konverzaci a kreativní práci.
-                </p>
               </section>
 
               <div className="mt-5 grid gap-4 md:grid-cols-3">
