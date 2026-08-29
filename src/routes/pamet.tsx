@@ -65,8 +65,8 @@ function MemoryPage() {
   const [kind, setKind] = useState<RegularMemoryKind>("communication_preference");
   const [content, setContent] = useState("");
   const [dateLabel, setDateLabel] = useState("");
-  const [dateDay, setDateDay] = useState(1);
-  const [dateMonth, setDateMonth] = useState(1);
+  const [dateDay, setDateDay] = useState<number | "">("");
+  const [dateMonth, setDateMonth] = useState<number | "">("");
   const [dateYear, setDateYear] = useState("");
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
 
@@ -138,8 +138,8 @@ function MemoryPage() {
     try {
       const input = {
         label: dateLabel,
-        day: dateDay,
-        month: dateMonth,
+        day: Number(dateDay),
+        month: Number(dateMonth),
         year: dateYear.trim() ? Number(dateYear) : null,
       };
       if (editingDateId) await updateImportantDate(editingDateId, input);
@@ -156,16 +156,16 @@ function MemoryPage() {
   function editImportantDate(memory: TeacherMemory) {
     setEditingDateId(memory.id);
     setDateLabel(memory.content);
-    setDateDay(memory.date_day ?? 1);
-    setDateMonth(memory.date_month ?? 1);
+    setDateDay(memory.date_day ?? "");
+    setDateMonth(memory.date_month ?? "");
     setDateYear(memory.date_year ? String(memory.date_year) : "");
   }
 
   function resetImportantDateForm() {
     setEditingDateId(null);
     setDateLabel("");
-    setDateDay(1);
-    setDateMonth(1);
+    setDateDay("");
+    setDateMonth("");
     setDateYear("");
   }
 
@@ -386,9 +386,10 @@ function MemoryPage() {
                 Den
                 <select
                   value={dateDay}
-                  onChange={(e) => setDateDay(Number(e.target.value))}
+                  onChange={(e) => setDateDay(e.target.value ? Number(e.target.value) : "")}
                   className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
                 >
+                  <option value="">Vyber den</option>
                   {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
                     <option key={day} value={day}>
                       {day}.
@@ -400,9 +401,10 @@ function MemoryPage() {
                 Měsíc
                 <select
                   value={dateMonth}
-                  onChange={(e) => setDateMonth(Number(e.target.value))}
+                  onChange={(e) => setDateMonth(e.target.value ? Number(e.target.value) : "")}
                   className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
                 >
+                  <option value="">Vyber měsíc</option>
                   {months.map((month, index) => (
                     <option key={month} value={index + 1}>
                       {month}
@@ -422,7 +424,7 @@ function MemoryPage() {
               </label>
             </div>
             <button
-              disabled={saving || !dateLabel.trim()}
+              disabled={saving || !dateLabel.trim() || !dateDay || !dateMonth}
               onClick={() => void saveImportantDate()}
               className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[#a76756] px-4 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-40"
             >
