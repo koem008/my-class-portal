@@ -36,11 +36,29 @@ export function FirstWelcome() {
         <div className="absolute -left-28 -top-24 h-80 w-80 rounded-full bg-[#f6cfae]/60 blur-3xl" />
         <div className="absolute -right-24 top-[8%] h-72 w-72 rounded-full bg-[#c9e8db]/70 blur-3xl" />
         <div className="absolute bottom-[-8%] left-[28%] h-72 w-72 rounded-full bg-[#d9d0ef]/65 blur-3xl" />
-        <svg className="absolute left-[-18px] top-[28%] h-40 w-40 text-[#d59374]/30" viewBox="0 0 160 160" fill="none">
-          <path d="M16 116c34-14 48-42 58-90M49 70c-20 0-33-8-42-24 24-4 41 4 48 20M69 54c13-18 30-27 50-27-5 22-20 36-46 42" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+        <svg
+          className="absolute left-[-18px] top-[28%] h-40 w-40 text-[#d59374]/30"
+          viewBox="0 0 160 160"
+          fill="none"
+        >
+          <path
+            d="M16 116c34-14 48-42 58-90M49 70c-20 0-33-8-42-24 24-4 41 4 48 20M69 54c13-18 30-27 50-27-5 22-20 36-46 42"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
         </svg>
-        <svg className="absolute right-[-26px] bottom-[24%] h-44 w-44 text-[#8fbfae]/28" viewBox="0 0 180 180" fill="none">
-          <path d="M22 132c34-2 61-19 82-52 10-16 15-35 17-58M83 72c-24 2-42-7-54-27 30-5 50 3 60 23M107 52c17-17 37-22 59-15-10 23-30 33-58 29" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+        <svg
+          className="absolute right-[-26px] bottom-[24%] h-44 w-44 text-[#8fbfae]/28"
+          viewBox="0 0 180 180"
+          fill="none"
+        >
+          <path
+            d="M22 132c34-2 61-19 82-52 10-16 15-35 17-58M83 72c-24 2-42-7-54-27 30-5 50 3 60 23M107 52c17-17 37-22 59-15-10 23-30 33-58 29"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
         </svg>
       </div>
 
@@ -57,14 +75,27 @@ export function FirstWelcome() {
               <span className="block text-[#2c756f]">Pojďme si udělat</span>
               <span className="relative inline-block">
                 školu po tvém.
-                <svg className="absolute -bottom-3 left-0 h-5 w-full text-[#e8a56f]" viewBox="0 0 360 24" preserveAspectRatio="none" fill="none" aria-hidden="true">
-                  <path d="M4 16c62-12 121-8 173-4 59 5 112 7 179-4" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+                <svg
+                  className="absolute -bottom-3 left-0 h-5 w-full text-[#e8a56f]"
+                  viewBox="0 0 360 24"
+                  preserveAspectRatio="none"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 16c62-12 121-8 173-4 59 5 112 7 179-4"
+                    stroke="currentColor"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </span>
             </h1>
 
             <p className="mt-8 max-w-xl text-[17px] leading-8 text-[#657570] sm:text-lg">
-              Ne další systém, který se musíš naučit používat. Tohle má být tvůj pracovní kout — místo, kam odložíš rozvrh, přípravy, nápady, nedodělky i věci, které si chceš pamatovat.
+              Ne další systém, který se musíš naučit používat. Tohle má být tvůj pracovní kout —
+              místo, kam odložíš rozvrh, přípravy, nápady, nedodělky i věci, které si chceš
+              pamatovat.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -105,7 +136,10 @@ export function FirstWelcome() {
 
               <div className="mt-6 grid gap-3">
                 {notes.map(({ icon: Icon, label, className }) => (
-                  <div key={label} className={`flex items-center gap-3 rounded-[22px] px-4 py-4 shadow-[0_10px_24px_rgba(70,68,61,.08)] ${className}`}>
+                  <div
+                    key={label}
+                    className={`flex items-center gap-3 rounded-[22px] px-4 py-4 shadow-[0_10px_24px_rgba(70,68,61,.08)] ${className}`}
+                  >
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70">
                       <Icon className="h-5 w-5" />
                     </div>
@@ -120,12 +154,16 @@ export function FirstWelcome() {
                     <PencilLine className="h-4 w-4" />
                     Rozdělané
                   </div>
-                  <div className="mt-3 text-lg font-black leading-5 text-[#4a453d]">Tady skončí věci, ke kterým se chceš vrátit.</div>
+                  <div className="mt-3 text-lg font-black leading-5 text-[#4a453d]">
+                    Tady skončí věci, ke kterým se chceš vrátit.
+                  </div>
                 </div>
                 <div className="rounded-[24px] bg-[#efeafb] p-4">
                   <div className="text-xs font-black text-[#74689a]">Malá radost</div>
                   <div className="mt-3 text-3xl">✦</div>
-                  <div className="mt-2 text-xs leading-5 text-[#7d7591]">A občas ti to i něco milého řekne.</div>
+                  <div className="mt-2 text-xs leading-5 text-[#7d7591]">
+                    A občas ti to i něco milého řekne.
+                  </div>
                 </div>
               </div>
 
