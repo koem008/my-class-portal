@@ -101,8 +101,7 @@ export const synthesizeAssistantVoice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(speechSynthesisSchema)
   .handler(async ({ data }) => {
-    const { readElevenLabsTtsConfigFromEnv, synthesizeSpeech } =
-      await import("./provider.server");
+    const { readElevenLabsTtsConfigFromEnv, synthesizeSpeech } = await import("./provider.server");
     const config = readElevenLabsTtsConfigFromEnv();
     if (!config) throw new Error("Hlas zatím není připojen.");
     const result = await synthesizeSpeech(config, data);
