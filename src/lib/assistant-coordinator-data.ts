@@ -1,7 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-const db = supabase as unknown as SupabaseClient<any>;
+const db = supabase as unknown as SupabaseClient;
+
+type SchoolMembershipRow = {
+  school_id: string;
+  role: string;
+  status: string;
+};
+
+type AssignmentRow = {
+  id: string;
+  school_id: string;
+  assistant_id: string;
+  class_id: string;
+  student_alias_id: string | null;
+  assignment_note: string | null;
+  is_active: boolean;
+};
 
 export type CoordinatorAccess = {
   schoolId: string;
@@ -95,7 +111,8 @@ export async function loadCoordinatorContext(): Promise<CoordinatorContext> {
         role: accesses[0].role as CoordinatorAccess["role"],
       }
     : null;
-  const admin = (memberships ?? []).find((row: any) => row.role === "school_admin");
+  const membershipRows = (memberships ?? []) as SchoolMembershipRow[];
+  const admin = membershipRows.find((row) => row.role === "school_admin");
   return { access, adminSchoolId: admin?.school_id ?? null };
 }
 
@@ -181,19 +198,20 @@ export async function loadAssistantAssignments(
     .order("created_at", { ascending: false });
   if (error) throw error;
 
+  const rows = (data ?? []) as AssignmentRow[];
   const assistantMap = new Map(assistants.map((row) => [row.id, row.display_name]));
   const classMap = new Map(classes.map((row) => [row.id, row.name]));
   const byClass = new Map<string, CoordinatorAliasOption[]>();
   const classIdsWithAliases = [
-    ...new Set((data ?? []).filter((row: any) => row.student_alias_id).map((row: any) => row.class_id)),
-  ] as string[];
+    ...new Set(rows.filter((row) => row.student_alias_id !== null).map((row) => row.class_id)),
+  ];
   await Promise.all(
     classIdsWithAliases.map(async (classId) => {
       byClass.set(classId, await loadCoordinatorAliasOptions(classId));
     }),
   );
 
-  return (data ?? []).map((row: any) => ({
+  return rows.map((row) => ({
     ...row,
     assistantName: assistantMap.get(row.assistant_id) ?? "Asistent pedagoga",
     className: classMap.get(row.class_id) ?? "Třída",
