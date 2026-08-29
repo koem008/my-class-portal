@@ -16,6 +16,7 @@ import {
   Sunset,
   MoonStar,
   Users,
+  UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ContextualDayLayer } from "@/components/ContextualDayLayer";
@@ -40,6 +41,7 @@ const nav = [
   { to: "/rozvrh" as const, label: "Rozvrh", icon: CalendarDays },
   { to: "/kalendar" as const, label: "Kalendář", icon: Clock3 },
   { to: "/trida" as const, label: "Třída", icon: Users },
+  { to: "/asistenti" as const, label: "Asistenti", icon: UsersRound },
   { to: "/asistentka" as const, label: "Asistentka", icon: Sparkles },
 ];
 

@@ -10,10 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AsistentiRouteImport } from './routes/asistenti'
 import { Route as AsistentkaRouteImport } from './routes/asistentka'
 import { Route as HlasRouteImport } from './routes/hlas'
 import { Route as KalendarRouteImport } from './routes/kalendar'
 import { Route as PametRouteImport } from './routes/pamet'
+import { Route as PrihlaseniRouteImport } from './routes/prihlaseni'
 import { Route as RozvrhRouteImport } from './routes/rozvrh'
 import { Route as SpecialniPedagogikaRouteImport } from './routes/specialni-pedagogika'
 import { Route as TridaRouteImport } from './routes/trida'
@@ -26,6 +28,11 @@ import { Route as SpecialniPedagogikaCaseIdSouhrnRouteImport } from './routes/sp
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AsistentiRoute = AsistentiRouteImport.update({
+  id: '/asistenti',
+  path: '/asistenti',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AsistentkaRoute = AsistentkaRouteImport.update({
@@ -46,6 +53,11 @@ const KalendarRoute = KalendarRouteImport.update({
 const PametRoute = PametRouteImport.update({
   id: '/pamet',
   path: '/pamet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrihlaseniRoute = PrihlaseniRouteImport.update({
+  id: '/prihlaseni',
+  path: '/prihlaseni',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RozvrhRoute = RozvrhRouteImport.update({
@@ -93,10 +105,12 @@ const SpecialniPedagogikaCaseIdSouhrnRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/asistenti': typeof AsistentiRoute
   '/asistentka': typeof AsistentkaRoute
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
   '/pamet': typeof PametRoute
+  '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
   '/specialni-pedagogika': typeof SpecialniPedagogikaRouteWithChildren
   '/trida': typeof TridaRoute
@@ -108,10 +122,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/asistenti': typeof AsistentiRoute
   '/asistentka': typeof AsistentkaRoute
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
   '/pamet': typeof PametRoute
+  '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
   '/specialni-pedagogika': typeof SpecialniPedagogikaRouteWithChildren
   '/trida': typeof TridaRoute
@@ -124,10 +140,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/asistenti': typeof AsistentiRoute
   '/asistentka': typeof AsistentkaRoute
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
   '/pamet': typeof PametRoute
+  '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
   '/specialni-pedagogika': typeof SpecialniPedagogikaRouteWithChildren
   '/trida': typeof TridaRoute
@@ -141,10 +159,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/asistenti'
     | '/asistentka'
     | '/hlas'
     | '/kalendar'
     | '/pamet'
+    | '/prihlaseni'
     | '/rozvrh'
     | '/specialni-pedagogika'
     | '/trida'
@@ -156,10 +176,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/asistenti'
     | '/asistentka'
     | '/hlas'
     | '/kalendar'
     | '/pamet'
+    | '/prihlaseni'
     | '/rozvrh'
     | '/specialni-pedagogika'
     | '/trida'
@@ -171,10 +193,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/asistenti'
     | '/asistentka'
     | '/hlas'
     | '/kalendar'
     | '/pamet'
+    | '/prihlaseni'
     | '/rozvrh'
     | '/specialni-pedagogika'
     | '/trida'
@@ -187,10 +211,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AsistentiRoute: typeof AsistentiRoute
   AsistentkaRoute: typeof AsistentkaRoute
   HlasRoute: typeof HlasRoute
   KalendarRoute: typeof KalendarRoute
   PametRoute: typeof PametRoute
+  PrihlaseniRoute: typeof PrihlaseniRoute
   RozvrhRoute: typeof RozvrhRoute
   SpecialniPedagogikaRoute: typeof SpecialniPedagogikaRouteWithChildren
   TridaRoute: typeof TridaRoute
@@ -206,6 +232,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/asistenti': {
+      id: '/asistenti'
+      path: '/asistenti'
+      fullPath: '/asistenti'
+      preLoaderRoute: typeof AsistentiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/asistentka': {
@@ -234,6 +267,13 @@ declare module '@tanstack/react-router' {
       path: '/pamet'
       fullPath: '/pamet'
       preLoaderRoute: typeof PametRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prihlaseni': {
+      id: '/prihlaseni'
+      path: '/prihlaseni'
+      fullPath: '/prihlaseni'
+      preLoaderRoute: typeof PrihlaseniRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rozvrh': {
@@ -322,10 +362,12 @@ const SpecialniPedagogikaRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AsistentiRoute: AsistentiRoute,
   AsistentkaRoute: AsistentkaRoute,
   HlasRoute: HlasRoute,
   KalendarRoute: KalendarRoute,
   PametRoute: PametRoute,
+  PrihlaseniRoute: PrihlaseniRoute,
   RozvrhRoute: RozvrhRoute,
   SpecialniPedagogikaRoute: SpecialniPedagogikaRouteWithChildren,
   TridaRoute: TridaRoute,

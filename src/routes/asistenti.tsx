@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, ChevronRight, Loader2, ShieldCheck, UserPlus, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   activateCoordinatorAccess,
   createAssistantAssignment,
@@ -194,7 +194,9 @@ function AssistantCoordinatorPage() {
           <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#eee8f8] text-[#675a8d]">
             <ShieldCheck className="h-6 w-6" />
           </div>
-          <h1 className="mt-5 text-3xl font-black tracking-[-.04em]">Koordinace asistentů pedagoga</h1>
+          <h1 className="mt-5 text-3xl font-black tracking-[-.04em]">
+            Koordinace asistentů pedagoga
+          </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#74827f]">
             Tohle je oddělený pracovní prostor. Samotné přihlášení nestačí — musí být výslovně
             aktivovaný koordinátorský přístup.
@@ -205,7 +207,11 @@ function AssistantCoordinatorPage() {
               onClick={() => void activate()}
               className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-5 py-3 text-sm font-black text-white shadow-[0_12px_28px_rgba(39,103,101,.2)] disabled:opacity-50"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
               Aktivovat koordinaci AP
             </button>
           ) : (
@@ -224,8 +230,12 @@ function AssistantCoordinatorPage() {
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="text-xs font-black uppercase tracking-[.16em] text-[#7e709a]">Třetí pracovní role</div>
-            <h1 className="mt-2 text-3xl font-black tracking-[-.045em] md:text-4xl">Asistenti pedagoga</h1>
+            <div className="text-xs font-black uppercase tracking-[.16em] text-[#7e709a]">
+              Třetí pracovní role
+            </div>
+            <h1 className="mt-2 text-3xl font-black tracking-[-.045em] md:text-4xl">
+              Asistenti pedagoga
+            </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#75827f]">
               Jen pracovní přehled AP a jejich přiřazení. Žádné diagnózy, learning signals ani obsah
               speciálně-pedagogických případů se sem nepřenáší.
@@ -250,14 +260,32 @@ function AssistantCoordinatorPage() {
               </div>
               <div>
                 <h2 className="font-black">Přidat asistenta</h2>
-                <p className="text-xs text-[#86918e]">Pouze pracovní údaje potřebné pro koordinaci.</p>
+                <p className="text-xs text-[#86918e]">
+                  Pouze pracovní údaje potřebné pro koordinaci.
+                </p>
               </div>
             </div>
             <div className="mt-5 space-y-3">
-              <Input value={assistantName} onChange={setAssistantName} placeholder="Jméno asistenta pedagoga" />
-              <Input value={assistantEmail} onChange={setAssistantEmail} placeholder="Pracovní e-mail (volitelné)" />
-              <Input value={assistantPhone} onChange={setAssistantPhone} placeholder="Pracovní telefon (volitelné)" />
-              <Input value={assistantWorkload} onChange={setAssistantWorkload} placeholder="Krátká poznámka k pracovnímu rozsahu" />
+              <Input
+                value={assistantName}
+                onChange={setAssistantName}
+                placeholder="Jméno asistenta pedagoga"
+              />
+              <Input
+                value={assistantEmail}
+                onChange={setAssistantEmail}
+                placeholder="Pracovní e-mail (volitelné)"
+              />
+              <Input
+                value={assistantPhone}
+                onChange={setAssistantPhone}
+                placeholder="Pracovní telefon (volitelné)"
+              />
+              <Input
+                value={assistantWorkload}
+                onChange={setAssistantWorkload}
+                placeholder="Krátká poznámka k pracovnímu rozsahu"
+              />
               <button
                 disabled={saving || !assistantName.trim()}
                 onClick={() => void addAssistant()}
@@ -275,26 +303,38 @@ function AssistantCoordinatorPage() {
               </div>
               <div>
                 <h2 className="font-black">Přiřazení podpory</h2>
-                <p className="text-xs text-[#86918e]">Třída je povinná. Pseudonym dítěte je volitelný.</p>
+                <p className="text-xs text-[#86918e]">
+                  Třída je povinná. Pseudonym dítěte je volitelný.
+                </p>
               </div>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <Select value={selectedAssistant} onChange={setSelectedAssistant} label="Vyber AP">
                 {assistants.map((assistant) => (
-                  <option key={assistant.id} value={assistant.id}>{assistant.display_name}</option>
+                  <option key={assistant.id} value={assistant.id}>
+                    {assistant.display_name}
+                  </option>
                 ))}
               </Select>
               <Select value={selectedClass} onChange={setSelectedClass} label="Vyber třídu">
                 {classes.map((row) => (
-                  <option key={row.id} value={row.id}>{row.name}</option>
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
                 ))}
               </Select>
               <Select value={selectedAlias} onChange={setSelectedAlias} label="Bez vazby na dítě">
                 {aliases.map((alias) => (
-                  <option key={alias.id} value={alias.id}>{alias.alias}</option>
+                  <option key={alias.id} value={alias.id}>
+                    {alias.alias}
+                  </option>
                 ))}
               </Select>
-              <Input value={assignmentNote} onChange={setAssignmentNote} placeholder="Organizační poznámka (volitelné)" />
+              <Input
+                value={assignmentNote}
+                onChange={setAssignmentNote}
+                placeholder="Organizační poznámka (volitelné)"
+              />
             </div>
             <button
               disabled={saving || !selectedAssistant || !selectedClass}
@@ -310,34 +350,54 @@ function AssistantCoordinatorPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-black">Kdo je kde přiřazený</h2>
-              <p className="mt-1 text-xs text-[#86918e]">První bezpečný slice — bez rozvrhů, porad a dalších workflow.</p>
+              <p className="mt-1 text-xs text-[#86918e]">
+                První bezpečný slice — bez rozvrhů, porad a dalších workflow.
+              </p>
             </div>
-            <span className="rounded-full bg-[#f4f1ea] px-3 py-1.5 text-xs font-black text-[#6e7773]">{assignments.length}</span>
+            <span className="rounded-full bg-[#f4f1ea] px-3 py-1.5 text-xs font-black text-[#6e7773]">
+              {assignments.length}
+            </span>
           </div>
 
           {assignments.length === 0 ? (
             <div className="mt-6 rounded-[26px] border border-dashed border-[#ddd7ca] bg-[#fffdf8] px-5 py-8 text-center">
               <UsersRound className="mx-auto h-7 w-7 text-[#b2a897]" />
               <p className="mt-3 text-sm font-black">Zatím tu není žádné přiřazení.</p>
-              <p className="mt-1 text-xs text-[#8b9591]">Přidej AP a spoj ho s třídou. Pseudonym dítěte použij jen tam, kde je to opravdu potřeba.</p>
+              <p className="mt-1 text-xs text-[#8b9591]">
+                Přidej AP a spoj ho s třídou. Pseudonym dítěte použij jen tam, kde je to opravdu
+                potřeba.
+              </p>
             </div>
           ) : (
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               {assignments.map((assignment) => {
                 const assistant = assistantMap.get(assignment.assistant_id);
                 return (
-                  <article key={assignment.id} className="rounded-[24px] border border-[#ece6dc] bg-[#fffefa] p-4">
+                  <article
+                    key={assignment.id}
+                    className="rounded-[24px] border border-[#ece6dc] bg-[#fffefa] p-4"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-black">{assignment.assistantName}</div>
-                        <div className="mt-1 text-xs font-bold text-[#5c746f]">{assignment.className}</div>
+                        <div className="mt-1 text-xs font-bold text-[#5c746f]">
+                          {assignment.className}
+                        </div>
                         {assignment.alias && (
                           <div className="mt-2 inline-flex rounded-full bg-[#edf4fb] px-2.5 py-1 text-[11px] font-black text-[#557087]">
                             podpora: {assignment.alias}
                           </div>
                         )}
-                        {assignment.assignment_note && <p className="mt-3 text-xs leading-5 text-[#7d8985]">{assignment.assignment_note}</p>}
-                        {assistant?.workload_note && <p className="mt-2 text-[11px] text-[#98a09d]">{assistant.workload_note}</p>}
+                        {assignment.assignment_note && (
+                          <p className="mt-3 text-xs leading-5 text-[#7d8985]">
+                            {assignment.assignment_note}
+                          </p>
+                        )}
+                        {assistant?.workload_note && (
+                          <p className="mt-2 text-[11px] text-[#98a09d]">
+                            {assistant.workload_note}
+                          </p>
+                        )}
                       </div>
                       <button
                         disabled={saving}
@@ -358,7 +418,15 @@ function AssistantCoordinatorPage() {
   );
 }
 
-function Input({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+function Input({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
   return (
     <input
       value={value}
@@ -369,7 +437,17 @@ function Input({ value, onChange, placeholder }: { value: string; onChange: (val
   );
 }
 
-function Select({ value, onChange, label, children }: { value: string; onChange: (value: string) => void; label: string; children: React.ReactNode }) {
+function Select({
+  value,
+  onChange,
+  label,
+  children,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <select
       value={value}
