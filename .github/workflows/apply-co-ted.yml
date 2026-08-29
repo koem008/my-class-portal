@@ -1,4 +1,5 @@
 name: Apply Co Ted
+# retry: 2
 on:
   push:
     paths:
