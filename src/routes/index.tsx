@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ContextualDayLayer } from "@/components/ContextualDayLayer";
+import { FirstWelcome } from "@/components/FirstWelcome";
 import {
   importantDatesForToday,
   loadAssistantMemory,
@@ -107,27 +108,7 @@ function Index() {
         text="Načítám rozvrh, přípravy, kalendář a návaznosti."
       />
     );
-  if (state === "empty")
-    return (
-      <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,#edf7f2,transparent_40%),#fbfaf7] px-4">
-        <div className="max-w-xl rounded-[34px] border border-[#e8e3da] bg-white p-8 text-center shadow-[0_24px_70px_rgba(62,78,69,.09)] md:p-10">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-[#276765] text-white">
-            <GraduationCap className="h-7 w-7" />
-          </div>
-          <h1 className="mt-5 text-3xl font-bold tracking-[-.04em]">Vítej v Moje třída</h1>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#73817f]">
-            Databáze je zatím čistá. Začni jedním krátkým nastavením školy a 5. třídy. Nebudeme
-            vytvářet žádná falešná data.
-          </p>
-          <Link
-            to="/zacatek"
-            className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-5 py-3 text-sm font-bold text-white"
-          >
-            Nastavit moji třídu <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </main>
-    );
+  if (state === "empty") return <FirstWelcome />;
   if (state === "error" || !briefing)
     return (
       <Centered

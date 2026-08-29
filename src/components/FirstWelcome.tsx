@@ -26,8 +26,17 @@ export function FirstWelcome() {
         <Palette className="absolute right-[10%] top-[12%] h-8 w-8 rotate-12 text-[#bd9fc9]/30" />
         <span className="absolute left-[7%] top-[38%] h-2 w-2 rounded-full bg-[#8fc6b4]/45" />
         <span className="absolute right-[8%] top-[43%] h-3 w-3 rounded-full bg-[#e9b48f]/40" />
-        <svg className="absolute bottom-[8%] left-[-20px] h-40 w-40 text-[#9fcdbd]/25" viewBox="0 0 160 160" fill="none">
-          <path d="M20 142c36-48 48-84 51-124M69 80c-24-4-39-17-46-36 27-1 45 10 50 30M72 58c16-20 35-28 55-23-8 24-26 37-54 36" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <svg
+          className="absolute bottom-[8%] left-[-20px] h-40 w-40 text-[#9fcdbd]/25"
+          viewBox="0 0 160 160"
+          fill="none"
+        >
+          <path
+            d="M20 142c36-48 48-84 51-124M69 80c-24-4-39-17-46-36 27-1 45 10 50 30M72 58c16-20 35-28 55-23-8 24-26 37-54 36"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
         </svg>
       </div>
 
@@ -59,7 +68,10 @@ export function FirstWelcome() {
 
               <div className="mt-6 flex flex-wrap justify-center gap-2.5">
                 {previews.map(({ icon: Icon, label, tone }) => (
-                  <div key={label} className="flex items-center gap-2 rounded-2xl border border-white bg-white px-3.5 py-2.5 text-xs font-bold shadow-[0_8px_24px_rgba(70,84,75,.07)]">
+                  <div
+                    key={label}
+                    className="flex items-center gap-2 rounded-2xl border border-white bg-white px-3.5 py-2.5 text-xs font-bold shadow-[0_8px_24px_rgba(70,84,75,.07)]"
+                  >
                     <span className={`grid h-7 w-7 place-items-center rounded-xl ${tone}`}>
                       <Icon className="h-3.5 w-3.5" />
                     </span>
@@ -75,7 +87,9 @@ export function FirstWelcome() {
                 Vytvořit moji třídu
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 motion-reduce:transform-none" />
               </Link>
-              <div className="mt-3 text-xs font-medium text-[#96a09e]">Zabere to přibližně 2 minuty.</div>
+              <div className="mt-3 text-xs font-medium text-[#96a09e]">
+                Zabere to přibližně 2 minuty.
+              </div>
             </div>
           </div>
 
