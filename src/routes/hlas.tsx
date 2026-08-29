@@ -1,5 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CheckCircle2, ChevronLeft, Loader2, Mic, MicOff, Save, ShieldCheck, Volume2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  Loader2,
+  Mic,
+  MicOff,
+  Save,
+  ShieldCheck,
+  Volume2,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { runLessonAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";
 import {
@@ -200,17 +209,41 @@ function VoiceReflectionPage() {
 
   async function speakAiResponse() {
     if (!selectedLesson || !transcript.trim()) return;
-    setSpeaking(true); setNotice("");
+    setSpeaking(true);
+    setNotice("");
     try {
       const workspace = await loadLessonWorkspace(selectedLesson.id);
-      const outcomeCodes = (workspace.curriculum?.outcomes ?? []).map((item) => item.official_code).filter((code): code is string => Boolean(code));
-      const ai = await runLessonAi({ data: { action: "activity", context: { lessonId: selectedLesson.id, grade: workspace.curriculum?.classGrade ?? 5, subject: selectedLesson.subject_name, topic: selectedLesson.topic ?? selectedLesson.title ?? undefined, durationMinutes: 45, curriculumOutcomeCodes: outcomeCodes, curriculumSummary: (workspace.curriculum?.outcomes ?? []).map((item) => [item.official_code, item.title].filter(Boolean).join(" · ")).join("\n") || undefined, teacherInstruction: `Učitel nadiktoval tuto stručnou reflexi: ${transcript.trim()}\nOdpověz česky velmi stručně a prakticky: co si z hodiny odnést a jak začít příště. Nepřidávej žádná jména ani osobní údaje.` } } });
+      const outcomeCodes = (workspace.curriculum?.outcomes ?? [])
+        .map((item) => item.official_code)
+        .filter((code): code is string => Boolean(code));
+      const ai = await runLessonAi({
+        data: {
+          action: "activity",
+          context: {
+            lessonId: selectedLesson.id,
+            grade: workspace.curriculum?.classGrade ?? 5,
+            subject: selectedLesson.subject_name,
+            topic: selectedLesson.topic ?? selectedLesson.title ?? undefined,
+            durationMinutes: 45,
+            curriculumOutcomeCodes: outcomeCodes,
+            curriculumSummary:
+              (workspace.curriculum?.outcomes ?? [])
+                .map((item) => [item.official_code, item.title].filter(Boolean).join(" · "))
+                .join("\n") || undefined,
+            teacherInstruction: `Učitel nadiktoval tuto stručnou reflexi: ${transcript.trim()}\nOdpověz česky velmi stručně a prakticky: co si z hodiny odnést a jak začít příště. Nepřidávej žádná jména ani osobní údaje.`,
+          },
+        },
+      });
       const spoken = [ai.title, ...extractSpokenText(ai.content)].join(". ").slice(0, 1800);
       if (!spoken.trim()) throw new Error("AI nevytvořila text vhodný k přečtení.");
       const voice = await synthesizeAssistantVoice({ data: { text: spoken } });
       await new Audio(`data:${voice.mimeType};base64,${voice.audioBase64}`).play();
       setNotice("AI odpověď se přehrává. Nic z odpovědi se samo neukládá.");
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Hlas zatím není připojen."); } finally { setSpeaking(false); }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Hlas zatím není připojen.");
+    } finally {
+      setSpeaking(false);
+    }
   }
 
   async function save() {
@@ -330,10 +363,31 @@ function VoiceReflectionPage() {
                 className="mt-4 min-h-36 w-full rounded-2xl border border-[#e2ded6] bg-[#fffefa] px-3 py-3 text-sm leading-6"
               />
               <div className="mt-3 flex flex-wrap justify-end gap-2">
-                <button type="button" onClick={structureCurrentTranscript} disabled={!transcript.trim()} className="rounded-2xl bg-[#eef6f2] px-4 py-2.5 text-sm font-bold text-[#276765] disabled:opacity-40">Rozdělit přepis bez AI</button>
-                <button type="button" onClick={() => void speakAiResponse()} disabled={!transcript.trim() || speaking} className="inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">{speaking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}{speaking ? "Připravuji odpověď…" : "Odpovědět hlasem"}</button>
+                <button
+                  type="button"
+                  onClick={structureCurrentTranscript}
+                  disabled={!transcript.trim()}
+                  className="rounded-2xl bg-[#eef6f2] px-4 py-2.5 text-sm font-bold text-[#276765] disabled:opacity-40"
+                >
+                  Rozdělit přepis bez AI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void speakAiResponse()}
+                  disabled={!transcript.trim() || speaking}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+                >
+                  {speaking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                  {speaking ? "Připravuji odpověď…" : "Odpovědět hlasem"}
+                </button>
               </div>
-              <p className="mt-2 text-right text-[11px] leading-4 text-[#8a9695]">Do hlasové AI zadávejte pouze pseudonymy, ne skutečná jména žáků.</p>
+              <p className="mt-2 text-right text-[11px] leading-4 text-[#8a9695]">
+                Do hlasové AI zadávejte pouze pseudonymy, ne skutečná jména žáků.
+              </p>
             </section>
 
             <section className="rounded-[28px] border border-[#e8e4dc] bg-white p-5">
@@ -388,7 +442,8 @@ function extractSpokenText(value: unknown): string[] {
   if (typeof value === "string") return value.trim() ? [value.trim()] : [];
   if (typeof value === "number" || typeof value === "boolean") return [String(value)];
   if (Array.isArray(value)) return value.flatMap(extractSpokenText);
-  if (value && typeof value === "object") return Object.values(value as Record<string, unknown>).flatMap(extractSpokenText);
+  if (value && typeof value === "object")
+    return Object.values(value as Record<string, unknown>).flatMap(extractSpokenText);
   return [];
 }
 

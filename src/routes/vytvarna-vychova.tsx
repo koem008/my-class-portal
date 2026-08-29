@@ -25,7 +25,9 @@ function ArtStudioPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [imageGenerating, setImageGenerating] = useState(false);
-  const [imageResult, setImageResult] = useState<{ imageBase64: string; mimeType: string } | null>(null);
+  const [imageResult, setImageResult] = useState<{ imageBase64: string; mimeType: string } | null>(
+    null,
+  );
   useEffect(() => {
     void init();
   }, []);
@@ -55,11 +57,25 @@ function ArtStudioPage() {
     }
   }
   async function generateInspiration(theme: ArtTheme) {
-    setImageGenerating(true); setError("");
+    setImageGenerating(true);
+    setError("");
     try {
-      const result = await generateArtInspirationImage({ data: { grade: 5, topic: theme.title, purpose: theme.summary, curriculumOutcomeCodes: theme.outcome_codes, style: "friendly_illustration", aspectRatio: "4:3" } });
+      const result = await generateArtInspirationImage({
+        data: {
+          grade: 5,
+          topic: theme.title,
+          purpose: theme.summary,
+          curriculumOutcomeCodes: theme.outcome_codes,
+          style: "friendly_illustration",
+          aspectRatio: "4:3",
+        },
+      });
       setImageResult({ imageBase64: result.imageBase64, mimeType: result.mimeType });
-    } catch (e: any) { setError(e?.message ?? "Obrázková AI zatím není připojena."); } finally { setImageGenerating(false); }
+    } catch (e: any) {
+      setError(e?.message ?? "Obrázková AI zatím není připojena.");
+    } finally {
+      setImageGenerating(false);
+    }
   }
 
   async function applyTheme(theme: ArtTheme) {
@@ -250,8 +266,30 @@ function ThemeDetail({
         </div>
       </div>
       <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50/50 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-sm font-semibold">AI inspirační obrázek</div><div className="mt-1 text-xs text-slate-500">Pouze jednoduchá školní ilustrace, bez fotorealistických osob a bez identity dětí.</div></div><button type="button" onClick={onGenerateImage} disabled={imageGenerating} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Sparkles className="h-4 w-4" />{imageGenerating ? "Generuji…" : "Vytvořit inspiraci"}</button></div>
-        {imageResult && <img src={`data:${imageResult.mimeType};base64,${imageResult.imageBase64}`} alt={`AI inspirační ilustrace k tématu ${theme.title}`} className="mt-4 w-full rounded-2xl border border-white object-cover shadow-sm" />}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold">AI inspirační obrázek</div>
+            <div className="mt-1 text-xs text-slate-500">
+              Pouze jednoduchá školní ilustrace, bez fotorealistických osob a bez identity dětí.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onGenerateImage}
+            disabled={imageGenerating}
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            <Sparkles className="h-4 w-4" />
+            {imageGenerating ? "Generuji…" : "Vytvořit inspiraci"}
+          </button>
+        </div>
+        {imageResult && (
+          <img
+            src={`data:${imageResult.mimeType};base64,${imageResult.imageBase64}`}
+            alt={`AI inspirační ilustrace k tématu ${theme.title}`}
+            className="mt-4 w-full rounded-2xl border border-white object-cover shadow-sm"
+          />
+        )}
       </div>
       <div className="mt-5 space-y-5">
         <Block title="Cíle">
