@@ -1,101 +1,139 @@
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
+  BookOpen,
   CalendarDays,
-  GraduationCap,
+  Heart,
   Mic2,
   Palette,
+  PencilLine,
   Sparkles,
   WandSparkles,
 } from "lucide-react";
 
-const previews = [
-  { icon: CalendarDays, label: "Rozvrh", tone: "bg-[#e7f4ef] text-[#276765]" },
-  { icon: WandSparkles, label: "AI přípravy", tone: "bg-[#fff0df] text-[#9a6746]" },
-  { icon: Mic2, label: "Asistentka", tone: "bg-[#efebfb] text-[#675c91]" },
+const notes = [
+  {
+    icon: CalendarDays,
+    label: "Tvůj rozvrh. Bez hledání.",
+    className: "-rotate-2 bg-[#dff2e9] text-[#2c6963]",
+  },
+  {
+    icon: WandSparkles,
+    label: "Přípravy, které nemusíš začínat od nuly.",
+    className: "rotate-2 bg-[#ffe5c8] text-[#995f3e]",
+  },
+  {
+    icon: Mic2,
+    label: "A někdo, komu to můžeš prostě říct nahlas.",
+    className: "-rotate-1 bg-[#e9e3f8] text-[#675a91]",
+  },
 ];
 
 export function FirstWelcome() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#fbfaf6] px-4 py-8 text-[#24343f] sm:py-12">
+    <main className="relative min-h-screen overflow-hidden bg-[#f8f3ea] text-[#23333a]">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-[#dff2e9]/75 blur-3xl" />
-        <div className="absolute -right-28 top-[18%] h-80 w-80 rounded-full bg-[#ffe7c9]/65 blur-3xl" />
-        <div className="absolute -bottom-28 left-[22%] h-80 w-80 rounded-full bg-[#e8e2f7]/70 blur-3xl" />
-        <Sparkles className="absolute left-[11%] top-[13%] h-5 w-5 text-[#d6b96d]/55" />
-        <Palette className="absolute right-[10%] top-[12%] h-8 w-8 rotate-12 text-[#bd9fc9]/30" />
-        <span className="absolute left-[7%] top-[38%] h-2 w-2 rounded-full bg-[#8fc6b4]/45" />
-        <span className="absolute right-[8%] top-[43%] h-3 w-3 rounded-full bg-[#e9b48f]/40" />
-        <svg
-          className="absolute bottom-[8%] left-[-20px] h-40 w-40 text-[#9fcdbd]/25"
-          viewBox="0 0 160 160"
-          fill="none"
-        >
-          <path
-            d="M20 142c36-48 48-84 51-124M69 80c-24-4-39-17-46-36 27-1 45 10 50 30M72 58c16-20 35-28 55-23-8 24-26 37-54 36"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
+        <div className="absolute -left-28 -top-24 h-80 w-80 rounded-full bg-[#f6cfae]/60 blur-3xl" />
+        <div className="absolute -right-24 top-[8%] h-72 w-72 rounded-full bg-[#c9e8db]/70 blur-3xl" />
+        <div className="absolute bottom-[-8%] left-[28%] h-72 w-72 rounded-full bg-[#d9d0ef]/65 blur-3xl" />
+        <svg className="absolute left-[-18px] top-[28%] h-40 w-40 text-[#d59374]/30" viewBox="0 0 160 160" fill="none">
+          <path d="M16 116c34-14 48-42 58-90M49 70c-20 0-33-8-42-24 24-4 41 4 48 20M69 54c13-18 30-27 50-27-5 22-20 36-46 42" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+        </svg>
+        <svg className="absolute right-[-26px] bottom-[24%] h-44 w-44 text-[#8fbfae]/28" viewBox="0 0 180 180" fill="none">
+          <path d="M22 132c34-2 61-19 82-52 10-16 15-35 17-58M83 72c-24 2-42-7-54-27 30-5 50 3 60 23M107 52c17-17 37-22 59-15-10 23-30 33-58 29" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
         </svg>
       </div>
 
-      <section className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl items-center justify-center">
-        <div className="w-full max-w-2xl">
-          <div className="mb-5 flex justify-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3.5 py-2 text-[11px] font-bold uppercase tracking-[.16em] text-[#66807a] shadow-sm backdrop-blur-xl">
-              <Sparkles className="h-3.5 w-3.5 text-[#c69655]" />
-              Tvůj nový učitelský prostor
+      <section className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid w-full items-center gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
+          <div className="relative z-10">
+            <div className="inline-flex -rotate-2 items-center gap-2 rounded-full border border-[#e7d8c4] bg-[#fffaf2] px-4 py-2 text-[11px] font-black uppercase tracking-[.17em] text-[#8a684d] shadow-[0_8px_24px_rgba(92,71,55,.08)]">
+              <Sparkles className="h-3.5 w-3.5" />
+              jen tvoje místo
+            </div>
+
+            <h1 className="mt-6 max-w-2xl text-[48px] font-black leading-[.94] tracking-[-.07em] text-[#1e2c35] sm:text-[64px] lg:text-[76px]">
+              Tak jo.
+              <span className="block text-[#2c756f]">Pojďme si udělat</span>
+              <span className="relative inline-block">
+                školu po tvém.
+                <svg className="absolute -bottom-3 left-0 h-5 w-full text-[#e8a56f]" viewBox="0 0 360 24" preserveAspectRatio="none" fill="none" aria-hidden="true">
+                  <path d="M4 16c62-12 121-8 173-4 59 5 112 7 179-4" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+                </svg>
+              </span>
+            </h1>
+
+            <p className="mt-8 max-w-xl text-[17px] leading-8 text-[#657570] sm:text-lg">
+              Ne další systém, který se musíš naučit používat. Tohle má být tvůj pracovní kout — místo, kam odložíš rozvrh, přípravy, nápady, nedodělky i věci, které si chceš pamatovat.
+            </p>
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                to="/zacatek"
+                className="group inline-flex min-h-14 items-center gap-3 rounded-[22px] bg-[#2c756f] px-6 py-3.5 text-sm font-black text-white shadow-[0_18px_40px_rgba(44,117,111,.24)] transition hover:-translate-y-1 hover:bg-[#245f5b] active:translate-y-0 motion-reduce:transform-none"
+              >
+                Pojďme to nastavit
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 motion-reduce:transform-none" />
+              </Link>
+              <span className="rounded-full bg-white/60 px-4 py-2 text-xs font-bold text-[#7d8a84] backdrop-blur">
+                pár minut a je tvoje
+              </span>
+            </div>
+
+            <div className="mt-8 flex items-center gap-2 text-xs font-semibold text-[#8a948f]">
+              <Heart className="h-4 w-4 text-[#cf8f85]" />
+              Bez demo dat. Bez cizích lidí. Jen tvoje věci.
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[38px] border border-white/90 bg-white/78 p-6 shadow-[0_32px_90px_rgba(61,83,75,.14)] backdrop-blur-xl sm:p-10 md:p-12">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#8fc7b6] via-[#f0c590] to-[#b7aad9]" />
-            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#e9f6f1] blur-2xl" />
-
-            <div className="relative text-center">
-              <div className="mx-auto grid h-[72px] w-[72px] place-items-center rounded-[25px] bg-gradient-to-br from-[#2d7772] to-[#245c5a] text-white shadow-[0_16px_36px_rgba(39,103,101,.25)]">
-                <GraduationCap className="h-8 w-8" />
+          <div className="relative mx-auto w-full max-w-[520px] lg:max-w-none" aria-hidden="true">
+            <div className="absolute left-[6%] top-[7%] h-[88%] w-[88%] rotate-3 rounded-[38px] bg-[#dceee6] shadow-[0_30px_80px_rgba(49,75,67,.12)]" />
+            <div className="absolute left-[2%] top-[11%] h-[84%] w-[92%] -rotate-2 rounded-[38px] bg-[#f8d9bd]" />
+            <div className="relative rounded-[40px] border border-white/70 bg-[#fffdf8] p-5 shadow-[0_36px_90px_rgba(76,68,57,.16)] sm:p-7">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#2c756f] text-white">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black">Moje třída</div>
+                    <div className="text-xs text-[#8d9994]">tvůj den · po ruce</div>
+                  </div>
+                </div>
+                <Palette className="h-6 w-6 rotate-12 text-[#b78aaa]" />
               </div>
 
-              <h1 className="mt-6 text-[34px] font-black leading-[1.04] tracking-[-.055em] text-[#17212b] sm:text-[46px]">
-                Vítej v <span className="text-[#2b706c]">Moje třída</span>
-              </h1>
-              <p className="mx-auto mt-4 max-w-lg text-[15px] leading-7 text-[#6f7e7c] sm:text-base">
-                Místo, kde se rozvrh, přípravy, nápady i tvoje asistentka potkají na jednom místě.
-                Nejdřív si ho během chvilky nastavíme podle tebe.
-              </p>
-
-              <div className="mt-6 flex flex-wrap justify-center gap-2.5">
-                {previews.map(({ icon: Icon, label, tone }) => (
-                  <div
-                    key={label}
-                    className="flex items-center gap-2 rounded-2xl border border-white bg-white px-3.5 py-2.5 text-xs font-bold shadow-[0_8px_24px_rgba(70,84,75,.07)]"
-                  >
-                    <span className={`grid h-7 w-7 place-items-center rounded-xl ${tone}`}>
-                      <Icon className="h-3.5 w-3.5" />
-                    </span>
-                    {label}
+              <div className="mt-6 grid gap-3">
+                {notes.map(({ icon: Icon, label, className }) => (
+                  <div key={label} className={`flex items-center gap-3 rounded-[22px] px-4 py-4 shadow-[0_10px_24px_rgba(70,68,61,.08)] ${className}`}>
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="text-sm font-black leading-5">{label}</div>
                   </div>
                 ))}
               </div>
 
-              <Link
-                to="/zacatek"
-                className="group mx-auto mt-7 inline-flex min-h-14 items-center justify-center gap-3 rounded-[20px] bg-[#276765] px-7 py-3.5 text-sm font-extrabold text-white shadow-[0_16px_34px_rgba(39,103,101,.24)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#215e5c] active:translate-y-0 motion-reduce:transform-none"
-              >
-                Vytvořit moji třídu
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 motion-reduce:transform-none" />
-              </Link>
-              <div className="mt-3 text-xs font-medium text-[#96a09e]">
-                Zabere to přibližně 2 minuty.
+              <div className="mt-5 grid grid-cols-[1.1fr_.9fr] gap-3">
+                <div className="rounded-[24px] bg-[#f3eddc] p-4">
+                  <div className="flex items-center gap-2 text-xs font-black text-[#8a6d4b]">
+                    <PencilLine className="h-4 w-4" />
+                    Rozdělané
+                  </div>
+                  <div className="mt-3 text-lg font-black leading-5 text-[#4a453d]">Tady skončí věci, ke kterým se chceš vrátit.</div>
+                </div>
+                <div className="rounded-[24px] bg-[#efeafb] p-4">
+                  <div className="text-xs font-black text-[#74689a]">Malá radost</div>
+                  <div className="mt-3 text-3xl">✦</div>
+                  <div className="mt-2 text-xs leading-5 text-[#7d7591]">A občas ti to i něco milého řekne.</div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[24px] border-2 border-dashed border-[#d9d0c2] bg-white/70 px-4 py-3 text-center text-xs font-bold text-[#8d948d]">
+                Tohle se postupně přizpůsobí tomu, jak funguješ ty.
               </div>
             </div>
           </div>
-
-          <p className="mx-auto mt-5 max-w-md text-center text-xs leading-5 text-[#8b9693]">
-            Žádná ukázková data. Začneš s čistým prostorem, který bude opravdu tvůj.
-          </p>
         </div>
       </section>
     </main>
