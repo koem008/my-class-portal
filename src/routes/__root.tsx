@@ -194,7 +194,7 @@ function AuthGate() {
   return (
     <>
       <SeasonalAmbience />
-      <div className="relative z-10">
+      <div key={pathname} className="app-polish app-screen-enter relative z-10">
         <Outlet />
       </div>
       <SpecialContinuityAssistantCard />
