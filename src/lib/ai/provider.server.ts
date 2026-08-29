@@ -100,8 +100,7 @@ export function readOpenAiTranscriptionConfigFromEnv(): OpenAiTranscriptionConfi
   return {
     apiKey,
     baseUrl:
-      process.env.OPENAI_TRANSCRIBE_URL?.trim() ||
-      "https://api.openai.com/v1/audio/transcriptions",
+      process.env.OPENAI_TRANSCRIBE_URL?.trim() || "https://api.openai.com/v1/audio/transcriptions",
     model: process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || "gpt-4o-mini-transcribe",
   };
 }
@@ -208,11 +207,7 @@ export async function generateLessonAsset(
 ): Promise<LessonAiResult> {
   assertPrivacySafePayload(request);
   if (!config.apiKey) {
-    throw new ExternalAiProviderError(
-      "anthropic",
-      "AI_NOT_CONFIGURED",
-      "AI zatím není připojena.",
-    );
+    throw new ExternalAiProviderError("anthropic", "AI_NOT_CONFIGURED", "AI zatím není připojena.");
   }
 
   const model = chooseModelForLessonAction(config, request.action);
@@ -316,7 +311,11 @@ export async function transcribeAudio(
     request.audio.byteOffset,
     request.audio.byteOffset + request.audio.byteLength,
   ) as ArrayBuffer;
-  form.append("file", new Blob([audioBuffer], { type: request.mimeType }), request.fileName || "voice.webm");
+  form.append(
+    "file",
+    new Blob([audioBuffer], { type: request.mimeType }),
+    request.fileName || "voice.webm",
+  );
   form.append("model", config.model);
   form.append("language", request.language || "cs");
   form.append("response_format", "json");
@@ -458,7 +457,10 @@ export async function generateArtImage(
   assertPrivacySafePayload(raw);
   const candidates = Array.isArray(raw.candidates) ? raw.candidates : [];
   const first = candidates[0];
-  const content = first && typeof first === "object" ? asRecord((first as Record<string, unknown>).content) : null;
+  const content =
+    first && typeof first === "object"
+      ? asRecord((first as Record<string, unknown>).content)
+      : null;
   const parts = content && Array.isArray(content.parts) ? content.parts : [];
   const imagePart = parts.find((part) => {
     if (!part || typeof part !== "object") return false;
@@ -466,7 +468,8 @@ export async function generateArtImage(
   }) as Record<string, unknown> | undefined;
   const inlineData = imagePart ? asRecord(imagePart.inlineData) : null;
   const data = inlineData && typeof inlineData.data === "string" ? inlineData.data : "";
-  const mimeType = inlineData && typeof inlineData.mimeType === "string" ? inlineData.mimeType : "image/png";
+  const mimeType =
+    inlineData && typeof inlineData.mimeType === "string" ? inlineData.mimeType : "image/png";
   if (!data) {
     throw new ExternalAiProviderError(
       "google",
