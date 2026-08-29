@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import type { DailyBriefing, DailyLesson } from "@/lib/daily-briefing-data";
 import type { LearningSignalKind } from "@/lib/lesson-workspace-data";
 
-const db = supabase as unknown as SupabaseClient<any>;
+const db = supabase as SupabaseClient<Database>;
 
 export type ContextualAction = {
   title: string;
@@ -36,11 +37,22 @@ type ConfirmedSignal = {
   created_at: string;
 };
 
+type PreparationRow = Pick<
+  Database["public"]["Tables"]["lesson_preparations"]["Row"],
+  "lesson_id" | "updated_at"
+>;
+type DraftLessonRow = Pick<
+  Database["public"]["Tables"]["lesson_instances"]["Row"],
+  "id" | "lesson_date" | "subject_name" | "topic" | "title" | "status"
+>;
+
 export function buildNowAction(briefing: DailyBriefing, now: Date): ContextualAction | null {
   if (briefing.blocked && briefing.lessons.length === 0)
     return {
       title: "Dnes má škola jiný rytmus",
-      detail: briefing.events.find((event) => event.blocks_lessons)?.title || "Mrkni do kalendáře, co dnešek mění.",
+      detail:
+        briefing.events.find((event) => event.blocks_lessons)?.title ||
+        "Mrkni do kalendáře, co dnešek mění.",
       to: "/kalendar",
       tone: "calm",
     };
@@ -48,16 +60,21 @@ export function buildNowAction(briefing: DailyBriefing, now: Date): ContextualAc
   const lessons = briefing.lessons
     .filter((lesson) => lesson.status !== "cancelled")
     .map((lesson) => ({ lesson, timing: lessonTiming(briefing.date, lesson) }))
-    .filter((item): item is { lesson: DailyLesson; timing: { start: Date; end: Date } } => Boolean(item.timing))
+    .filter(
+      (item): item is { lesson: DailyLesson; timing: { start: Date; end: Date } } =>
+        Boolean(item.timing),
+    )
     .sort((a, b) => a.timing.start.getTime() - b.timing.start.getTime());
 
   const current = lessons.find(
-    ({ timing }) => now.getTime() >= timing.start.getTime() && now.getTime() <= timing.end.getTime(),
+    ({ timing }) =>
+      now.getTime() >= timing.start.getTime() && now.getTime() <= timing.end.getTime(),
   );
   if (current)
     return {
       title: `Právě teď: ${current.lesson.subject_name}`,
-      detail: current.lesson.topic || current.lesson.title || "Otevři pracovní prostor této hodiny.",
+      detail:
+        current.lesson.topic || current.lesson.title || "Otevři pracovní prostor této hodiny.",
       to: "/hodina/$lessonId",
       lessonId: current.lesson.id,
       tone: "now",
@@ -65,7 +82,10 @@ export function buildNowAction(briefing: DailyBriefing, now: Date): ContextualAc
 
   const next = lessons.find(({ timing }) => timing.start.getTime() > now.getTime());
   if (next) {
-    const minutes = Math.max(1, Math.round((next.timing.start.getTime() - now.getTime()) / 60_000));
+    const minutes = Math.max(
+      1,
+      Math.round((next.timing.start.getTime() - now.getTime()) / 60_000),
+    );
     const time = next.lesson.starts_at?.slice(0, 5) ?? "";
     const timingText = minutes <= 90 ? `Za ${minutes} min` : time ? `V ${time}` : "Další hodina";
     return {
@@ -91,7 +111,8 @@ export function buildNowAction(briefing: DailyBriefing, now: Date): ContextualAc
   if (hour >= 20)
     return {
       title: "Na dnešek hotovo",
-      detail: "Pracovní den může zůstat zavřený. Zítra se zase chytíme přesně tam, kde bude potřeba.",
+      detail:
+        "Pracovní den může zůstat zavřený. Zítra se zase chytíme přesně tam, kde bude potřeba.",
       to: "/rozvrh",
       tone: "calm",
     };
@@ -110,8 +131,8 @@ export async function loadRecentUnfinishedPreparation(
     .order("updated_at", { ascending: false })
     .limit(12);
   if (prepResult.error) throw prepResult.error;
-  const rows = prepResult.data ?? [];
-  const lessonIds = rows.map((row: any) => row.lesson_id as string);
+  const rows = (prepResult.data ?? []) as PreparationRow[];
+  const lessonIds = rows.map((row) => row.lesson_id);
   if (!lessonIds.length) return null;
 
   const lessonResult = await db
@@ -121,17 +142,19 @@ export async function loadRecentUnfinishedPreparation(
     .lte("lesson_date", todayIso)
     .in("status", ["planned", "draft"]);
   if (lessonResult.error) throw lessonResult.error;
-  const lessonsById = new Map((lessonResult.data ?? []).map((lesson: any) => [lesson.id, lesson]));
+  const lessonsById = new Map(
+    ((lessonResult.data ?? []) as DraftLessonRow[]).map((lesson) => [lesson.id, lesson]),
+  );
 
   for (const row of rows) {
-    const lesson = lessonsById.get((row as any).lesson_id) as any;
+    const lesson = lessonsById.get(row.lesson_id);
     if (!lesson) continue;
     return {
       lessonId: lesson.id,
       subject: lesson.subject_name,
       topic: lesson.topic || lesson.title || null,
       lessonDate: lesson.lesson_date,
-      updatedAt: (row as any).updated_at,
+      updatedAt: row.updated_at,
     };
   }
   return null;
@@ -150,7 +173,9 @@ export async function loadProgressMoment(classId: string): Promise<ProgressMomen
 
   const grouped = new Map<string, ConfirmedSignal[]>();
   for (const signal of signals) {
-    const key = `${signal.student_alias_id}:${(signal.topic || "").trim().toLocaleLowerCase("cs-CZ")}`;
+    const key = `${signal.student_alias_id}:${(signal.topic || "")
+      .trim()
+      .toLocaleLowerCase("cs-CZ")}`;
     const group = grouped.get(key) ?? [];
     group.push(signal);
     grouped.set(key, group);
@@ -176,7 +201,8 @@ export async function loadProgressMoment(classId: string): Promise<ProgressMomen
       return {
         status,
         title: "Tady stojí za to ještě chvíli sledovat",
-        detail: "Poslední potvrzené signály ukazují potřebu dalšího procvičení nebo návratu k tématu.",
+        detail:
+          "Poslední potvrzené signály ukazují potřebu dalšího procvičení nebo návratu k tématu.",
       };
   }
   return null;
