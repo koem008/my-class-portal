@@ -8,15 +8,33 @@ export function ContextualDayLayer({ briefing, now }: { briefing: DailyBriefing;
   if (!action) return null;
 
   const meta = {
-    now: { Icon: Clock3, shell: "border-[#cfe4dc] bg-[#f2faf6]", icon: "bg-[#dcefe7] text-[#276765]" },
-    next: { Icon: ArrowRight, shell: "border-[#eadfcd] bg-[#fffaf2]", icon: "bg-[#f7ead4] text-[#8b6846]" },
-    reflect: { Icon: Sparkles, shell: "border-[#ddd8ec] bg-[#f8f5fc]", icon: "bg-[#ebe5f6] text-[#6e6396]" },
-    calm: { Icon: MoonStar, shell: "border-[#dde4e7] bg-[#f6f8f8]", icon: "bg-[#e8edef] text-[#61747c]" },
+    now: {
+      Icon: Clock3,
+      shell: "border-[#cfe4dc] bg-[#f2faf6]",
+      icon: "bg-[#dcefe7] text-[#276765]",
+    },
+    next: {
+      Icon: ArrowRight,
+      shell: "border-[#eadfcd] bg-[#fffaf2]",
+      icon: "bg-[#f7ead4] text-[#8b6846]",
+    },
+    reflect: {
+      Icon: Sparkles,
+      shell: "border-[#ddd8ec] bg-[#f8f5fc]",
+      icon: "bg-[#ebe5f6] text-[#6e6396]",
+    },
+    calm: {
+      Icon: MoonStar,
+      shell: "border-[#dde4e7] bg-[#f6f8f8]",
+      icon: "bg-[#e8edef] text-[#61747c]",
+    },
   }[action.tone];
   const Icon = meta.Icon;
 
   const content = (
-    <div className={`group flex items-center gap-4 rounded-[26px] border p-4 shadow-[0_10px_30px_rgba(65,78,72,.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(65,78,72,.09)] ${meta.shell}`}>
+    <div
+      className={`group flex items-center gap-4 rounded-[26px] border p-4 shadow-[0_10px_30px_rgba(65,78,72,.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(65,78,72,.09)] ${meta.shell}`}
+    >
       <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${meta.icon}`}>
         <Icon className="h-5 w-5" />
       </div>

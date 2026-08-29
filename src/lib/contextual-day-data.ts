@@ -60,9 +60,8 @@ export function buildNowAction(briefing: DailyBriefing, now: Date): ContextualAc
   const lessons = briefing.lessons
     .filter((lesson) => lesson.status !== "cancelled")
     .map((lesson) => ({ lesson, timing: lessonTiming(briefing.date, lesson) }))
-    .filter(
-      (item): item is { lesson: DailyLesson; timing: { start: Date; end: Date } } =>
-        Boolean(item.timing),
+    .filter((item): item is { lesson: DailyLesson; timing: { start: Date; end: Date } } =>
+      Boolean(item.timing),
     )
     .sort((a, b) => a.timing.start.getTime() - b.timing.start.getTime());
 
@@ -82,10 +81,7 @@ export function buildNowAction(briefing: DailyBriefing, now: Date): ContextualAc
 
   const next = lessons.find(({ timing }) => timing.start.getTime() > now.getTime());
   if (next) {
-    const minutes = Math.max(
-      1,
-      Math.round((next.timing.start.getTime() - now.getTime()) / 60_000),
-    );
+    const minutes = Math.max(1, Math.round((next.timing.start.getTime() - now.getTime()) / 60_000));
     const time = next.lesson.starts_at?.slice(0, 5) ?? "";
     const timingText = minutes <= 90 ? `Za ${minutes} min` : time ? `V ${time}` : "Další hodina";
     return {

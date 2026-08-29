@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ContextualDayLayer } from "@/components/ContextualDayLayer";
 import {
   importantDatesForToday,
   loadAssistantMemory,
@@ -284,6 +285,8 @@ function Index() {
                   </div>
                 </div>
               </section>
+
+              <ContextualDayLayer briefing={briefing} now={now} />
 
               <div className="mt-5 grid gap-4 md:grid-cols-3">
                 <Metric
