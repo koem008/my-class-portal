@@ -80,10 +80,12 @@ function LoginPage() {
           <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/12">
             <GraduationCap className="h-7 w-7" />
           </div>
-          <h1 className="mt-7 text-3xl font-bold tracking-[-.04em]">Moje třída začíná bezpečným přihlášením.</h1>
+          <h1 className="mt-7 text-3xl font-bold tracking-[-.04em]">
+            Moje třída začíná bezpečným přihlášením.
+          </h1>
           <p className="mt-4 max-w-lg text-sm leading-7 text-white/75">
-            Škola, třída, přípravy i citlivější pedagogická data se vážou ke konkrétnímu účtu.
-            Bez přihlášení aplikace žádná školní data nevytvoří ani nezpřístupní.
+            Škola, třída, přípravy i citlivější pedagogická data se vážou ke konkrétnímu účtu. Bez
+            přihlášení aplikace žádná školní data nevytvoří ani nezpřístupní.
           </p>
           <div className="mt-8 space-y-3">
             <SecurityPoint text="Každý účet má vlastní identitu v Supabase Auth" />
