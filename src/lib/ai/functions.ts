@@ -39,6 +39,29 @@ const lessonAiRequestSchema = z.object({
   }),
 });
 
+const companionRequestSchema = z.object({
+  message: z.string().trim().min(1).max(4000),
+  assistantName: z.string().trim().min(1).max(80),
+  tone: z.enum(["friendly", "calm", "efficient", "custom"]),
+  todaySummary: z.string().trim().max(8000).optional(),
+  continuitySummary: z.string().trim().max(5000).optional(),
+  personalPreferences: z.array(z.string().trim().max(500)).max(20).optional(),
+  recentConversation: z
+    .array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().max(2000) }))
+    .max(8)
+    .optional(),
+  availableLessons: z
+    .array(
+      z.object({
+        lessonId: z.string().uuid(),
+        subject: z.string().trim().max(160),
+        topic: z.string().trim().max(500).optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
+});
+
 const speechSynthesisSchema = z.object({
   text: z.string().trim().min(1).max(10_000),
 });
@@ -68,6 +91,17 @@ export const runLessonAi = createServerFn({ method: "POST" })
     const config = readAnthropicTextProviderConfigFromEnv();
     if (!config) throw new Error("AI zatím není připojena.");
     return generateLessonAsset(config, data);
+  });
+
+export const runCompanionAi = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(companionRequestSchema)
+  .handler(async ({ data }) => {
+    const { generateCompanionReply, readAnthropicTextProviderConfigFromEnv } =
+      await import("./provider.server");
+    const config = readAnthropicTextProviderConfigFromEnv();
+    if (!config) throw new Error("AI zatím není připojena.");
+    return generateCompanionReply(config, data);
   });
 
 export const transcribeVoice = createServerFn({ method: "POST" })

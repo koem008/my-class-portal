@@ -4,6 +4,8 @@ import {
   buildProviderInput,
   type ArtImageRequest,
   type ArtImageResult,
+  type CompanionRequest,
+  type CompanionResult,
   type LessonAiAction,
   type LessonAiRequest,
   type LessonAiResult,
@@ -284,6 +286,115 @@ export async function generateLessonAsset(
     usage: {
       provider: "anthropic",
       model,
+      inputTokens: numberOrUndefined(usage?.input_tokens),
+      outputTokens: numberOrUndefined(usage?.output_tokens),
+    },
+  };
+}
+
+export async function generateCompanionReply(
+  config: AnthropicTextProviderConfig,
+  request: CompanionRequest,
+  signal?: AbortSignal,
+): Promise<CompanionResult> {
+  assertPrivacySafePayload(request);
+  if (!config.apiKey) {
+    throw new ExternalAiProviderError("anthropic", "AI_NOT_CONFIGURED", "AI zatím není připojena.");
+  }
+  const response = await fetchWithTimeout(
+    config.baseUrl,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": config.apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: config.economyModel,
+        max_tokens: 1200,
+        system: [
+          "Jsi obecná hlasová pracovní asistentka české učitelky.",
+          "Buď přirozená, stručná a praktická. Nepředstírej vědomí, city ani skutečný osobní vztah.",
+          "Používej pouze dodaný pracovní kontext a explicitně povolené osobní preference.",
+          "Nikdy neodvozuj osobní fakta a nikdy nepožaduj skutečnou identitu dítěte.",
+          "Navigace v aplikaci je bezpečná a může proběhnout bez potvrzení.",
+          "Jakákoli změna pedagogických nebo osobních dat MUSÍ mít requiresConfirmation=true a pouze slovní proposedChange; žádnou změnu sama neprovádíš.",
+          "Vrať pouze validní JSON: reply, navigation volitelně {target, lessonId}, requiresConfirmation, proposedChange volitelně.",
+          "Povolené target: home, schedule, calendar, memory, art_studio, special_education, lesson.",
+        ].join("\n"),
+        messages: [{ role: "user", content: JSON.stringify(request) }],
+      }),
+      signal,
+    },
+    "anthropic",
+  );
+  const raw = (await parseJsonResponse(response, "anthropic")) as Record<string, unknown>;
+  const blocks = Array.isArray(raw.content) ? raw.content : [];
+  const text = blocks
+    .map((block) => {
+      if (!block || typeof block !== "object") return "";
+      const value = block as Record<string, unknown>;
+      return value.type === "text" && typeof value.text === "string" ? value.text : "";
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  if (!text)
+    throw new ExternalAiProviderError(
+      "anthropic",
+      "MALFORMED_RESPONSE",
+      "AI vrátila prázdnou odpověď.",
+    );
+  // JSON.parse is the untyped provider boundary; fields are validated immediately below.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsed: any;
+  try {
+    parsed = JSON.parse(stripJsonFence(text));
+  } catch {
+    throw new ExternalAiProviderError(
+      "anthropic",
+      "MALFORMED_RESPONSE",
+      "AI odpověď nemá očekávaný strukturovaný formát.",
+    );
+  }
+  assertPrivacySafePayload(parsed);
+  if (
+    !parsed ||
+    typeof parsed.reply !== "string" ||
+    typeof parsed.requiresConfirmation !== "boolean"
+  ) {
+    throw new ExternalAiProviderError("anthropic", "MALFORMED_RESPONSE", "AI odpověď je neplatná.");
+  }
+  const allowed = new Set([
+    "home",
+    "schedule",
+    "calendar",
+    "memory",
+    "art_studio",
+    "special_education",
+    "lesson",
+  ]);
+  const nav =
+    parsed.navigation &&
+    typeof parsed.navigation === "object" &&
+    allowed.has(parsed.navigation.target)
+      ? {
+          target: parsed.navigation.target,
+          lessonId:
+            typeof parsed.navigation.lessonId === "string" ? parsed.navigation.lessonId : undefined,
+        }
+      : undefined;
+  const usage = asRecord(raw.usage);
+  return {
+    reply: parsed.reply.trim(),
+    navigation: nav,
+    requiresConfirmation: parsed.requiresConfirmation,
+    proposedChange:
+      typeof parsed.proposedChange === "string" ? parsed.proposedChange.trim() : undefined,
+    usage: {
+      provider: "anthropic",
+      model: config.economyModel,
       inputTokens: numberOrUndefined(usage?.input_tokens),
       outputTokens: numberOrUndefined(usage?.output_tokens),
     },

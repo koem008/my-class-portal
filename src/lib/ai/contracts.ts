@@ -54,6 +54,32 @@ export type LessonAiResult = {
   usage?: AiUsage;
 };
 
+export type CompanionTone = "friendly" | "calm" | "efficient" | "custom";
+export type CompanionNavigationTarget =
+  "home" | "schedule" | "calendar" | "memory" | "art_studio" | "special_education" | "lesson";
+
+export type CompanionConversationTurn = { role: "user" | "assistant"; text: string };
+
+/** Minimal, privacy-safe context for the general teacher companion. */
+export type CompanionRequest = {
+  message: string;
+  assistantName: string;
+  tone: CompanionTone;
+  todaySummary?: string;
+  continuitySummary?: string;
+  personalPreferences?: string[];
+  recentConversation?: CompanionConversationTurn[];
+  availableLessons?: Array<{ lessonId: string; subject: string; topic?: string }>;
+};
+
+export type CompanionResult = {
+  reply: string;
+  navigation?: { target: CompanionNavigationTarget; lessonId?: string };
+  requiresConfirmation: boolean;
+  proposedChange?: string;
+  usage?: AiUsage;
+};
+
 export type SpeechTranscriptionRequest = {
   /** Raw bytes are supplied only to the server-only adapter and are never persisted here. */
   audio: Uint8Array;

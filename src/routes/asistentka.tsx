@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
   Brain,
@@ -9,13 +9,17 @@ import {
   Heart,
   Loader2,
   Mic,
+  MicOff,
+  Volume2,
   MoonStar,
   Settings2,
   Sparkles,
   SunMedium,
   WandSparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { runCompanionAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";
+import { loadAssistantMemory } from "@/lib/assistant-memory-data";
 import {
   buildMorningMessage,
   loadDailyBriefing,
@@ -29,8 +33,17 @@ type Tone = "Přátelská" | "Klidná" | "Efektivní";
 type LoadState = "loading" | "ready" | "empty" | "error";
 
 function AssistantPage() {
+  const navigate = useNavigate();
   const [tone, setTone] = useState<Tone>("Přátelská");
   const [listening, setListening] = useState(false);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceReply, setVoiceReply] = useState("");
+  const [voiceNotice, setVoiceNotice] = useState("");
+  const [proposedChange, setProposedChange] = useState("");
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [specialAttention, setSpecialAttention] = useState<SpecialAttentionItem[]>([]);
@@ -80,6 +93,132 @@ function AssistantPage() {
   }, []);
 
   const message = briefing ? buildMorningMessage(briefing) : "Dobré ráno.";
+
+  async function startGeneralVoice() {
+    if (listening) {
+      recorderRef.current?.stop();
+      return;
+    }
+    setVoiceNotice("");
+    setProposedChange("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        setListening(false);
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        void processGeneralVoice(recorder.mimeType || "audio/webm");
+      };
+      recorder.start();
+      setListening(true);
+    } catch (error) {
+      setVoiceNotice(error instanceof Error ? error.message : "Mikrofon se nepodařilo spustit.");
+    }
+  }
+
+  async function processGeneralVoice(mimeType: string) {
+    const chunks = chunksRef.current;
+    chunksRef.current = [];
+    if (!chunks.length) return;
+    setVoiceBusy(true);
+    setVoiceNotice("Přepisuji…");
+    try {
+      const blob = new Blob(chunks, { type: mimeType });
+      const form = new FormData();
+      form.append("audio", blob, "asistentka.webm");
+      const transcribed = await transcribeVoice({ data: form });
+      setVoiceTranscript(transcribed.text);
+      setVoiceNotice("Přemýšlím nad požadavkem…");
+      let settings: any = null;
+      let memories: any[] = [];
+      try {
+        const loaded = await loadAssistantMemory();
+        settings = loaded.settings;
+        memories = loaded.memories;
+      } catch {
+        /* companion works without personal memory */
+      }
+      const todaySummary = briefing
+        ? [
+            `${briefing.classInfo.name}: ${briefing.lessons.length} hodin, ${briefing.readyCount} připravených.`,
+            briefing.events.length
+              ? `Události: ${briefing.events.map((e) => e.title).join(", ")}.`
+              : "Bez zvláštních událostí.",
+          ].join(" ")
+        : undefined;
+      const continuitySummary = briefing?.carryOvers.length
+        ? briefing.carryOvers
+            .map(
+              (c) => `${c.subject}: ${c.unfinished}${c.nextNote ? `; příště ${c.nextNote}` : ""}`,
+            )
+            .join("\n")
+        : undefined;
+      const result = await runCompanionAi({
+        data: {
+          message: transcribed.text,
+          assistantName: settings?.assistant_name || "Asistentka",
+          tone:
+            settings?.tone ||
+            ({ Přátelská: "friendly", Klidná: "calm", Efektivní: "efficient" } as const)[tone],
+          todaySummary,
+          continuitySummary,
+          personalPreferences: settings?.memory_enabled
+            ? memories.map((m) => m.content)
+            : undefined,
+          availableLessons: briefing?.lessons.map((l) => ({
+            lessonId: l.id,
+            subject: l.subject_name,
+            topic: l.topic || l.title || undefined,
+          })),
+        },
+      });
+      setVoiceReply(result.reply);
+      setProposedChange(
+        result.requiresConfirmation
+          ? result.proposedChange || "Tato akce by změnila data a vyžaduje potvrzení."
+          : "",
+      );
+      if (result.reply.trim()) {
+        try {
+          const speech = await synthesizeAssistantVoice({
+            data: { text: result.reply.slice(0, 2500) },
+          });
+          await new Audio(`data:${speech.mimeType};base64,${speech.audioBase64}`).play();
+        } catch {
+          setVoiceNotice("Odpověď je připravená, hlasové přehrání zatím není dostupné.");
+        }
+      }
+      if (result.navigation && !result.requiresConfirmation) {
+        const nav = result.navigation;
+        if (nav.target === "home") await navigate({ to: "/" });
+        else if (nav.target === "schedule") await navigate({ to: "/rozvrh" });
+        else if (nav.target === "calendar") await navigate({ to: "/kalendar" });
+        else if (nav.target === "memory") await navigate({ to: "/pamet" });
+        else if (nav.target === "art_studio") await navigate({ to: "/vytvarna-vychova" });
+        else if (nav.target === "special_education")
+          await navigate({ to: "/specialni-pedagogika" });
+        else if (nav.target === "lesson" && nav.lessonId)
+          await navigate({ to: "/hodina/$lessonId", params: { lessonId: nav.lessonId } });
+      }
+      if (!result.navigation)
+        setVoiceNotice(
+          result.requiresConfirmation ? "Navržená změna čeká na potvrzení." : "Hotovo.",
+        );
+    } catch (error) {
+      setVoiceNotice(
+        error instanceof Error ? error.message : "Hlasová asistentka zatím není připojena.",
+      );
+    } finally {
+      setVoiceBusy(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#24343f] md:px-8 md:py-8">
@@ -396,20 +535,62 @@ function AssistantPage() {
               Hlas se spouští pouze po stisknutí tlačítka.
             </p>
             <button
-              onClick={() => setListening(!listening)}
-              className={`mx-auto mt-8 grid h-28 w-28 place-items-center rounded-full text-white shadow-[0_18px_45px_rgba(39,103,101,.25)] transition ${listening ? "scale-105 bg-[#b85f61]" : "bg-[#276765] hover:scale-105"}`}
+              onClick={() => void startGeneralVoice()}
+              disabled={voiceBusy}
+              className={`mx-auto mt-8 grid h-28 w-28 place-items-center rounded-full text-white shadow-[0_18px_45px_rgba(39,103,101,.25)] transition disabled:opacity-50 ${listening ? "scale-105 bg-[#b85f61]" : "bg-[#276765] hover:scale-105"}`}
             >
-              <Mic className="h-9 w-9" />
+              {voiceBusy ? (
+                <Loader2 className="h-9 w-9 animate-spin" />
+              ) : listening ? (
+                <MicOff className="h-9 w-9" />
+              ) : (
+                <Mic className="h-9 w-9" />
+              )}
             </button>
             <p className="mt-4 text-center text-sm font-semibold text-[#53696a]">
-              {listening
-                ? "Mikrofon zatím není připojený — klepnutím zavři"
-                : "Klepni pro hlasové zadání"}
+              {voiceBusy
+                ? "Zpracovávám…"
+                : listening
+                  ? "Mluv — klepnutím ukončíš"
+                  : "Klepni a mluv přirozeně"}
             </p>
+            {(voiceTranscript || voiceReply || voiceNotice) && (
+              <div className="mt-6 space-y-3">
+                {voiceTranscript && (
+                  <div className="rounded-2xl bg-[#f7f8f5] p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-[.12em] text-[#82908f]">
+                      Ty
+                    </div>
+                    <p className="mt-1 text-sm leading-6">{voiceTranscript}</p>
+                  </div>
+                )}
+                {voiceReply && (
+                  <div className="rounded-2xl bg-[#eaf6f0] p-4">
+                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.12em] text-[#4e7772]">
+                      <Volume2 className="h-3.5 w-3.5" /> Asistentka
+                    </div>
+                    <p className="mt-1 text-sm leading-6">{voiceReply}</p>
+                  </div>
+                )}
+                {proposedChange && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="text-xs font-bold text-amber-800">
+                      Návrh změny — zatím neprovedeno
+                    </div>
+                    <p className="mt-1 text-sm text-amber-900">{proposedChange}</p>
+                    <p className="mt-2 text-xs text-amber-700">
+                      Změny pedagogických dat se nikdy neprovedou jen hlasovým požadavkem bez
+                      výslovného potvrzení.
+                    </p>
+                  </div>
+                )}
+                {voiceNotice && <p className="text-center text-xs text-[#7b8989]">{voiceNotice}</p>}
+              </div>
+            )}
             <div className="mt-6 rounded-2xl border border-dashed border-[#ddd8ce] bg-[#fcfbf8] p-4 text-xs leading-5 text-[#7b8989]">
-              <strong>AI a hlas zatím nejsou připojené.</strong> Reálný pracovní kontext už aplikace
-              sestavuje sama; až doplníme serverový API klíč, pošle se providerovi jen minimum
-              nutných dat.
+              Push-to-talk: mikrofon běží jen po stisknutí. Zvuk se odešle k přepisu a po zpracování
+              se neukládá. Asistentka dostává jen minimum pracovního kontextu a osobní paměť pouze
+              tehdy, když je výslovně zapnutá.
             </div>
           </section>
           <aside className="space-y-4">
