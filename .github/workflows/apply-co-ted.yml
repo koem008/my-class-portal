@@ -1,0 +1,47 @@
+name: Apply Co Ted
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-co-ted.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Patch index
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/routes/index.tsx')
+          s=p.read_text()
+          imp='import { ContextualDayLayer } from "@/components/ContextualDayLayer";\n'
+          anchor='import {\n  importantDatesForToday,'
+          if imp not in s:
+              s=s.replace(anchor, imp+anchor)
+          marker='''              </section>\n\n              <div className="mt-5 grid gap-4 md:grid-cols-3">'''
+          repl='''              </section>\n\n              <ContextualDayLayer briefing={briefing} now={now} />\n\n              <div className="mt-5 grid gap-4 md:grid-cols-3">'''
+          if '<ContextualDayLayer briefing={briefing} now={now} />' not in s:
+              if marker not in s: raise SystemExit('index insertion marker not found')
+              s=s.replace(marker,repl,1)
+          p.write_text(s)
+          PY
+      - run: bunx prettier --write src/routes/index.tsx src/components/ContextualDayLayer.tsx src/lib/contextual-day-data.ts
+      - run: bun run lint
+      - run: bun run build
+      - name: Commit and remove runner
+        run: |
+          rm .github/workflows/apply-co-ted.yml
+          git config user.name "koem008"
+          git config user.email "propertyboostmedia@gmail.com"
+          git add src/routes/index.tsx src/components/ContextualDayLayer.tsx src/lib/contextual-day-data.ts .github/workflows/apply-co-ted.yml
+          git commit -m "feat: surface deterministic Co ted card"
+          git push origin main
