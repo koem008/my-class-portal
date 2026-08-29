@@ -1,11 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Brain, Loader2, Plus, Save, ShieldCheck, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
 import {
+  ArrowLeft,
+  Brain,
+  CalendarHeart,
+  Edit3,
+  Loader2,
+  Plus,
+  Save,
+  ShieldCheck,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  addImportantDate,
   addTeacherMemory,
   deleteTeacherMemory,
   loadAssistantMemory,
   saveAssistantSettings,
+  updateImportantDate,
   type AssistantSettings,
   type AssistantTone,
   type TeacherMemory,
@@ -20,12 +33,28 @@ const toneLabels: Record<AssistantTone, string> = {
   efficient: "Efektivní",
   custom: "Vlastní",
 };
-const kindLabels: Record<TeacherMemoryKind, string> = {
+const kindLabels: Record<Exclude<TeacherMemoryKind, "important_date">, string> = {
   communication_preference: "Komunikace",
   planning_preference: "Plánování",
   recurring_commitment: "Pravidelný závazek",
   personal_note: "Osobní poznámka",
 };
+const months = [
+  "leden",
+  "únor",
+  "březen",
+  "duben",
+  "květen",
+  "červen",
+  "červenec",
+  "srpen",
+  "září",
+  "říjen",
+  "listopad",
+  "prosinec",
+];
+
+type RegularMemoryKind = Exclude<TeacherMemoryKind, "important_date">;
 
 function MemoryPage() {
   const [settings, setSettings] = useState<AssistantSettings | null>(null);
@@ -33,8 +62,29 @@ function MemoryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [kind, setKind] = useState<TeacherMemoryKind>("communication_preference");
+  const [kind, setKind] = useState<RegularMemoryKind>("communication_preference");
   const [content, setContent] = useState("");
+  const [dateLabel, setDateLabel] = useState("");
+  const [dateDay, setDateDay] = useState(1);
+  const [dateMonth, setDateMonth] = useState(1);
+  const [dateYear, setDateYear] = useState("");
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
+
+  const regularMemories = useMemo(
+    () => memories.filter((memory) => memory.kind !== "important_date"),
+    [memories],
+  );
+  const importantDates = useMemo(
+    () =>
+      memories
+        .filter((memory) => memory.kind === "important_date")
+        .sort((a, b) =>
+          (a.date_month ?? 13) !== (b.date_month ?? 13)
+            ? (a.date_month ?? 13) - (b.date_month ?? 13)
+            : (a.date_day ?? 32) - (b.date_day ?? 32),
+        ),
+    [memories],
+  );
 
   async function reload() {
     setLoading(true);
@@ -52,6 +102,7 @@ function MemoryPage() {
   useEffect(() => {
     void reload();
   }, []);
+
   async function saveSettings() {
     if (!settings) return;
     setSaving(true);
@@ -66,6 +117,7 @@ function MemoryPage() {
       setSaving(false);
     }
   }
+
   async function add() {
     setSaving(true);
     setError("");
@@ -79,11 +131,50 @@ function MemoryPage() {
       setSaving(false);
     }
   }
+
+  async function saveImportantDate() {
+    setSaving(true);
+    setError("");
+    try {
+      const input = {
+        label: dateLabel,
+        day: dateDay,
+        month: dateMonth,
+        year: dateYear.trim() ? Number(dateYear) : null,
+      };
+      if (editingDateId) await updateImportantDate(editingDateId, input);
+      else await addImportantDate(input);
+      resetImportantDateForm();
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Důležité datum se nepodařilo uložit.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function editImportantDate(memory: TeacherMemory) {
+    setEditingDateId(memory.id);
+    setDateLabel(memory.content);
+    setDateDay(memory.date_day ?? 1);
+    setDateMonth(memory.date_month ?? 1);
+    setDateYear(memory.date_year ? String(memory.date_year) : "");
+  }
+
+  function resetImportantDateForm() {
+    setEditingDateId(null);
+    setDateLabel("");
+    setDateDay(1);
+    setDateMonth(1);
+    setDateYear("");
+  }
+
   async function remove(id: string) {
     setSaving(true);
     setError("");
     try {
       await deleteTeacherMemory(id);
+      if (editingDateId === id) resetImportantDateForm();
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Položku se nepodařilo smazat.");
@@ -162,7 +253,7 @@ function MemoryPage() {
               </label>
               <Toggle
                 label="Osobní paměť"
-                text="Pokud je vypnutá, asistentka osobní položky do kontextu nepoužije."
+                text="Pokud je vypnutá, asistentka osobní položky ani důležitá data do kontextu nepoužije."
                 checked={settings.memory_enabled}
                 onChange={(v) => setSettings({ ...settings, memory_enabled: v })}
               />
@@ -201,7 +292,7 @@ function MemoryPage() {
             <div className="mt-5 rounded-[22px] bg-[#f8f7f3] p-4">
               <select
                 value={kind}
-                onChange={(e) => setKind(e.target.value as TeacherMemoryKind)}
+                onChange={(e) => setKind(e.target.value as RegularMemoryKind)}
                 className="w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm"
               >
                 {Object.entries(kindLabels).map(([v, l]) => (
@@ -213,7 +304,7 @@ function MemoryPage() {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Např. Ve středu odpoledne mám pravidelný rodinný program."
+                placeholder="Napiš jen to, co chceš, aby si asistentka pamatovala."
                 className="mt-3 min-h-24 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-3 text-sm"
               />
               <button
@@ -226,14 +317,14 @@ function MemoryPage() {
               </button>
             </div>
             <div className="mt-5 space-y-2">
-              {memories.map((m) => (
+              {regularMemories.map((m) => (
                 <div
                   key={m.id}
                   className="flex items-start justify-between gap-3 rounded-2xl border border-[#ebe7df] bg-[#fffefa] p-4"
                 >
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-wide text-[#75837f]">
-                      {kindLabels[m.kind]}
+                      {kindLabels[m.kind as RegularMemoryKind]}
                     </div>
                     <p className="mt-1 text-sm leading-6 text-[#5f706f]">{m.content}</p>
                   </div>
@@ -247,7 +338,7 @@ function MemoryPage() {
                   </button>
                 </div>
               ))}
-              {!memories.length && (
+              {!regularMemories.length && (
                 <div className="rounded-2xl border border-dashed border-[#ddd8cf] p-5 text-sm text-[#7c8988]">
                   Zatím tu nic osobního není. To je výchozí a bezpečný stav.
                 </div>
@@ -255,10 +346,141 @@ function MemoryPage() {
             </div>
           </section>
         </div>
+
+        <section className="mt-5 overflow-hidden rounded-[30px] border border-[#eadfd8] bg-gradient-to-br from-[#fffdfa] via-white to-[#fff4ee] p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#fff0e8] text-[#a76756]">
+                <CalendarHeart className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-bold">Důležitá data, která chci mít v hlavě</h2>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-[#7c8988]">
+                  Přidej jen data, která chceš sama uložit. Asistentka je nebude hledat v kalendáři,
+                  zprávách ani konverzacích a nic sem sama nepřidá.
+                </p>
+              </div>
+            </div>
+            {editingDateId && (
+              <button
+                onClick={resetImportantDateForm}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-[#866e67] hover:bg-white"
+              >
+                <X className="h-4 w-4" /> Zrušit úpravu
+              </button>
+            )}
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
+            <label className="block text-xs font-bold">
+              Co si chceš připomenout
+              <input
+                value={dateLabel}
+                onChange={(e) => setDateLabel(e.target.value)}
+                placeholder="Např. narozeniny, výročí nebo jiný osobní den"
+                className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
+              />
+            </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.4fr_1fr]">
+              <label className="text-xs font-bold">
+                Den
+                <select
+                  value={dateDay}
+                  onChange={(e) => setDateDay(Number(e.target.value))}
+                  className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
+                >
+                  {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+                    <option key={day} value={day}>
+                      {day}.
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs font-bold">
+                Měsíc
+                <select
+                  value={dateMonth}
+                  onChange={(e) => setDateMonth(Number(e.target.value))}
+                  className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
+                >
+                  {months.map((month, index) => (
+                    <option key={month} value={index + 1}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs font-bold">
+                Rok <span className="font-normal text-[#929c9a]">(volitelně)</span>
+                <input
+                  value={dateYear}
+                  onChange={(e) => setDateYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  inputMode="numeric"
+                  placeholder="—"
+                  className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
+                />
+              </label>
+            </div>
+            <button
+              disabled={saving || !dateLabel.trim()}
+              onClick={() => void saveImportantDate()}
+              className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[#a76756] px-4 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-40"
+            >
+              {editingDateId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {editingDateId ? "Uložit změnu" : "Přidat důležité datum"}
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {importantDates.map((memory) => (
+              <div
+                key={memory.id}
+                className="flex items-start justify-between gap-4 rounded-[22px] border border-[#eee3dc] bg-white/85 p-4"
+              >
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[.12em] text-[#a76756]">
+                    {formatImportantDate(memory)}
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-[#5f706f]">{memory.content}</p>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    disabled={saving}
+                    onClick={() => editImportantDate(memory)}
+                    className="rounded-xl p-2 text-[#6f7f7b] hover:bg-[#f5f3ef]"
+                    aria-label="Upravit datum"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                  <button
+                    disabled={saving}
+                    onClick={() => void remove(memory.id)}
+                    className="rounded-xl p-2 text-[#9b7770] hover:bg-[#fff3ef]"
+                    aria-label="Smazat datum"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!importantDates.length && (
+              <div className="md:col-span-2 rounded-[22px] border border-dashed border-[#dfd6cf] bg-white/40 p-5 text-sm text-[#7c8988]">
+                Žádné důležité datum tu zatím není. Pozdrav funguje úplně stejně i bez nich.
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </main>
   );
 }
+
+function formatImportantDate(memory: TeacherMemory) {
+  if (!memory.date_day || !memory.date_month) return "Datum není nastavené";
+  const month = months[memory.date_month - 1] ?? `${memory.date_month}. měsíc`;
+  return `${memory.date_day}. ${month}${memory.date_year ? ` ${memory.date_year}` : ""}`;
+}
+
 function Toggle({
   label,
   text,
@@ -285,6 +507,7 @@ function Toggle({
     </label>
   );
 }
+
 function Centered({ title, text, icon }: { title: string; text: string; icon?: React.ReactNode }) {
   return (
     <main className="grid min-h-screen place-items-center bg-[#fbfaf7] px-4">
