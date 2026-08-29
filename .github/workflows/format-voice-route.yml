@@ -1,0 +1,30 @@
+name: Format Voice Route
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bunx prettier --write src/routes/hlas.tsx
+      - shell: bash
+        run: |
+          if git diff --quiet -- src/routes/hlas.tsx; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/hlas.tsx
+          git commit -m "style: format controlled voice reflection route"
+          git push origin HEAD:main
