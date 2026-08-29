@@ -142,3 +142,117 @@
     color: var(--color-foreground);
   }
 }
+
+/* Authenticated app polish: visual delight only, no data or API behavior. */
+.app-polish {
+  min-height: 100vh;
+}
+
+.app-polish button,
+.app-polish a,
+.app-polish [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-polish button:not(:disabled),
+.app-polish a,
+.app-polish [role="button"] {
+  transition:
+    transform 160ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease;
+}
+
+.app-polish button:not(:disabled):active,
+.app-polish a:active,
+.app-polish [role="button"]:active {
+  transform: scale(0.985);
+}
+
+.app-polish :is(section, article, div)[class*="rounded-"][class*="border"][class*="bg-white"] {
+  transition:
+    transform 180ms ease,
+    box-shadow 220ms ease,
+    border-color 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .app-polish :is(section, article, div)[class*="rounded-"][class*="border"][class*="bg-white"]:hover {
+    border-color: rgb(213 226 220);
+    box-shadow: 0 18px 44px rgb(55 70 65 / 0.08);
+  }
+
+  .app-polish a[class*="rounded-"]:hover,
+  .app-polish button[class*="rounded-"]:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+}
+
+.app-polish [class*="border-dashed"] {
+  background-image:
+    radial-gradient(circle at 12% 20%, rgb(228 242 235 / 0.6) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 88% 28%, rgb(250 232 217 / 0.55) 0 2px, transparent 2.5px),
+    linear-gradient(135deg, rgb(255 255 255 / 0.75), rgb(250 249 245 / 0.9));
+  background-size: auto, auto, auto;
+}
+
+.app-polish [class*="bg-[#eef8f3]"],
+.app-polish [class*="bg-[#f1f9f5]"] {
+  animation: appSuccessIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-screen-enter {
+  animation: appScreenIn 220ms ease-out both;
+}
+
+@keyframes appScreenIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes appSuccessIn {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.992);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(0) scale(1.006);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-screen-enter,
+  .app-polish [class*="bg-[#eef8f3]"],
+  .app-polish [class*="bg-[#f1f9f5]"] {
+    animation: none;
+  }
+
+  .app-polish button,
+  .app-polish a,
+  .app-polish [role="button"],
+  .app-polish :is(section, article, div)[class*="rounded-"][class*="border"][class*="bg-white"] {
+    transition-duration: 0.01ms;
+  }
+}
+
+@media print {
+  .app-screen-enter,
+  .app-polish [class*="bg-[#eef8f3]"],
+  .app-polish [class*="bg-[#f1f9f5]"] {
+    animation: none !important;
+  }
+}
