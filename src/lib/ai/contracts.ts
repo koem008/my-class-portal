@@ -23,13 +23,13 @@ export type LessonAiContext = {
   lessonId: string;
   grade: number;
   subject: string;
-  topic?: string;
+  topic?: string | undefined;
   durationMinutes: number;
   curriculumOutcomeCodes: string[];
-  curriculumSummary?: string;
-  previousLessonSummary?: string;
-  teacherInstruction?: string;
-  pseudonymNeeds?: PseudonymNeed[];
+  curriculumSummary?: string | undefined;
+  previousLessonSummary?: string | undefined;
+  teacherInstruction?: string | undefined;
+  pseudonymNeeds?: PseudonymNeed[] | undefined;
 };
 
 export type LessonAiRequest = {
@@ -40,18 +40,18 @@ export type LessonAiRequest = {
 export type AiUsage = {
   provider: "anthropic" | "openai" | "elevenlabs" | "google";
   model: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  characters?: number;
-  audioSeconds?: number;
-  images?: number;
+  inputTokens?: number | undefined;
+  outputTokens?: number | undefined;
+  characters?: number | undefined;
+  audioSeconds?: number | undefined;
+  images?: number | undefined;
 };
 
 export type LessonAiResult = {
   title: string;
   content: Record<string, unknown>;
   warnings: string[];
-  usage?: AiUsage;
+  usage?: AiUsage | undefined;
 };
 
 export type CompanionTone = "friendly" | "calm" | "efficient" | "custom";
@@ -65,53 +65,53 @@ export type CompanionRequest = {
   message: string;
   assistantName: string;
   tone: CompanionTone;
-  todaySummary?: string;
-  continuitySummary?: string;
+  todaySummary?: string | undefined;
+  continuitySummary?: string | undefined;
   /** Minimal continuity summary for the current local calendar day only. */
-  sameDayContext?: string;
-  personalPreferences?: string[];
-  recentConversation?: CompanionConversationTurn[];
-  availableLessons?: Array<{ lessonId: string; subject: string; topic?: string }>;
+  sameDayContext?: string | undefined;
+  personalPreferences?: string[] | undefined;
+  recentConversation?: CompanionConversationTurn[] | undefined;
+  availableLessons?: Array<{ lessonId: string | undefined; subject: string; topic?: string }>;
 };
 
 export type CompanionPedagogicalProposal =
   | { type: "save_preparation_note"; lessonId: string; text: string }
-  | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string };
+  | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string | undefined };
 
 export type CompanionResult = {
   mode: "conversation" | "navigate" | "propose";
   reply: string;
-  navigation?: { target: CompanionNavigationTarget; lessonId?: string };
-  proposal?: CompanionPedagogicalProposal;
+  navigation?: { target: CompanionNavigationTarget | undefined; lessonId?: string };
+  proposal?: CompanionPedagogicalProposal | undefined;
   /** Minimal carry-forward summary for today only; never a transcript. */
-  sameDaySummary?: string;
+  sameDaySummary?: string | undefined;
   requiresConfirmation: boolean;
-  usage?: AiUsage;
+  usage?: AiUsage | undefined;
 };
 
 export type SpeechTranscriptionRequest = {
   /** Raw bytes are supplied only to the server-only adapter and are never persisted here. */
   audio: Uint8Array;
   mimeType: string;
-  fileName?: string;
-  language?: "cs";
+  fileName?: string | undefined;
+  language?: "cs" | undefined;
 };
 
 export type SpeechTranscriptionResult = {
   text: string;
-  language?: string;
-  usage?: AiUsage;
+  language?: string | undefined;
+  usage?: AiUsage | undefined;
 };
 
 export type SpeechSynthesisRequest = {
   text: string;
-  voiceId?: string;
+  voiceId?: string | undefined;
 };
 
 export type SpeechSynthesisResult = {
   audio: Uint8Array;
   mimeType: "audio/mpeg";
-  usage?: AiUsage;
+  usage?: AiUsage | undefined;
 };
 
 export type ArtImageStyle = "friendly_illustration" | "paper_collage" | "watercolor" | "graphic";
@@ -127,14 +127,14 @@ export type ArtImageRequest = {
   topic: string;
   purpose: string;
   curriculumOutcomeCodes: string[];
-  style?: ArtImageStyle;
-  aspectRatio?: ArtImageAspectRatio;
+  style?: ArtImageStyle | undefined;
+  aspectRatio?: ArtImageAspectRatio | undefined;
 };
 
 export type ArtImageResult = {
   imageBase64: string;
   mimeType: string;
-  usage?: AiUsage;
+  usage?: AiUsage | undefined;
 };
 
 const forbiddenKeys = new Set([
