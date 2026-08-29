@@ -83,7 +83,10 @@ export async function saveAssistantSettings(values: Omit<AssistantSettings, "use
   if (error) throw error;
 }
 
-export async function addTeacherMemory(kind: Exclude<TeacherMemoryKind, "important_date">, content: string) {
+export async function addTeacherMemory(
+  kind: Exclude<TeacherMemoryKind, "important_date">,
+  content: string,
+) {
   const text = content.trim();
   if (!text) throw new Error("Napište, co si má asistentka pamatovat.");
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -135,7 +138,11 @@ export async function updateImportantDate(id: string, input: ImportantDateInput)
 
 export async function deleteTeacherMemory(id: string) {
   const uid = await authenticatedUserId();
-  const { error } = await db.from("teacher_personal_memory").delete().eq("id", id).eq("user_id", uid);
+  const { error } = await db
+    .from("teacher_personal_memory")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", uid);
   if (error) throw error;
 }
 

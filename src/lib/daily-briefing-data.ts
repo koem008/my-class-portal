@@ -220,7 +220,11 @@ export async function loadDailyBriefing(
   };
 }
 
-export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): TimeAwareGreeting {
+export function buildTimeAwareGreeting(
+  briefing: DailyBriefing,
+  now: Date,
+  niceThingsToKnow: string[] = [],
+): TimeAwareGreeting {
   const hour = now.getHours();
   const phase: DayPhase =
     hour < 11 ? "morning" : hour < 14 ? "midday" : hour < 18 ? "afternoon" : "evening";
@@ -229,6 +233,9 @@ export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): Time
   const missing = briefing.missingPreparationCount;
   const carry = briefing.carryOvers.length;
   const blocker = briefing.events.find((e) => e.blocks_lessons)?.title;
+  const niceThingText = niceThingsToKnow.length
+    ? `A dnes je tu ještě něco milého: ${joinNiceThings(niceThingsToKnow)}.`
+    : "";
 
   if (briefing.blocked && lessonCount === 0) {
     const greeting =
@@ -244,8 +251,12 @@ export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): Time
       eyebrow: phase === "evening" ? "Dnešek v klidu" : "Dnes je jiný rytmus",
       greeting,
       headline: `${greeting} ${blocker ? blocker : "Dnes"} mění běžný školní režim.`,
-      supportingText:
+      supportingText: [
+        niceThingText,
         "Běžné hodiny dnes neplánujeme. Můžeš si otevřít kalendář, připravit další den nebo si prostě nechat prostor.",
+      ]
+        .filter(Boolean)
+        .join(" "),
     };
   }
 
@@ -267,8 +278,9 @@ export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): Time
       phase,
       eyebrow: "Start dne",
       greeting,
-      headline: `${greeting} ${lessonSummary} ${missing ? "Pojďme si uvolnit hlavu tím nejdůležitějším." : "Dnešek vypadá pěkně připraveně."}`,
+      headline: `${greeting} ${niceThingText ? `${niceThingText} ` : ""}${lessonSummary} ${missing ? "Pojďme si uvolnit hlavu tím nejdůležitějším." : "Dnešek vypadá pěkně připraveně."}`,
       supportingText: [
+        niceThingText,
         prepSummary,
         carrySummary,
         "Když chceš, asistentka s tebou rychle projde, co má smysl řešit jako první.",
@@ -286,7 +298,7 @@ export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): Time
       greeting,
       headline: `${greeting} ${lessonSummary} Co už je za tebou, nemusíš držet v hlavě — soustřeďme se jen na další krok.`,
       supportingText:
-        [prepSummary, carrySummary].filter(Boolean).join(" ") ||
+        [niceThingText, prepSummary, carrySummary].filter(Boolean).join(" ") ||
         "Teď není potřeba nic honit. Otevři si jen to, co opravdu potřebuješ.",
     };
   }
@@ -300,8 +312,18 @@ export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): Time
       headline: `${greeting} Dnešek už je z velké části za tebou. Co stojí za zachycení, než to vypustíš z hlavy?`,
       supportingText:
         carry > 0
-          ? `${carrySummary} Můžeš si je rovnou otevřít, nebo je probrat hlasem s asistentkou.`
-          : "Jestli chceš, stačí krátká hlasová reflexe. Nic se samo nezapíše bez tvého potvrzení.",
+          ? [
+              niceThingText,
+              `${carrySummary} Můžeš si je rovnou otevřít, nebo je probrat hlasem s asistentkou.`,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : [
+              niceThingText,
+              "Jestli chceš, stačí krátká hlasová reflexe. Nic se samo nezapíše bez tvého potvrzení.",
+            ]
+              .filter(Boolean)
+              .join(" "),
     };
   }
 
@@ -312,6 +334,7 @@ export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): Time
     greeting,
     headline: `${greeting} Dnes už nemusíš všechno řešit. Stačí vědět, co je hotové a co může počkat na zítra.`,
     supportingText: [
+      niceThingText,
       carrySummary,
       missing > 0 ? `${prepSummary} Klidně až zítra.` : "Co šlo uzavřít, je uzavřené.",
     ]
@@ -323,6 +346,12 @@ export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): Time
 /** Backward-compatible wrapper for older callers. */
 export function buildMorningMessage(briefing: DailyBriefing): string {
   return buildTimeAwareGreeting(briefing, new Date()).headline;
+}
+
+function joinNiceThings(items: string[]) {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} a ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} a ${items.at(-1)}`;
 }
 
 function lessonWord(count: number) {

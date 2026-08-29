@@ -19,6 +19,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
+  importantDatesForToday,
+  loadAssistantMemory,
+  type TeacherMemory,
+} from "@/lib/assistant-memory-data";
+import {
   buildTimeAwareGreeting,
   loadDailyBriefing,
   type DailyBriefing,
@@ -39,6 +44,8 @@ const nav = [
 function Index() {
   const [state, setState] = useState<LoadState>("loading");
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
+  const [personalMemoryEnabled, setPersonalMemoryEnabled] = useState(false);
+  const [personalMemories, setPersonalMemories] = useState<TeacherMemory[]>([]);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -72,8 +79,15 @@ function Index() {
         return;
       }
       const current = classes[0];
+      const memoryPromise = loadAssistantMemory().catch(() => null);
       await loadWeekLessons(current.id, mondayOf(now));
-      setBriefing(await loadDailyBriefing(current, todayIso));
+      const [dailyBriefing, memory] = await Promise.all([
+        loadDailyBriefing(current, todayIso),
+        memoryPromise,
+      ]);
+      setBriefing(dailyBriefing);
+      setPersonalMemoryEnabled(Boolean(memory?.settings.memory_enabled));
+      setPersonalMemories(memory?.memories ?? []);
       setState("ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Přehled se nepodařilo načíst.");
@@ -129,7 +143,10 @@ function Index() {
       />
     );
 
-  const greeting = buildTimeAwareGreeting(briefing, now);
+  const todayNiceThings = personalMemoryEnabled
+    ? importantDatesForToday(personalMemories, now).map((memory) => memory.content)
+    : [];
+  const greeting = buildTimeAwareGreeting(briefing, now, todayNiceThings);
   const phaseMeta = {
     morning: {
       icon: Sunrise,
