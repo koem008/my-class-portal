@@ -1,0 +1,433 @@
+name: Apply External Diagnosis Safety
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-external-diagnosis-safety.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+
+      - name: Add controlled diagnosis catalog
+        run: |
+          cat > src/lib/special-diagnosis-catalog.ts <<'EOF'
+          export const externalDiagnosisCatalog = [
+            { code: "adhd", label: "ADHD", patterns: [/\badhd\b/i] },
+            { code: "pas", label: "Porucha autistického spektra (PAS)", patterns: [/\bpas\b/i, /\bautis(m|tick)/i] },
+            { code: "dyslexie", label: "Dyslexie", patterns: [/\bdyslex/i] },
+            { code: "dysgrafie", label: "Dysgrafie", patterns: [/\bdysgraf/i] },
+            { code: "dyskalkulie", label: "Dyskalkulie", patterns: [/\bdyskalk/i] },
+            { code: "porucha_chovani", label: "Porucha chování", patterns: [/\bporuch(a|u) chov/i] },
+          ] as const;
+
+          export type ExternalDiagnosisCode = (typeof externalDiagnosisCatalog)[number]["code"];
+
+          export function diagnosisCatalogItem(code: string) {
+            return externalDiagnosisCatalog.find((item) => item.code === code);
+          }
+
+          export function diagnosisCodesMentioned(text: string): ExternalDiagnosisCode[] {
+            return externalDiagnosisCatalog
+              .filter((item) => item.patterns.some((pattern) => pattern.test(text)))
+              .map((item) => item.code);
+          }
+          EOF
+
+      - name: Refine voice safety contract
+        run: |
+          cat > src/lib/special-education-voice-contract.ts <<'EOF'
+          import {
+            diagnosisCodesMentioned,
+            diagnosisCatalogItem,
+            type ExternalDiagnosisCode,
+          } from "@/lib/special-diagnosis-catalog";
+
+          export type SpecialPedagogyVoiceDraft = {
+            transcript: string;
+            proposedObservation: string;
+            proposedContext?: string;
+            proposedAreaCode?: string;
+            confidence?: number;
+            warnings: string[];
+            notices?: string[];
+            documentedDiagnosisCodes?: ExternalDiagnosisCode[];
+          };
+
+          const genericDiagnosticPatterns = [
+            /\bdiagn[oó]z/i,
+            /\bm[aá]\s+(adhd|pas|autismus|dyslex|dysgraf|dyskalk)/i,
+          ];
+
+          export function inspectVoiceDraft(draft: SpecialPedagogyVoiceDraft): SpecialPedagogyVoiceDraft {
+            const text = `${draft.transcript} ${draft.proposedObservation}`;
+            const warnings = [...draft.warnings];
+            const notices = [...(draft.notices ?? [])];
+            const documented = new Set(draft.documentedDiagnosisCodes ?? []);
+            const mentioned = diagnosisCodesMentioned(text);
+            const undocumented = mentioned.filter((code) => !documented.has(code));
+
+            if (undocumented.length > 0) {
+              warnings.push(
+                `Text obsahuje diagnostické označení bez evidované externí dokumentace: ${undocumented
+                  .map((code) => diagnosisCatalogItem(code)?.label ?? code)
+                  .join(", ")}. Přepište jej na faktické pedagogické pozorování, nebo nejprve evidujte zdrojový dokument.`,
+              );
+            }
+
+            if (mentioned.length > 0 && undocumented.length === 0) {
+              notices.push(
+                "Diagnostické označení odpovídá externí dokumentaci evidované u tohoto případu. Ukládejte pouze faktickou návaznou poznámku; aplikace tím nevytváří nový diagnostický závěr.",
+              );
+            }
+
+            const hasGenericDiagnosticLanguage = genericDiagnosticPatterns.some((pattern) => pattern.test(text));
+            const onlyDocumentedReference = mentioned.length > 0 && undocumented.length === 0;
+            if (hasGenericDiagnosticLanguage && !onlyDocumentedReference) {
+              warnings.push(
+                "Text obsahuje možný nový diagnostický závěr. Před uložením jej přepište na faktické pedagogické pozorování.",
+              );
+            }
+
+            if (draft.proposedObservation.trim().length < 12) {
+              warnings.push(
+                "Pozorování je příliš stručné. Doplňte konkrétní, pozorovatelný projev a kontext.",
+              );
+            }
+            return {
+              ...draft,
+              warnings: [...new Set(warnings)],
+              notices: [...new Set(notices)],
+            };
+          }
+
+          export function canConfirmVoiceDraft(draft: SpecialPedagogyVoiceDraft) {
+            return draft.proposedObservation.trim().length >= 12 && draft.warnings.length === 0;
+          }
+
+          export function buildSpecialPedagogyVoiceRequest(input: {
+            caseId: string;
+            alias: string;
+            activeAreaCodes: string[];
+            transcript: string;
+          }) {
+            return {
+              mode: "special_pedagogy_observation",
+              caseId: input.caseId,
+              student: { alias: input.alias },
+              activeAreaCodes: input.activeAreaCodes,
+              transcript: input.transcript.trim().slice(0, 5000),
+              constraints: {
+                noNewDiagnosis: true,
+                documentedDiagnosisReferencesMayBeQuoted: true,
+                factualObservationOnly: true,
+                requireHumanConfirmation: true,
+              },
+            };
+          }
+          EOF
+
+      - name: Add external documentation persistence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/lib/special-education-data.ts')
+          s=p.read_text()
+          anchor='import { supabase } from "@/integrations/supabase/client";\n'
+          imp='import type { ExternalDiagnosisCode } from "@/lib/special-diagnosis-catalog";\n'
+          if imp not in s: s=s.replace(anchor, anchor+imp)
+          type_anchor='export type SpecialObservation = {'
+          type_block='''export type ExternalDiagnosticDocumentation = {\n  id: string;\n  case_id: string;\n  diagnosis_code: ExternalDiagnosisCode;\n  source_reference: string;\n  document_date: string;\n  recorded_by: string;\n  created_at: string;\n};\n'''
+          if type_block not in s: s=s.replace(type_anchor,type_block+type_anchor)
+          old='''  const [observations, goals, interventions, followups, audit, supportAreas, reviews] =\n    await Promise.all(['''
+          new='''  const [observations, goals, interventions, followups, audit, supportAreas, reviews, externalDocumentation] =\n    await Promise.all(['''
+          if old not in s: raise SystemExit('workspace tuple marker not found')
+          s=s.replace(old,new,1)
+          marker='''      db\n        .from("special_education_progress_reviews")\n        .select("id,area_code,reviewed_on,change_level,evidence,next_step,created_at")\n        .eq("case_id", caseId)\n        .order("reviewed_on", { ascending: false }),\n    ]);'''
+          repl='''      db\n        .from("special_education_progress_reviews")\n        .select("id,area_code,reviewed_on,change_level,evidence,next_step,created_at")\n        .eq("case_id", caseId)\n        .order("reviewed_on", { ascending: false }),\n      db\n        .from("special_education_external_documentation")\n        .select("id,case_id,diagnosis_code,source_reference,document_date,recorded_by,created_at")\n        .eq("case_id", caseId)\n        .order("document_date", { ascending: false }),\n    ]);'''
+          if marker not in s: raise SystemExit('reviews query marker not found')
+          s=s.replace(marker,repl,1)
+          s=s.replace('for (const r of [observations, goals, interventions, followups, audit, reviews])','for (const r of [observations, goals, interventions, followups, audit, reviews, externalDocumentation])',1)
+          s=s.replace('''    reviews: (reviews.data ?? []) as ProgressReview[],\n  };''','''    reviews: (reviews.data ?? []) as ProgressReview[],\n    externalDocumentation: (externalDocumentation.data ?? []) as ExternalDiagnosticDocumentation[],\n  };''',1)
+          insert_before='export async function updateCaseStatus(input: {'
+          fn='''export async function createExternalDiagnosticDocumentation(input: {\n  caseId: string;\n  schoolId: string;\n  diagnosisCode: ExternalDiagnosisCode;\n  sourceReference: string;\n  documentDate: string;\n}) {\n  const userId = await authUserId();\n  const sourceReference = input.sourceReference.trim();\n  if (!sourceReference) throw new Error("Uveďte odkaz na zdrojový dokument.");\n  const { data, error } = await db\n    .from("special_education_external_documentation")\n    .insert({\n      case_id: input.caseId,\n      school_id: input.schoolId,\n      diagnosis_code: input.diagnosisCode,\n      source_reference: sourceReference,\n      document_date: input.documentDate,\n      recorded_by: userId,\n    })\n    .select("id")\n    .single();\n  if (error) throw error;\n  await writeAudit(\n    input.schoolId,\n    input.caseId,\n    "external_documentation_recorded",\n    "external_documentation",\n    data.id,\n  );\n  return data.id as string;\n}\n\n'''
+          if fn not in s:
+              if insert_before not in s: raise SystemExit('function insertion marker not found')
+              s=s.replace(insert_before,fn+insert_before,1)
+          p.write_text(s)
+          PY
+
+      - name: Add structured external documentation card
+        run: |
+          cat > src/components/special-education/ExternalDocumentationCard.tsx <<'EOF'
+          import { FileCheck2, ShieldCheck } from "lucide-react";
+          import { useState } from "react";
+          import {
+            diagnosisCatalogItem,
+            externalDiagnosisCatalog,
+            type ExternalDiagnosisCode,
+          } from "@/lib/special-diagnosis-catalog";
+          import type { ExternalDiagnosticDocumentation } from "@/lib/special-education-data";
+
+          export function ExternalDocumentationCard({
+            records,
+            saving,
+            onSave,
+          }: {
+            records: ExternalDiagnosticDocumentation[];
+            saving: boolean;
+            onSave: (input: {
+              diagnosisCode: ExternalDiagnosisCode;
+              sourceReference: string;
+              documentDate: string;
+            }) => Promise<void>;
+          }) {
+            const [diagnosisCode, setDiagnosisCode] = useState<ExternalDiagnosisCode>("adhd");
+            const [sourceReference, setSourceReference] = useState("");
+            const [documentDate, setDocumentDate] = useState("");
+
+            async function submit() {
+              if (!sourceReference.trim() || !documentDate) return;
+              await onSave({ diagnosisCode, sourceReference: sourceReference.trim(), documentDate });
+              setSourceReference("");
+              setDocumentDate("");
+            }
+
+            return (
+              <section className="rounded-3xl border border-sky-100 bg-white p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky-800">
+                    <FileCheck2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold">Externí diagnostika / dokumentace</h2>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">
+                      Zaznamenejte pouze údaj převzatý z existující zprávy PPP/SPC nebo jiného oprávněného odborného pracoviště. Tento záznam není novou diagnózou školy ani aplikace.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
+                    Dokumentované označení
+                    <select
+                      value={diagnosisCode}
+                      onChange={(e) => setDiagnosisCode(e.target.value as ExternalDiagnosisCode)}
+                      className="rounded-xl border bg-white px-3 py-2.5 text-sm font-normal text-slate-900"
+                    >
+                      {externalDiagnosisCatalog.map((item) => (
+                        <option key={item.code} value={item.code}>{item.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
+                    Datum dokumentu
+                    <input
+                      type="date"
+                      value={documentDate}
+                      onChange={(e) => setDocumentDate(e.target.value)}
+                      className="rounded-xl border px-3 py-2.5 text-sm font-normal text-slate-900"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-600 md:col-span-2">
+                    Odkaz na zdrojový dokument
+                    <input
+                      value={sourceReference}
+                      onChange={(e) => setSourceReference(e.target.value)}
+                      placeholder="např. Zpráva PPP Ústí nad Orlicí, 12. 3. 2026"
+                      className="rounded-xl border px-3 py-2.5 text-sm font-normal text-slate-900"
+                    />
+                  </label>
+                </div>
+                <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Zapisující pracovník se uloží automaticky z přihlášeného účtu.
+                </div>
+                <button
+                  disabled={saving || !sourceReference.trim() || !documentDate}
+                  onClick={() => void submit()}
+                  className="mt-4 rounded-xl bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  Evidovat externí dokumentaci
+                </button>
+
+                {records.length > 0 && (
+                  <div className="mt-5 border-t pt-4">
+                    <div className="text-xs font-bold uppercase tracking-[.12em] text-slate-500">Evidováno</div>
+                    <div className="mt-2 space-y-2">
+                      {records.map((record) => (
+                        <div key={record.id} className="rounded-2xl bg-sky-50/70 px-4 py-3">
+                          <div className="text-sm font-semibold text-slate-900">
+                            {diagnosisCatalogItem(record.diagnosis_code)?.label ?? record.diagnosis_code}
+                          </div>
+                          <div className="mt-1 text-xs leading-5 text-slate-600">{record.source_reference}</div>
+                          <div className="mt-1 text-[11px] text-slate-500">
+                            Dokument {new Date(`${record.document_date}T12:00:00`).toLocaleDateString("cs-CZ")}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            );
+          }
+          EOF
+
+      - name: Pass documented diagnoses into voice guard
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/components/special-education/VoiceObservationDraft.tsx')
+          s=p.read_text()
+          s=s.replace('''  loadSpecialPedagogyAccess,\n  type SupportAreaCatalogItem,''','''  loadSpecialPedagogyAccess,\n  type ExternalDiagnosticDocumentation,\n  type SupportAreaCatalogItem,''')
+          s=s.replace('''export function VoiceObservationDraft({\n  areas,\n}: {\n  areas: SupportAreaCatalogItem[];''','''export function VoiceObservationDraft({\n  areas,\n  externalDocumentation = [],\n}: {\n  areas: SupportAreaCatalogItem[];\n  externalDocumentation?: ExternalDiagnosticDocumentation[];''')
+          marker='''        proposedAreaCode: areaCode,\n        warnings: [],'''
+          repl='''        proposedAreaCode: areaCode,\n        warnings: [],\n        documentedDiagnosisCodes: externalDocumentation.map((item) => item.diagnosis_code),'''
+          if marker not in s: raise SystemExit('inspect args marker not found')
+          s=s.replace(marker,repl,1)
+          s=s.replace('[transcript, observation, context, areaCode],','[transcript, observation, context, areaCode, externalDocumentation],',1)
+          warning_anchor='''      {error && (\n        <div className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{error}</div>\n      )}'''
+          notices='''      {inspected.notices && inspected.notices.length > 0 && (\n        <div className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm text-sky-900">\n          <div className="font-semibold">Odkaz na evidovanou externí dokumentaci</div>\n          <ul className="mt-2 list-disc space-y-1 pl-5">\n            {inspected.notices.map((notice) => (\n              <li key={notice}>{notice}</li>\n            ))}\n          </ul>\n        </div>\n      )}\n\n'''
+          if warning_anchor not in s: raise SystemExit('notice insertion marker not found')
+          s=s.replace(warning_anchor,notices+warning_anchor,1)
+          p.write_text(s)
+          PY
+
+      - name: Add case-level UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/routes/specialni-pedagogika.$caseId.tsx')
+          s=p.read_text()
+          imp='import { ExternalDocumentationCard } from "@/components/special-education/ExternalDocumentationCard";\n'
+          anchor='import { CaseTimeline } from "@/components/special-education/CaseTimeline";\n'
+          if imp not in s: s=s.replace(anchor,anchor+imp)
+          s=s.replace('''  createFollowup,\n  createIntervention,''','''  createExternalDiagnosticDocumentation,\n  createFollowup,\n  createIntervention,''')
+          voice='''          <VoiceObservationDraft\n            areas={activeAreas}'''
+          voice_new='''          <VoiceObservationDraft\n            areas={activeAreas}\n            externalDocumentation={workspace.externalDocumentation ?? []}'''
+          if voice not in s: raise SystemExit('voice marker not found')
+          s=s.replace(voice,voice_new,1)
+          marker='''        <div className="mt-5 grid gap-5 xl:grid-cols-[1.1fr_.9fr]">'''
+          card='''        <div className="mt-5">\n          <ExternalDocumentationCard\n            records={workspace.externalDocumentation ?? []}\n            saving={saving}\n            onSave={async (input) => {\n              await run(() =>\n                createExternalDiagnosticDocumentation({\n                  caseId,\n                  schoolId: schoolId!,\n                  ...input,\n                }),\n              );\n            }}\n          />\n        </div>\n\n'''
+          if marker not in s: raise SystemExit('case card insertion marker not found')
+          s=s.replace(marker,card+marker,1)
+          p.write_text(s)
+          PY
+
+      - name: Add database migration with isolated RLS and audit-compatible fields
+        run: |
+          cat > supabase/migrations/20260829193500_special_education_external_documentation.sql <<'EOF'
+          -- Structured citation of diagnosis/documentation established outside the school app.
+          -- This table must never be used to infer or create a diagnosis.
+          create table if not exists public.special_education_external_documentation (
+            id uuid primary key default gen_random_uuid(),
+            case_id uuid not null references public.special_education_cases(id) on delete cascade,
+            school_id uuid not null references public.schools(id) on delete cascade,
+            diagnosis_code text not null check (diagnosis_code in (
+              'adhd','pas','dyslexie','dysgrafie','dyskalkulie','porucha_chovani'
+            )),
+            source_reference text not null check (length(trim(source_reference)) >= 5),
+            document_date date not null,
+            recorded_by uuid not null references auth.users(id),
+            created_at timestamptz not null default now(),
+            unique (case_id, diagnosis_code, source_reference, document_date)
+          );
+
+          create index if not exists special_external_documentation_case_idx
+            on public.special_education_external_documentation(case_id, document_date desc);
+
+          alter table public.special_education_external_documentation enable row level security;
+
+          create policy special_external_documentation_authorized_read
+          on public.special_education_external_documentation
+          for select to authenticated
+          using (
+            public.has_special_education_access(school_id)
+            and exists (
+              select 1 from public.special_education_cases c
+              where c.id = case_id and c.school_id = school_id
+            )
+          );
+
+          create policy special_external_documentation_authorized_insert
+          on public.special_education_external_documentation
+          for insert to authenticated
+          with check (
+            public.has_special_education_access(school_id)
+            and recorded_by = auth.uid()
+            and exists (
+              select 1 from public.special_education_cases c
+              where c.id = case_id and c.school_id = school_id
+            )
+          );
+
+          comment on table public.special_education_external_documentation is
+            'Structured factual citation of an external PPP/SPC/authorized professional document. Not a school/app diagnostic judgment.';
+          comment on column public.special_education_external_documentation.diagnosis_code is
+            'Controlled label copied from external documentation; never inferred by AI or school observation.';
+          EOF
+
+      - name: Add voice safety regression tests
+        run: |
+          cat > src/lib/special-education-voice-contract.test.ts <<'EOF'
+          import { describe, expect, test } from "bun:test";
+          import { canConfirmVoiceDraft, inspectVoiceDraft } from "./special-education-voice-contract";
+
+          describe("documented external diagnosis voice safety", () => {
+            test("blocks an undocumented diagnostic label", () => {
+              const inspected = inspectVoiceDraft({
+                transcript: "Dnes u něj ADHD výrazně ovlivnilo začátek práce.",
+                proposedObservation: "Dnes u něj ADHD výrazně ovlivnilo začátek práce.",
+                warnings: [],
+                documentedDiagnosisCodes: [],
+              });
+              expect(canConfirmVoiceDraft(inspected)).toBe(false);
+              expect(inspected.warnings.join(" ")).toContain("bez evidované externí dokumentace");
+            });
+
+            test("allows a documented label while keeping a non-blocking factual notice", () => {
+              const inspected = inspectVoiceDraft({
+                transcript: "U žáka s ADHD dnes pomohl rozdělený pracovní postup.",
+                proposedObservation: "U žáka s ADHD dnes pomohl rozdělený pracovní postup.",
+                warnings: [],
+                documentedDiagnosisCodes: ["adhd"],
+              });
+              expect(canConfirmVoiceDraft(inspected)).toBe(true);
+              expect(inspected.warnings).toHaveLength(0);
+              expect(inspected.notices?.join(" ")).toContain("externí dokumentaci");
+            });
+
+            test("documenting ADHD does not whitelist another diagnosis", () => {
+              const inspected = inspectVoiceDraft({
+                transcript: "Dnes se projevila dyslexie při samostatném čtení.",
+                proposedObservation: "Dnes se projevila dyslexie při samostatném čtení.",
+                warnings: [],
+                documentedDiagnosisCodes: ["adhd"],
+              });
+              expect(canConfirmVoiceDraft(inspected)).toBe(false);
+            });
+          });
+          EOF
+
+      - run: bunx prettier --write src/lib/special-diagnosis-catalog.ts src/lib/special-education-voice-contract.ts src/lib/special-education-voice-contract.test.ts src/lib/special-education-data.ts src/components/special-education/ExternalDocumentationCard.tsx src/components/special-education/VoiceObservationDraft.tsx 'src/routes/specialni-pedagogika.$caseId.tsx'
+      - run: bun test src/lib/special-education-voice-contract.test.ts
+      - run: bun run lint
+      - run: bun run build
+      - name: Commit and remove runner
+        run: |
+          rm .github/workflows/apply-external-diagnosis-safety.yml
+          git config user.name "koem008"
+          git config user.email "propertyboostmedia@gmail.com"
+          git add src/lib/special-diagnosis-catalog.ts src/lib/special-education-voice-contract.ts src/lib/special-education-voice-contract.test.ts src/lib/special-education-data.ts src/components/special-education/ExternalDocumentationCard.tsx src/components/special-education/VoiceObservationDraft.tsx 'src/routes/specialni-pedagogika.$caseId.tsx' supabase/migrations/20260829193500_special_education_external_documentation.sql .github/workflows/apply-external-diagnosis-safety.yml
+          git commit -m "feat: allow documented external diagnoses in follow-up notes"
+          git push origin main
