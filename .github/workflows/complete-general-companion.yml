@@ -1,0 +1,129 @@
+name: Complete General Companion
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Patch companion policy, confirmation flow and tests
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          def once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f"marker missing: {label}")
+              return text.replace(old, new, 1)
+
+          # 1) Contracts: strict mode + structured pedagogical proposal.
+          p = Path('src/lib/ai/contracts.ts')
+          s = p.read_text()
+          old = '''export type CompanionResult = {\n  reply: string;\n  navigation?: { target: CompanionNavigationTarget; lessonId?: string };\n  requiresConfirmation: boolean;\n  proposedChange?: string;\n  usage?: AiUsage;\n};'''
+          new = '''export type CompanionPedagogicalProposal =\n  | { type: "save_preparation_note"; lessonId: string; text: string }\n  | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string };\n\nexport type CompanionResult = {\n  mode: "conversation" | "navigate" | "propose";\n  reply: string;\n  navigation?: { target: CompanionNavigationTarget; lessonId?: string };\n  proposal?: CompanionPedagogicalProposal;\n  requiresConfirmation: boolean;\n  usage?: AiUsage;\n};'''
+          s = once(s, old, new, 'contracts result')
+          p.write_text(s)
+
+          # 2) Pure policy/parser + four required behavior tests.
+          Path('src/lib/ai/companion-policy.ts').write_text('''import { assertPrivacySafePayload, type CompanionNavigationTarget, type CompanionPedagogicalProposal, type CompanionResult } from "./contracts";\n\nconst navigationTargets = new Set<CompanionNavigationTarget>([\n  "home", "schedule", "calendar", "memory", "art_studio", "special_education", "lesson",\n]);\n\nfunction record(value: unknown): Record<string, unknown> | null {\n  return value && typeof value === "object" && !Array.isArray(value)\n    ? (value as Record<string, unknown>)\n    : null;\n}\n\nfunction parseNavigation(value: unknown): CompanionResult["navigation"] {\n  const item = record(value);\n  if (!item || typeof item.target !== "string" || !navigationTargets.has(item.target as CompanionNavigationTarget)) {\n    throw new Error("AI navigace není platná.");\n  }\n  const target = item.target as CompanionNavigationTarget;\n  const lessonId = typeof item.lessonId === "string" ? item.lessonId : undefined;\n  if (target === "lesson" && !lessonId) throw new Error("Navigace na hodinu postrádá lessonId.");\n  if (target !== "lesson" && lessonId) throw new Error("lessonId je povolen jen pro konkrétní hodinu.");\n  return { target, lessonId };\n}\n\nfunction parseProposal(value: unknown): CompanionPedagogicalProposal {\n  const item = record(value);\n  if (!item || typeof item.type !== "string" || typeof item.lessonId !== "string") {\n    throw new Error("AI návrh změny není platný.");\n  }\n  if (item.type === "save_preparation_note") {\n    if (typeof item.text !== "string" || !item.text.trim()) throw new Error("Návrh přípravy je prázdný.");\n    return { type: item.type, lessonId: item.lessonId, text: item.text.trim() };\n  }\n  if (item.type === "mark_lesson_completed") {\n    return {\n      type: item.type,\n      lessonId: item.lessonId,\n      completedSummary: typeof item.completedSummary === "string" && item.completedSummary.trim()\n        ? item.completedSummary.trim()\n        : undefined,\n    };\n  }\n  throw new Error("AI navrhla nepovolený typ změny.");\n}\n\nexport function parseCompanionPayload(value: unknown): Omit<CompanionResult, "usage"> {\n  assertPrivacySafePayload(value);\n  const item = record(value);\n  if (!item || typeof item.mode !== "string" || typeof item.reply !== "string" || !item.reply.trim()) {\n    throw new Error("AI odpověď není platná.");\n  }\n  if (item.mode === "conversation") {\n    if (item.navigation !== undefined || item.proposal !== undefined) throw new Error("Konverzace nesmí spouštět akci.");\n    return { mode: "conversation", reply: item.reply.trim(), requiresConfirmation: false };\n  }\n  if (item.mode === "navigate") {\n    if (item.proposal !== undefined) throw new Error("Navigace nesmí současně zapisovat data.");\n    return { mode: "navigate", reply: item.reply.trim(), navigation: parseNavigation(item.navigation), requiresConfirmation: false };\n  }\n  if (item.mode === "propose") {\n    if (item.navigation !== undefined) throw new Error("Návrh změny nesmí současně navigovat.");\n    return { mode: "propose", reply: item.reply.trim(), proposal: parseProposal(item.proposal), requiresConfirmation: true };\n  }\n  throw new Error("AI odpověď používá nepovolený režim.");\n}\n\nexport function navigationPath(target: CompanionNavigationTarget): string {\n  const paths: Record<Exclude<CompanionNavigationTarget, "lesson">, string> = {\n    home: "/",\n    schedule: "/rozvrh",\n    calendar: "/kalendar",\n    memory: "/pamet",\n    art_studio: "/vytvarna-vychova",\n    special_education: "/specialni-pedagogika",\n  };\n  if (target === "lesson") return "/hodina/$lessonId";\n  return paths[target];\n}\n''')
+
+          Path('src/lib/ai/companion-policy.test.ts').write_text('''import { describe, expect, test } from "bun:test";\nimport { navigationPath, parseCompanionPayload } from "./companion-policy";\n\ndescribe("general voice companion policy", () => {\n  test("ordinary conversation has no navigation or write proposal", () => {\n    const result = parseCompanionPayload({ mode: "conversation", reply: "Zítra máš čtyři hodiny." });\n    expect(result.mode).toBe("conversation");\n    expect(result.requiresConfirmation).toBe(false);\n    expect(result.navigation).toBeUndefined();\n    expect(result.proposal).toBeUndefined();\n  });\n\n  test("open schedule maps only to the real schedule route and needs no confirmation", () => {\n    const result = parseCompanionPayload({ mode: "navigate", reply: "Otevírám rozvrh.", navigation: { target: "schedule" } });\n    expect(result.requiresConfirmation).toBe(false);\n    expect(result.navigation?.target).toBe("schedule");\n    expect(navigationPath("schedule")).toBe("/rozvrh");\n  });\n\n  test("pedagogical write is proposal-only until explicit confirmation", () => {\n    const result = parseCompanionPayload({ mode: "propose", reply: "Připravila jsem návrh k potvrzení.", proposal: { type: "mark_lesson_completed", lessonId: "11111111-1111-4111-8111-111111111111", completedSummary: "Probráno." } });\n    expect(result.requiresConfirmation).toBe(true);\n    expect(result.proposal?.type).toBe("mark_lesson_completed");\n    expect(result.navigation).toBeUndefined();\n  });\n\n  test("ambiguous/out-of-scope conversational answer cannot smuggle navigation or write", () => {\n    expect(() => parseCompanionPayload({ mode: "conversation", reply: "Můžeš to upřesnit?", navigation: { target: "schedule" } })).toThrow();\n    const safe = parseCompanionPayload({ mode: "conversation", reply: "Můžeš prosím upřesnit, co chceš otevřít?" });\n    expect(safe.navigation).toBeUndefined();\n    expect(safe.proposal).toBeUndefined();\n  });\n});\n''')
+
+          # 3) Provider: strict three-mode response parsed by the pure policy.
+          p = Path('src/lib/ai/provider.server.ts')
+          s = p.read_text()
+          s = once(s, '} from "./contracts";\n', '} from "./contracts";\nimport { parseCompanionPayload } from "./companion-policy";\n', 'provider policy import')
+          old_prompt = '''          "Navigace v aplikaci je bezpečná a může proběhnout bez potvrzení.",\n          "Jakákoli změna pedagogických nebo osobních dat MUSÍ mít requiresConfirmation=true a pouze slovní proposedChange; žádnou změnu sama neprovádíš.",\n          "Vrať pouze validní JSON: reply, navigation volitelně {target, lessonId}, requiresConfirmation, proposedChange volitelně.",\n          "Povolené target: home, schedule, calendar, memory, art_studio, special_education, lesson.",'''
+          new_prompt = '''          "Vždy zvol přesně jeden režim: conversation, navigate, propose.",\n          "conversation: běžná konverzace, dotaz, nejasný nebo nepodporovaný požadavek. V tomto režimu nikdy nevracej navigation ani proposal; při nejasnosti se doptávej.",\n          "navigate: pouze otevření existující obrazovky. Vrať navigation jen z pevného seznamu home, schedule, calendar, memory, art_studio, special_education, lesson. Pro lesson musíš použít lessonId z availableLessons; nikdy si ID nevymýšlej.",\n          "propose: pouze pedagogická změna, která musí čekat na lidské potvrzení. Povolené proposal typy jsou save_preparation_note {lessonId,text} a mark_lesson_completed {lessonId,completedSummary?}. Žádnou změnu sama neprovádíš.",\n          "Pokud uživatel chce komplexní nový materiál nebo plnou přípravu, nepiš ho tímto levným tokem; raději naviguj na konkrétní hodinu, pokud je jednoznačně určena, jinak se doptávej.",\n          "Vrať pouze validní JSON. conversation={mode,reply}; navigate={mode,reply,navigation}; propose={mode,reply,proposal}.",'''
+          s = once(s, old_prompt, new_prompt, 'provider system prompt')
+          pattern = re.compile(r'''  // JSON\.parse is the untyped provider boundary; fields are validated immediately below\.\n  // eslint-disable-next-line @typescript-eslint/no-explicit-any\n  let parsed: any;\n  try \{\n    parsed = JSON\.parse\(stripJsonFence\(text\)\);\n  \} catch \{\n    throw new ExternalAiProviderError\(\n      "anthropic",\n      "MALFORMED_RESPONSE",\n      "AI odpověď nemá očekávaný strukturovaný formát\.",\n    \);\n  \}\n  assertPrivacySafePayload\(parsed\);\n  if \([\s\S]*?  const usage = asRecord\(raw\.usage\);\n  return \{\n    reply: parsed\.reply\.trim\(\),[\s\S]*?  \};\n''')
+          replacement = '''  let parsed: unknown;\n  try {\n    parsed = JSON.parse(stripJsonFence(text));\n  } catch {\n    throw new ExternalAiProviderError(\n      "anthropic",\n      "MALFORMED_RESPONSE",\n      "AI odpověď nemá očekávaný strukturovaný formát.",\n    );\n  }\n  let result: Omit<CompanionResult, "usage">;\n  try {\n    result = parseCompanionPayload(parsed);\n  } catch {\n    throw new ExternalAiProviderError("anthropic", "MALFORMED_RESPONSE", "AI odpověď je neplatná.");\n  }\n  const usage = asRecord(raw.usage);\n  return {\n    ...result,\n    usage: {\n      provider: "anthropic",\n      model: config.economyModel,\n      inputTokens: numberOrUndefined(usage?.input_tokens),\n      outputTokens: numberOrUndefined(usage?.output_tokens),\n    },\n  };\n'''
+          s2, count = pattern.subn(replacement, s, count=1)
+          if count != 1:
+              raise SystemExit(f'provider parser replacement count={count}')
+          p.write_text(s2)
+
+          # 4) Authenticated server-side confirmation. Nothing writes unless this separate function is called by a tap.
+          p = Path('src/lib/ai/functions.ts')
+          s = p.read_text()
+          marker = 'const speechSynthesisSchema = z.object({'
+          schema = '''const companionProposalSchema = z.discriminatedUnion("type", [\n  z.object({\n    type: z.literal("save_preparation_note"),\n    lessonId: z.string().uuid(),\n    text: z.string().trim().min(1).max(8_000),\n  }),\n  z.object({\n    type: z.literal("mark_lesson_completed"),\n    lessonId: z.string().uuid(),\n    completedSummary: z.string().trim().max(4_000).optional(),\n  }),\n]);\n\n'''
+          s = once(s, marker, schema + marker, 'confirm schema')
+          marker = 'export const transcribeVoice = createServerFn({ method: "POST" })'
+          fn = '''export const confirmCompanionPedagogicalAction = createServerFn({ method: "POST" })\n  .middleware([requireSupabaseAuth])\n  .validator(companionProposalSchema)\n  .handler(async ({ data, context }) => {\n    const lessonResult = await context.supabase\n      .from("lesson_instances")\n      .select("id,school_id,class_id")\n      .eq("id", data.lessonId)\n      .single();\n    if (lessonResult.error || !lessonResult.data) throw lessonResult.error ?? new Error("Hodina není dostupná.");\n    const lesson = lessonResult.data;\n\n    if (data.type === "save_preparation_note") {\n      const existing = await context.supabase\n        .from("lesson_preparations")\n        .select("id")\n        .eq("lesson_id", lesson.id)\n        .order("version", { ascending: false })\n        .limit(1)\n        .maybeSingle();\n      if (existing.error) throw existing.error;\n      if (existing.data?.id) {\n        const updated = await context.supabase\n          .from("lesson_preparations")\n          .update({ teacher_notes: data.text, updated_at: new Date().toISOString() })\n          .eq("id", existing.data.id)\n          .eq("lesson_id", lesson.id);\n        if (updated.error) throw updated.error;\n      } else {\n        const inserted = await context.supabase.from("lesson_preparations").insert({\n          school_id: lesson.school_id,\n          class_id: lesson.class_id,\n          lesson_id: lesson.id,\n          teacher_notes: data.text,\n        });\n        if (inserted.error) throw inserted.error;\n      }\n      return { ok: true, message: "Příprava byla uložena po vašem potvrzení." };\n    }\n\n    const progress = await context.supabase\n      .from("lesson_progress")\n      .select("id")\n      .eq("lesson_id", lesson.id)\n      .maybeSingle();\n    if (progress.error) throw progress.error;\n    if (progress.data?.id) {\n      const updated = await context.supabase\n        .from("lesson_progress")\n        .update({\n          state: "completed",\n          completed_summary: data.completedSummary ?? null,\n          updated_at: new Date().toISOString(),\n        })\n        .eq("id", progress.data.id)\n        .eq("lesson_id", lesson.id);\n      if (updated.error) throw updated.error;\n    } else {\n      const inserted = await context.supabase.from("lesson_progress").insert({\n        school_id: lesson.school_id,\n        class_id: lesson.class_id,\n        lesson_id: lesson.id,\n        state: "completed",\n        completed_summary: data.completedSummary ?? null,\n      });\n      if (inserted.error) throw inserted.error;\n    }\n    const lessonUpdate = await context.supabase\n      .from("lesson_instances")\n      .update({ status: "completed", updated_at: new Date().toISOString() })\n      .eq("id", lesson.id);\n    if (lessonUpdate.error) throw lessonUpdate.error;\n    return { ok: true, message: "Hodina byla označena jako dokončená po vašem potvrzení." };\n  });\n\n'''
+          s = once(s, marker, fn + marker, 'confirm function')
+          p.write_text(s)
+
+          # 5) UI: proposal is structured; user must tap Confirm. Add short in-session history only.
+          p = Path('src/routes/asistentka.tsx')
+          s = p.read_text()
+          s = once(
+              s,
+              'import { runCompanionAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";',
+              'import { confirmCompanionPedagogicalAction, runCompanionAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";\nimport type { CompanionConversationTurn, CompanionPedagogicalProposal } from "@/lib/ai/contracts";',
+              'ui imports',
+          )
+          s = once(
+              s,
+              '  const [proposedChange, setProposedChange] = useState("");',
+              '  const [pendingProposal, setPendingProposal] = useState<CompanionPedagogicalProposal | null>(null);\n  const [companionHistory, setCompanionHistory] = useState<CompanionConversationTurn[]>([]);',
+              'ui state',
+          )
+          s = once(s, '    setProposedChange("");', '    setPendingProposal(null);', 'clear proposal')
+          s = once(
+              s,
+              '          availableLessons: briefing?.lessons.map((l) => ({',
+              '          recentConversation: companionHistory.slice(-6),\n          availableLessons: briefing?.lessons.map((l) => ({',
+              'recent conversation',
+          )
+          old = '''      setVoiceReply(result.reply);\n      setProposedChange(\n        result.requiresConfirmation\n          ? result.proposedChange || "Tato akce by změnila data a vyžaduje potvrzení."\n          : "",\n      );'''
+          new = '''      setVoiceReply(result.reply);\n      setPendingProposal(result.mode === "propose" ? result.proposal ?? null : null);\n      setCompanionHistory((current) =>\n        [...current, { role: "user", text: transcribed.text }, { role: "assistant", text: result.reply }].slice(-8),\n      );'''
+          s = once(s, old, new, 'result handling')
+          s = s.replace('if (result.navigation && !result.requiresConfirmation) {', 'if (result.mode === "navigate" && result.navigation) {', 1)
+          old_notice = '''      if (!result.navigation)\n        setVoiceNotice(\n          result.requiresConfirmation ? "Navržená změna čeká na potvrzení." : "Hotovo.",\n        );'''
+          new_notice = '''      if (result.mode !== "navigate")\n        setVoiceNotice(result.mode === "propose" ? "Navržená změna čeká na potvrzení." : "Hotovo.");'''
+          s = once(s, old_notice, new_notice, 'notice handling')
+
+          marker = '  return (\n    <main className="min-h-screen'
+          confirm_fn = '''  async function confirmPendingProposal() {\n    if (!pendingProposal) return;\n    setVoiceBusy(true);\n    setVoiceNotice("Ukládám potvrzenou změnu…");\n    try {\n      const result = await confirmCompanionPedagogicalAction({ data: pendingProposal });\n      setPendingProposal(null);\n      setVoiceNotice(result.message);\n      await reload();\n    } catch (error) {\n      setVoiceNotice(error instanceof Error ? error.message : "Potvrzenou změnu se nepodařilo uložit.");\n    } finally {\n      setVoiceBusy(false);\n    }\n  }\n\n'''
+          s = once(s, marker, confirm_fn + marker, 'confirm ui function')
+
+          # Replace existing amber proposal block.
+          pattern = re.compile(r'''\{proposedChange && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">[\s\S]*?</div>\}''')
+          replacement = '''{pendingProposal && (\n                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">\n                    <div className="text-xs font-bold text-amber-800">Návrh změny — zatím neprovedeno</div>\n                    <p className="mt-1 text-sm text-amber-900">\n                      {pendingProposal.type === "save_preparation_note"\n                        ? `Uložit jako poznámku k přípravě: ${pendingProposal.text}`\n                        : `Označit hodinu jako dokončenou${pendingProposal.completedSummary ? `: ${pendingProposal.completedSummary}` : "."}`}\n                    </p>\n                    <p className="mt-2 text-xs text-amber-700">Mluvený požadavek sám nic nezapisuje.</p>\n                    <div className="mt-3 flex flex-wrap gap-2">\n                      <button type="button" onClick={() => void confirmPendingProposal()} disabled={voiceBusy} className="rounded-xl bg-amber-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Potvrdit a uložit</button>\n                      <button type="button" onClick={() => { setPendingProposal(null); setVoiceNotice("Návrh byl zrušen. Nic se nezměnilo."); }} disabled={voiceBusy} className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-amber-800 disabled:opacity-50">Zrušit</button>\n                    </div>\n                  </div>\n                )}'''
+          s2, count = pattern.subn(replacement, s, count=1)
+          if count != 1:
+              raise SystemExit(f'ui proposal replacement count={count}')
+          p.write_text(s2)
+          PY
+      - run: bunx prettier --write src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/companion-policy.test.ts src/lib/ai/provider.server.ts src/lib/ai/functions.ts src/routes/asistentka.tsx
+      - name: Policy tests
+        run: bun test src/lib/ai/companion-policy.test.ts
+      - name: Lint
+        run: bun run lint
+      - name: Build
+        run: bun run build
+      - name: Ensure scoped voice route untouched
+        run: git diff --exit-code HEAD -- src/routes/hlas.tsx
+      - name: Commit
+        run: |
+          rm -f .github/workflows/complete-general-companion.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/companion-policy.test.ts src/lib/ai/provider.server.ts src/lib/ai/functions.ts src/routes/asistentka.tsx .github/workflows/complete-general-companion.yml
+          git commit -m "feat: complete general voice companion confirmation policy"
+          git push origin main
