@@ -4,16 +4,18 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { Mic } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { Loader2, Mic, ShieldCheck } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AfternoonReflectionPrompt } from "@/components/AfternoonReflectionPrompt";
 import { SpecialContinuityAssistantCard } from "@/components/special-education/SpecialContinuityAssistantCard";
+import { supabase } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {
   return (
@@ -123,11 +125,73 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+type AuthGateState = "checking" | "authenticated" | "anonymous";
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthGate />
+    </QueryClientProvider>
+  );
+}
+
+function AuthGate() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const [authState, setAuthState] = useState<AuthGateState>("checking");
+
+  useEffect(() => {
+    let active = true;
+
+    async function verify() {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (!active) return;
+        if (error || !data.user) setAuthState("anonymous");
+        else setAuthState("authenticated");
+      } catch {
+        if (active) setAuthState("anonymous");
+      }
+    }
+
+    void verify();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      setAuthState(session?.user ? "authenticated" : "anonymous");
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authState === "checking" || typeof window === "undefined") return;
+
+    if (authState === "anonymous" && pathname !== "/prihlaseni") {
+      const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.replace(`/prihlaseni?next=${encodeURIComponent(next)}`);
+      return;
+    }
+
+    if (authState === "authenticated" && pathname === "/prihlaseni") {
+      const next = new URLSearchParams(window.location.search).get("next");
+      const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      window.location.replace(safeNext === "/prihlaseni" ? "/" : safeNext);
+    }
+  }, [authState, pathname]);
+
+  if (authState === "checking") return <AuthLoading />;
+  if (authState === "anonymous") {
+    if (pathname === "/prihlaseni") return <Outlet />;
+    return <AuthLoading />;
+  }
+  if (pathname === "/prihlaseni") return <AuthLoading />;
+
+  return (
+    <>
       <Outlet />
       <SpecialContinuityAssistantCard />
       <AfternoonReflectionPrompt />
@@ -139,6 +203,22 @@ function RootComponent() {
         <Mic className="h-5 w-5" />
         <span className="hidden sm:inline">Říct, jak to dopadlo</span>
       </Link>
-    </QueryClientProvider>
+    </>
+  );
+}
+
+function AuthLoading() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#fbfaf7] px-4 text-[#24343f]">
+      <div className="text-center">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#e9f4ef] text-[#276765]">
+          <ShieldCheck className="h-6 w-6" />
+        </div>
+        <div className="mt-4 flex items-center justify-center gap-2 text-sm font-bold text-[#526663]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Ověřuji bezpečné přihlášení…
+        </div>
+      </div>
+    </main>
   );
 }
