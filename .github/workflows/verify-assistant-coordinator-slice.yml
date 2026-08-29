@@ -42,3 +42,4 @@ jobs:
             git commit -m "feat: surface assistant coordinator workspace"
             git push origin main
           fi
+      # retry: typed coordinator data layer
