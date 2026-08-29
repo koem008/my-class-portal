@@ -1,3 +1,9 @@
+import {
+  diagnosisCodesMentioned,
+  diagnosisCatalogItem,
+  type ExternalDiagnosisCode,
+} from "@/lib/special-diagnosis-catalog";
+
 export type SpecialPedagogyVoiceDraft = {
   transcript: string;
   proposedObservation: string;
@@ -5,34 +11,59 @@ export type SpecialPedagogyVoiceDraft = {
   proposedAreaCode?: string;
   confidence?: number;
   warnings: string[];
+  notices?: string[];
+  documentedDiagnosisCodes?: ExternalDiagnosisCode[];
 };
 
-const diagnosticPatterns = [
-  /\badhd\b/i,
-  /\bpas\b/i,
-  /\bautis(m|tick)/i,
-  /\bdyslex/i,
-  /\bdysgraf/i,
-  /\bdyskalk/i,
-  /\bporuch(a|u) chov/i,
+const genericDiagnosticPatterns = [
   /\bdiagn[oó]z/i,
-  /\bm[aá]\s+(adhd|pas|autismus|dyslex)/i,
+  /\bm[aá]\s+(adhd|pas|autismus|dyslex|dysgraf|dyskalk)/i,
 ];
 
 export function inspectVoiceDraft(draft: SpecialPedagogyVoiceDraft): SpecialPedagogyVoiceDraft {
   const text = `${draft.transcript} ${draft.proposedObservation}`;
   const warnings = [...draft.warnings];
-  if (diagnosticPatterns.some((pattern) => pattern.test(text))) {
+  const notices = [...(draft.notices ?? [])];
+  const documented = new Set(draft.documentedDiagnosisCodes ?? []);
+  const mentioned = diagnosisCodesMentioned(text);
+  const undocumented = mentioned.filter((code) => !documented.has(code));
+
+  if (undocumented.length > 0) {
     warnings.push(
-      "Text obsahuje možný diagnostický závěr. Před uložením jej přepište na faktické pedagogické pozorování.",
+      `Text obsahuje diagnostické označení bez evidované externí dokumentace: ${undocumented
+        .map((code) => diagnosisCatalogItem(code)?.label ?? code)
+        .join(
+          ", ",
+        )}. Přepište jej na faktické pedagogické pozorování, nebo nejprve evidujte zdrojový dokument.`,
     );
   }
+
+  if (mentioned.length > 0 && undocumented.length === 0) {
+    notices.push(
+      "Diagnostické označení odpovídá externí dokumentaci evidované u tohoto případu. Ukládejte pouze faktickou návaznou poznámku; aplikace tím nevytváří nový diagnostický závěr.",
+    );
+  }
+
+  const hasGenericDiagnosticLanguage = genericDiagnosticPatterns.some((pattern) =>
+    pattern.test(text),
+  );
+  const onlyDocumentedReference = mentioned.length > 0 && undocumented.length === 0;
+  if (hasGenericDiagnosticLanguage && !onlyDocumentedReference) {
+    warnings.push(
+      "Text obsahuje možný nový diagnostický závěr. Před uložením jej přepište na faktické pedagogické pozorování.",
+    );
+  }
+
   if (draft.proposedObservation.trim().length < 12) {
     warnings.push(
       "Pozorování je příliš stručné. Doplňte konkrétní, pozorovatelný projev a kontext.",
     );
   }
-  return { ...draft, warnings: [...new Set(warnings)] };
+  return {
+    ...draft,
+    warnings: [...new Set(warnings)],
+    notices: [...new Set(notices)],
+  };
 }
 
 export function canConfirmVoiceDraft(draft: SpecialPedagogyVoiceDraft) {
@@ -52,7 +83,8 @@ export function buildSpecialPedagogyVoiceRequest(input: {
     activeAreaCodes: input.activeAreaCodes,
     transcript: input.transcript.trim().slice(0, 5000),
     constraints: {
-      noDiagnosis: true,
+      noNewDiagnosis: true,
+      documentedDiagnosisReferencesMayBeQuoted: true,
       factualObservationOnly: true,
       requireHumanConfirmation: true,
     },

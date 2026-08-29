@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { ExternalDiagnosisCode } from "@/lib/special-diagnosis-catalog";
 const db = supabase as unknown as SupabaseClient<any>;
 export type SpecialCase = {
   id: string;
@@ -10,6 +11,15 @@ export type SpecialCase = {
   focus_summary: string | null;
   alias: string;
   avatar_key: string | null;
+};
+export type ExternalDiagnosticDocumentation = {
+  id: string;
+  case_id: string;
+  diagnosis_code: ExternalDiagnosisCode;
+  source_reference: string;
+  document_date: string;
+  recorded_by: string;
+  created_at: string;
 };
 export type SpecialObservation = {
   id: string;
@@ -216,6 +226,39 @@ export async function createSpecialCase(input: {
   await writeAudit(input.schoolId, data.id, "case_created", "case", data.id);
   return data.id as string;
 }
+export async function createExternalDiagnosticDocumentation(input: {
+  caseId: string;
+  schoolId: string;
+  diagnosisCode: ExternalDiagnosisCode;
+  sourceReference: string;
+  documentDate: string;
+}) {
+  const userId = await authUserId();
+  const sourceReference = input.sourceReference.trim();
+  if (!sourceReference) throw new Error("Uveďte odkaz na zdrojový dokument.");
+  const { data, error } = await db
+    .from("special_education_external_documentation")
+    .insert({
+      case_id: input.caseId,
+      school_id: input.schoolId,
+      diagnosis_code: input.diagnosisCode,
+      source_reference: sourceReference,
+      document_date: input.documentDate,
+      recorded_by: userId,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(
+    input.schoolId,
+    input.caseId,
+    "external_documentation_recorded",
+    "external_documentation",
+    data.id,
+  );
+  return data.id as string;
+}
+
 export async function updateCaseStatus(input: {
   caseId: string;
   schoolId: string;
@@ -312,44 +355,65 @@ export async function removeCaseSupportArea(input: {
   await writeAudit(input.schoolId, input.caseId, "support_area_removed", "support_area", null);
 }
 export async function loadCaseWorkspace(caseId: string) {
-  const [observations, goals, interventions, followups, audit, supportAreas, reviews] =
-    await Promise.all([
-      db
-        .from("special_education_observations")
-        .select("id,observed_at,context,observation,support_area")
-        .eq("case_id", caseId)
-        .order("observed_at", { ascending: false }),
-      db
-        .from("special_education_support_goals")
-        .select("id,area_code,title,description,status,target_date,created_at")
-        .eq("case_id", caseId)
-        .order("created_at", { ascending: false }),
-      db
-        .from("special_education_interventions")
-        .select(
-          "id,area_code,goal_id,planned_for,performed_at,strategy,observed_effect,status,created_at",
-        )
-        .eq("case_id", caseId)
-        .order("created_at", { ascending: false }),
-      db
-        .from("special_education_followups")
-        .select("id,case_id,due_on,note,completed_at,created_at")
-        .eq("case_id", caseId)
-        .order("due_on", { ascending: true }),
-      db
-        .from("special_education_audit_log")
-        .select("id,action,entity_type,entity_id,created_at")
-        .eq("case_id", caseId)
-        .order("created_at", { ascending: false })
-        .limit(50),
-      loadCaseSupportAreas(caseId),
-      db
-        .from("special_education_progress_reviews")
-        .select("id,area_code,reviewed_on,change_level,evidence,next_step,created_at")
-        .eq("case_id", caseId)
-        .order("reviewed_on", { ascending: false }),
-    ]);
-  for (const r of [observations, goals, interventions, followups, audit, reviews])
+  const [
+    observations,
+    goals,
+    interventions,
+    followups,
+    audit,
+    supportAreas,
+    reviews,
+    externalDocumentation,
+  ] = await Promise.all([
+    db
+      .from("special_education_observations")
+      .select("id,observed_at,context,observation,support_area")
+      .eq("case_id", caseId)
+      .order("observed_at", { ascending: false }),
+    db
+      .from("special_education_support_goals")
+      .select("id,area_code,title,description,status,target_date,created_at")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false }),
+    db
+      .from("special_education_interventions")
+      .select(
+        "id,area_code,goal_id,planned_for,performed_at,strategy,observed_effect,status,created_at",
+      )
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false }),
+    db
+      .from("special_education_followups")
+      .select("id,case_id,due_on,note,completed_at,created_at")
+      .eq("case_id", caseId)
+      .order("due_on", { ascending: true }),
+    db
+      .from("special_education_audit_log")
+      .select("id,action,entity_type,entity_id,created_at")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    loadCaseSupportAreas(caseId),
+    db
+      .from("special_education_progress_reviews")
+      .select("id,area_code,reviewed_on,change_level,evidence,next_step,created_at")
+      .eq("case_id", caseId)
+      .order("reviewed_on", { ascending: false }),
+    db
+      .from("special_education_external_documentation")
+      .select("id,case_id,diagnosis_code,source_reference,document_date,recorded_by,created_at")
+      .eq("case_id", caseId)
+      .order("document_date", { ascending: false }),
+  ]);
+  for (const r of [
+    observations,
+    goals,
+    interventions,
+    followups,
+    audit,
+    reviews,
+    externalDocumentation,
+  ])
     if ((r as any).error) throw (r as any).error;
   const ws = {
     observations: (observations.data ?? []) as SpecialObservation[],
@@ -359,6 +423,7 @@ export async function loadCaseWorkspace(caseId: string) {
     audit: (audit.data ?? []) as AuditEntry[],
     supportAreas,
     reviews: (reviews.data ?? []) as ProgressReview[],
+    externalDocumentation: (externalDocumentation.data ?? []) as ExternalDiagnosticDocumentation[],
   };
   return { ...ws, timeline: buildTimeline(ws) };
 }

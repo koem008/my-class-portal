@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { canConfirmVoiceDraft, inspectVoiceDraft } from "@/lib/special-education-voice-contract";
 import {
   loadSpecialPedagogyAccess,
+  type ExternalDiagnosticDocumentation,
   type SupportAreaCatalogItem,
 } from "@/lib/special-education-data";
 import {
@@ -35,8 +36,10 @@ function evidenceStatus(item: SupportInsight) {
 
 export function VoiceObservationDraft({
   areas,
+  externalDocumentation = [],
 }: {
   areas: SupportAreaCatalogItem[];
+  externalDocumentation?: ExternalDiagnosticDocumentation[];
   onConfirm?: (draft: {
     observation: string;
     context?: string;
@@ -64,8 +67,9 @@ export function VoiceObservationDraft({
         proposedContext: context,
         proposedAreaCode: areaCode,
         warnings: [],
+        documentedDiagnosisCodes: externalDocumentation.map((item) => item.diagnosis_code),
       }),
-    [transcript, observation, context, areaCode],
+    [transcript, observation, context, areaCode, externalDocumentation],
   );
   const confirmable = canConfirmVoiceDraft(inspected);
 
@@ -208,6 +212,17 @@ export function VoiceObservationDraft({
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {inspected.warnings.map((w) => (
               <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {inspected.notices && inspected.notices.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-sky-50 p-4 text-sm text-sky-900">
+          <div className="font-semibold">Odkaz na evidovanou externí dokumentaci</div>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {inspected.notices.map((notice) => (
+              <li key={notice}>{notice}</li>
             ))}
           </ul>
         </div>

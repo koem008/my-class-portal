@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Clock3, History, Plus, ShieldAlert, Target } from "lucide-react";
 import { CaseTimeline } from "@/components/special-education/CaseTimeline";
+import { ExternalDocumentationCard } from "@/components/special-education/ExternalDocumentationCard";
 import { ProgressReviewCard } from "@/components/special-education/ProgressReviewCard";
 import { StrategyLibrary } from "@/components/special-education/StrategyLibrary";
 import { VoiceObservationDraft } from "@/components/special-education/VoiceObservationDraft";
@@ -10,6 +11,7 @@ import {
   addFactualObservation,
   completeFollowup,
   completeIntervention,
+  createExternalDiagnosticDocumentation,
   createFollowup,
   createIntervention,
   createProgressReview,
@@ -223,9 +225,26 @@ function SpecialCasePage() {
           </div>
         </section>
 
+        <div className="mt-5">
+          <ExternalDocumentationCard
+            records={workspace.externalDocumentation ?? []}
+            saving={saving}
+            onSave={async (input) => {
+              await run(() =>
+                createExternalDiagnosticDocumentation({
+                  caseId,
+                  schoolId: schoolId!,
+                  ...input,
+                }),
+              );
+            }}
+          />
+        </div>
+
         <div className="mt-5 grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
           <VoiceObservationDraft
             areas={activeAreas}
+            externalDocumentation={workspace.externalDocumentation ?? []}
             onConfirm={async (draft) => {
               await run(() =>
                 addFactualObservation({
