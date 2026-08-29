@@ -17,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { runLessonAi } from "@/lib/ai/functions";
+import type { LessonAiAction } from "@/lib/ai/contracts";
 import {
   createLearningSignal,
   createMaterial,
@@ -62,6 +64,7 @@ const signalLabels: Record<LearningSignalKind, string> = {
   advanced: "Je napřed",
   follow_up: "Vrátit se k tématu",
 };
+const aiActionLabels: Record<LessonAiAction, string> = { lesson_plan: "Kompletní příprava", board_notes: "Zápis na tabuli", worksheet: "Pracovní list", answer_key: "Klíč správných odpovědí", quiz: "Kvíz", presentation_outline: "Osnova prezentace", activity: "Aktivita do hodiny", differentiation: "Diferenciace", homework: "Domácí úkol" };
 
 function LessonWorkspacePage() {
   const { lessonId } = Route.useParams();
@@ -93,6 +96,9 @@ function LessonWorkspacePage() {
   const [signalAliasId, setSignalAliasId] = useState("");
   const [signalKind, setSignalKind] = useState<LearningSignalKind>("needs_practice");
   const [signalNote, setSignalNote] = useState("");
+  const [aiAction, setAiAction] = useState<LessonAiAction>("lesson_plan");
+  const [aiInstruction, setAiInstruction] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   const lessonDate = useMemo(
     () =>
@@ -236,6 +242,18 @@ function LessonWorkspacePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleAiGenerate() {
+    if (!lesson) return;
+    setAiGenerating(true); setNotice("");
+    try {
+      const outcomeCodes = (curriculum?.outcomes ?? []).map((item) => item.official_code).filter((code): code is string => Boolean(code));
+      const result = await runLessonAi({ data: { action: aiAction, context: { lessonId: lesson.id, grade: curriculum?.classGrade ?? 5, subject: lesson.subject_name, topic: lesson.topic ?? lesson.title ?? undefined, durationMinutes: 45, curriculumOutcomeCodes: outcomeCodes, curriculumSummary: (curriculum?.outcomes ?? []).map((item) => [item.official_code, item.title, item.description].filter(Boolean).join(" · ")).join("\n") || undefined, previousLessonSummary: continuity.map((item) => `${item.title}: ${item.detail}`).join("\n") || undefined, teacherInstruction: aiInstruction.trim() || undefined } } });
+      setMaterialKind((aiAction === "presentation_outline" ? "presentation" : aiAction) as MaterialKind);
+      setMaterialTitle(result.title); setMaterialText(JSON.stringify(result.content, null, 2));
+      setNotice("AI připravila editovatelný koncept. Nic se neuložilo — obsah zkontrolujte a potvrďte ručně.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "AI zatím není připojena."); } finally { setAiGenerating(false); }
   }
 
   if (loadState === "loading")
@@ -587,24 +605,12 @@ function LessonWorkspacePage() {
                 </div>
               )}
             </Panel>
-            <Panel
-              title="AI asistentka hodiny"
-              subtitle="Provider zatím není připojený. Žádný obsah se neposílá třetí straně."
-              icon={<Sparkles className="h-5 w-5" />}
-            >
+            <Panel title="AI asistentka hodiny" subtitle="Claude připraví návrh z kontextu hodiny a ověřeného kurikula. Nikdy ho sám neuloží." icon={<Sparkles className="h-5 w-5" />}>
               <div className="rounded-2xl bg-gradient-to-br from-[#eef8f3] to-[#fff8ed] p-4">
-                <p className="text-sm leading-6 text-[#617474]">
-                  Až doplníme serverový API klíč, AI dostane jen kontext této hodiny, relevantní
-                  ověřené kurikulum, reflexi a pseudonymní pedagogické signály. Ne skutečné
-                  identity.
-                </p>
-                <button
-                  disabled
-                  className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[#dfe9e5] px-4 py-2.5 text-sm font-bold text-[#78908b]"
-                >
-                  <Mic className="h-4 w-4" />
-                  AI zatím není připojena
-                </button>
+                <p className="text-sm leading-6 text-[#617474]">Vyberte výstup a případně doplňte instrukci. Výsledek se vloží jen do editovatelného konceptu v sekci Materiály.</p>
+                <select value={aiAction} onChange={(event) => setAiAction(event.target.value as LessonAiAction)} className="mt-4 w-full rounded-2xl border border-[#dbe7e2] bg-white px-3 py-2.5 text-sm">{Object.entries(aiActionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+                <textarea value={aiInstruction} onChange={(event) => setAiInstruction(event.target.value)} placeholder="Volitelně: více pohybu, práce ve dvojicích, jednodušší varianta…" className="mt-3 min-h-24 w-full rounded-2xl border border-[#dbe7e2] bg-white px-3 py-3 text-sm" />
+                <button onClick={() => void handleAiGenerate()} disabled={aiGenerating} className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{aiGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{aiGenerating ? "Připravuji…" : "Vytvořit návrh"}</button>
               </div>
             </Panel>
             <Panel
