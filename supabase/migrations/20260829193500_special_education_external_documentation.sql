@@ -1,5 +1,6 @@
 -- Structured citation of diagnosis/documentation established outside the school app.
 -- This table must never be used to infer or create a diagnosis.
+-- Verification marker: exercise the repository's standard migration reset workflow on this schema.
 create table if not exists public.special_education_external_documentation (
   id uuid primary key default gen_random_uuid(),
   case_id uuid not null references public.special_education_cases(id) on delete cascade,
