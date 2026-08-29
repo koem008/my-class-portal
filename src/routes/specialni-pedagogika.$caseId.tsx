@@ -5,6 +5,7 @@ import { CaseTimeline } from "@/components/special-education/CaseTimeline";
 import { ProgressReviewCard } from "@/components/special-education/ProgressReviewCard";
 import { StrategyLibrary } from "@/components/special-education/StrategyLibrary";
 import { VoiceObservationDraft } from "@/components/special-education/VoiceObservationDraft";
+import { classifySpecialProgressEvidence, evidenceStatusCopy } from "@/lib/evidence-status";
 import {
   addFactualObservation,
   completeFollowup,
@@ -117,6 +118,10 @@ function SpecialCasePage() {
     );
   if (!caseInfo || !workspace) return null;
   const activeAreas = catalog.filter((a) => activeCodes.has(a.code));
+  const specialEvidenceStatus = classifySpecialProgressEvidence(
+    (workspace.reviews ?? []).map((review: any) => review.change_level),
+  );
+  const specialEvidenceCopy = evidenceStatusCopy[specialEvidenceStatus];
 
   return (
     <main className="min-h-screen bg-[#f7f7f2] text-slate-800">
@@ -444,6 +449,15 @@ function SpecialCasePage() {
                 ))}
               </div>
             </Card>
+            {specialEvidenceStatus !== "insufficient" && (
+              <div className="rounded-3xl border border-[#dce8e2] bg-[#f5faf7] p-4">
+                <div className="text-xs font-bold text-[#416f66]">{specialEvidenceCopy.label}</div>
+                <div className="mt-1 text-xs leading-5 text-[#74847f]">
+                  {specialEvidenceCopy.detail} Jde pouze o souhrn ručně potvrzených záznamů, ne o
+                  diagnózu ani AI úsudek.
+                </div>
+              </div>
+            )}
             <ProgressReviewCard
               areas={activeAreas}
               saving={saving}

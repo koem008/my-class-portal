@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { DailyBriefing, DailyLesson } from "@/lib/daily-briefing-data";
 import type { LearningSignalKind } from "@/lib/lesson-workspace-data";
+import { classifyLearningSignalEvidence, type EvidenceStatus } from "@/lib/evidence-status";
 
 const db = supabase as SupabaseClient<Database>;
 
@@ -21,8 +22,6 @@ export type RecentDraft = {
   lessonDate: string;
   updatedAt: string;
 };
-
-export type EvidenceStatus = "insufficient" | "promising" | "mixed" | "attention";
 
 export type ProgressMoment = {
   status: EvidenceStatus;
@@ -177,7 +176,7 @@ export async function loadProgressMoment(classId: string): Promise<ProgressMomen
 
   for (const group of grouped.values()) {
     if (group.length < 2) continue;
-    const status = classifyConfirmedEvidence(group.slice(0, 4).map((signal) => signal.kind));
+    const status = classifyLearningSignalEvidence(group.slice(0, 4).map((signal) => signal.kind));
     if (status === "promising")
       return {
         status,
@@ -200,23 +199,6 @@ export async function loadProgressMoment(classId: string): Promise<ProgressMomen
       };
   }
   return null;
-}
-
-/**
- * Shared deterministic evidence status. It consumes human-confirmed observations only.
- * It never diagnoses, predicts or infers a child's state from AI output.
- */
-export function classifyConfirmedEvidence(kinds: LearningSignalKind[]): EvidenceStatus {
-  if (kinds.length < 2) return "insufficient";
-  const positive = new Set<LearningSignalKind>(["improving", "mastered", "advanced"]);
-  const attention = new Set<LearningSignalKind>(["needs_practice", "follow_up"]);
-  const recent = kinds.slice(0, 4);
-  const positiveCount = recent.filter((kind) => positive.has(kind)).length;
-  const attentionCount = recent.filter((kind) => attention.has(kind)).length;
-  if (positiveCount >= 2 && attentionCount === 0) return "promising";
-  if (positiveCount > 0 && attentionCount > 0) return "mixed";
-  if (attentionCount >= 2 && positiveCount === 0) return "attention";
-  return "insufficient";
 }
 
 function lessonTiming(date: string, lesson: DailyLesson) {

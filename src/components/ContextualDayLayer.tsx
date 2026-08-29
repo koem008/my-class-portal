@@ -4,23 +4,27 @@ import { useEffect, useState } from "react";
 import type { DailyBriefing } from "@/lib/daily-briefing-data";
 import {
   buildNowAction,
+  loadProgressMoment,
   loadRecentUnfinishedPreparation,
+  type ProgressMoment,
   type RecentDraft,
 } from "@/lib/contextual-day-data";
 
 export function ContextualDayLayer({ briefing, now }: { briefing: DailyBriefing; now: Date }) {
   const action = buildNowAction(briefing, now);
   const [recentDraft, setRecentDraft] = useState<RecentDraft | null>(null);
+  const [progressMoment, setProgressMoment] = useState<ProgressMoment | null>(null);
 
   useEffect(() => {
     let active = true;
-    void loadRecentUnfinishedPreparation(briefing.classInfo.id)
-      .then((draft) => {
-        if (active) setRecentDraft(draft);
-      })
-      .catch(() => {
-        if (active) setRecentDraft(null);
-      });
+    void Promise.all([
+      loadRecentUnfinishedPreparation(briefing.classInfo.id).catch(() => null),
+      loadProgressMoment(briefing.classInfo.id).catch(() => null),
+    ]).then(([draft, moment]) => {
+      if (!active) return;
+      setRecentDraft(draft);
+      setProgressMoment(moment);
+    });
     return () => {
       active = false;
     };
@@ -30,6 +34,7 @@ export function ContextualDayLayer({ briefing, now }: { briefing: DailyBriefing;
     <div className="mt-5 grid gap-3">
       {action ? <NowCard action={action} /> : null}
       {recentDraft ? <ContinuationCard draft={recentDraft} now={now} /> : null}
+      {progressMoment ? <ProgressMomentCard moment={progressMoment} /> : null}
     </div>
   );
 }
@@ -126,4 +131,26 @@ function relativeEditedLabel(updatedAt: string, now: Date) {
   if (days === 0) return "Rozpracováno dnes";
   if (days === 1) return "Rozpracováno včera";
   return `Upraveno ${new Intl.DateTimeFormat("cs-CZ", { day: "numeric", month: "numeric" }).format(updated)}`;
+}
+
+function ProgressMomentCard({ moment }: { moment: ProgressMoment }) {
+  const tone =
+    moment.status === "promising"
+      ? "border-[#d5e8db] bg-[#f3faf5]"
+      : moment.status === "mixed"
+        ? "border-[#eadfcf] bg-[#fffaf2]"
+        : "border-[#ead8d4] bg-[#fff7f5]";
+  return (
+    <div className={`rounded-[22px] border px-4 py-3.5 ${tone}`}>
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 text-lg" aria-hidden="true">
+          {moment.status === "promising" ? "🌱" : "○"}
+        </div>
+        <div>
+          <div className="text-sm font-bold text-[#3f5551]">{moment.title}</div>
+          <p className="mt-1 text-xs leading-5 text-[#778581]">{moment.detail}</p>
+        </div>
+      </div>
+    </div>
+  );
 }

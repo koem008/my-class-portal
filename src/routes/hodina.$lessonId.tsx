@@ -167,7 +167,14 @@ function LessonWorkspacePage() {
         preparation?.id,
       );
       await updateLessonStatus(lesson.id, "prepared");
-      setNotice("Příprava je bezpečně uložená.");
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowIso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+      setNotice(
+        lesson.lesson_date === tomorrowIso
+          ? "Připraveno na zítřek. ✓"
+          : "Příprava je hotová a bezpečně uložená. ✓",
+      );
       await reload();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Uložení se nepodařilo.");
