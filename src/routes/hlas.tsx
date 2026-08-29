@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckCircle2, ChevronLeft, Loader2, Mic, MicOff, Save, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { transcribeVoice } from "@/lib/ai/functions";
 import {
   loadLessonWorkspace,
   saveProgress,
@@ -13,28 +14,6 @@ import { loadAccessibleClasses, loadWeekLessons, mondayOf } from "@/lib/schedule
 export const Route = createFileRoute("/hlas")({ component: VoiceReflectionPage });
 
 type LoadState = "loading" | "ready" | "empty" | "error";
-type SpeechResultEvent = {
-  results: ArrayLike<{
-    0: { transcript: string };
-    isFinal: boolean;
-  }>;
-};
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: SpeechResultEvent) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
-type SpeechWindow = Window & {
-  SpeechRecognition?: SpeechRecognitionCtor;
-  webkitSpeechRecognition?: SpeechRecognitionCtor;
-};
-
 type StructuredReflection = {
   completed: string;
   unfinished: string;
@@ -55,9 +34,12 @@ function VoiceReflectionPage() {
   const [progressState, setProgressState] = useState<ProgressState>("not_started");
   const [progressId, setProgressId] = useState<string | undefined>();
   const [listening, setListening] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   const selectedLesson = useMemo(
     () => lessons.find((lesson) => lesson.id === lessonId) ?? null,
@@ -119,45 +101,83 @@ function VoiceReflectionPage() {
 
   useEffect(
     () => () => {
-      recognitionRef.current?.stop();
+      recorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
     },
     [],
   );
 
-  function startDictation() {
+  async function startDictation() {
     setNotice("");
-    const speechWindow = window as SpeechWindow;
-    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      setNotice("Tento prohlížeč diktování nepodporuje. Text můžete zapsat ručně.");
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setNotice("Tento prohlížeč neumí bezpečně vytvořit hlasovou nahrávku. Text můžete zapsat ručně.");
       return;
     }
-    const recognition = new Recognition();
-    recognition.lang = "cs-CZ";
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.onresult = (event) => {
-      const chunks: string[] = [];
-      for (let index = 0; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        if (result?.isFinal && result[0]?.transcript) chunks.push(result[0].transcript.trim());
-      }
-      if (chunks.length) setTranscript((current) => [current, ...chunks].filter(Boolean).join(" "));
-    };
-    recognition.onerror = () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      streamRef.current = stream;
+      recorderRef.current = recorder;
+      chunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        setListening(false);
+        stream.getTracks().forEach((track) => track.stop());
+        setNotice("Nahrávání bylo přerušeno. Můžete to zkusit znovu nebo text napsat ručně.");
+      };
+      recorder.onstop = () => {
+        setListening(false);
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        recorderRef.current = null;
+        void sendRecordedAudio(recorder.mimeType || "audio/webm");
+      };
+      recorder.start();
+      setListening(true);
+    } catch (error) {
       setListening(false);
-      setNotice("Diktování bylo přerušeno. Dosavadní přepis zůstal zachovaný.");
-    };
-    recognition.onend = () => setListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
+      setNotice(
+        error instanceof Error
+          ? `Mikrofon se nepodařilo spustit: ${error.message}`
+          : "Mikrofon se nepodařilo spustit.",
+      );
+    }
   }
 
   function stopDictation() {
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
-    setListening(false);
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === "inactive") return;
+    recorder.stop();
+  }
+
+  async function sendRecordedAudio(mimeType: string) {
+    const chunks = chunksRef.current;
+    chunksRef.current = [];
+    if (!chunks.length) {
+      setNotice("Nahrávka je prázdná.");
+      return;
+    }
+    const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
+    if (!blob.size) {
+      setNotice("Nahrávka je prázdná.");
+      return;
+    }
+    setTranscribing(true);
+    setNotice("Přepisuji nahrávku…");
+    try {
+      const extension = mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm";
+      const form = new FormData();
+      form.append("audio", blob, `reflexe.${extension}`);
+      const result = await transcribeVoice({ data: form });
+      setTranscript((current) => [current.trim(), result.text.trim()].filter(Boolean).join(" "));
+      setNotice("Přepis je připravený jako koncept. Před uložením ho zkontrolujte.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Hlas se nepodařilo přepsat.");
+    } finally {
+      setTranscribing(false);
+    }
   }
 
   function structureCurrentTranscript() {
@@ -213,13 +233,13 @@ function VoiceReflectionPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-[-.03em]">Hlas po hodině</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#758482]">
-              Nadiktujte, co se skutečně stalo. Aplikace sama audio nearchivuje a do databáze se
-              uloží až vámi potvrzený text. Samotný převod řeči může podle prohlížeče zajišťovat
-              jeho vlastní speech služba.
+              Po zastavení se nahrávka odešle zabezpečeně na externí službu pro přepis a v aplikaci
+              se nearchivuje. Do pedagogických dat se uloží až text, který sama zkontrolujete a
+              potvrdíte.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-2xl bg-[#eef6f2] px-3 py-2 text-xs font-bold text-[#276765]">
-            <ShieldCheck className="h-4 w-4" /> Bez audio archivu v aplikaci
+            <ShieldCheck className="h-4 w-4" /> Dočasné audio · potvrzený text
           </div>
         </div>
 
@@ -257,16 +277,24 @@ function VoiceReflectionPage() {
                 <div>
                   <h2 className="font-bold">1. Nadiktovat průběh</h2>
                   <p className="mt-1 text-xs text-[#82908f]">
-                    Přepis zůstává konceptem, dokud ho nepotvrdíte.
+                    Nahrávka opustí zařízení pouze kvůli přepisu. Přepis zůstává konceptem, dokud
+                    ho nepotvrdíte.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={listening ? stopDictation : startDictation}
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold ${listening ? "bg-[#fff0ed] text-[#a94f43]" : "bg-[#276765] text-white"}`}
+                  onClick={() => void (listening ? stopDictation() : startDictation())}
+                  disabled={transcribing}
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${listening ? "bg-[#fff0ed] text-[#a94f43]" : "bg-[#276765] text-white"}`}
                 >
-                  {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  {listening ? "Zastavit" : "Začít diktovat"}
+                  {transcribing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : listening ? (
+                    <MicOff className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                  {transcribing ? "Přepisuji…" : listening ? "Zastavit a přepsat" : "Začít diktovat"}
                 </button>
               </div>
               <textarea
