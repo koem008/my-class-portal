@@ -1,0 +1,101 @@
+name: Wire And Verify Important Dates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/important-dates-verify.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Wire important dates into greeting
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          daily = Path('src/lib/daily-briefing-data.ts')
+          s = daily.read_text()
+          old_sig = 'export function buildTimeAwareGreeting(briefing: DailyBriefing, now: Date): TimeAwareGreeting {'
+          new_sig = 'export function buildTimeAwareGreeting(\n  briefing: DailyBriefing,\n  now: Date,\n  niceThingsToKnow: string[] = [],\n): TimeAwareGreeting {'
+          if old_sig in s:
+              s = s.replace(old_sig, new_sig, 1)
+          marker = '  const blocker = briefing.events.find((e) => e.blocks_lessons)?.title;\n'
+          addition = '''  const niceThingText = niceThingsToKnow.length\n    ? `A dnes je tu ještě něco milého: ${joinNiceThings(niceThingsToKnow)}.`\n    : "";\n'''
+          if addition not in s:
+              s = s.replace(marker, marker + addition, 1)
+          s = s.replace(
+              '        "Běžné hodiny dnes neplánujeme. Můžeš si otevřít kalendář, připravit další den nebo si prostě nechat prostor.",',
+              '        [niceThingText, "Běžné hodiny dnes neplánujeme. Můžeš si otevřít kalendář, připravit další den nebo si prostě nechat prostor."].filter(Boolean).join(" "),',
+              1,
+          )
+          s = s.replace(
+              '      headline: `${greeting} ${lessonSummary} ${missing ? "Pojďme si uvolnit hlavu tím nejdůležitějším." : "Dnešek vypadá pěkně připraveně."}`,',
+              '      headline: `${greeting} ${niceThingText ? `${niceThingText} ` : ""}${lessonSummary} ${missing ? "Pojďme si uvolnit hlavu tím nejdůležitějším." : "Dnešek vypadá pěkně připraveně."}`,',
+              1,
+          )
+          s = s.replace('        prepSummary,\n        carrySummary,', '        niceThingText,\n        prepSummary,\n        carrySummary,', 1)
+          s = s.replace(
+              '        [prepSummary, carrySummary].filter(Boolean).join(" ") ||',
+              '        [niceThingText, prepSummary, carrySummary].filter(Boolean).join(" ") ||',
+              1,
+          )
+          s = s.replace(
+              '          ? `${carrySummary} Můžeš si je rovnou otevřít, nebo je probrat hlasem s asistentkou.`\n          : "Jestli chceš, stačí krátká hlasová reflexe. Nic se samo nezapíše bez tvého potvrzení.",',
+              '          ? [niceThingText, `${carrySummary} Můžeš si je rovnou otevřít, nebo je probrat hlasem s asistentkou.`].filter(Boolean).join(" ")\n          : [niceThingText, "Jestli chceš, stačí krátká hlasová reflexe. Nic se samo nezapíše bez tvého potvrzení."].filter(Boolean).join(" "),',
+              1,
+          )
+          s = s.replace('    supportingText: [\n      carrySummary,', '    supportingText: [\n      niceThingText,\n      carrySummary,', 1)
+          helper_marker = 'function lessonWord(count: number) {'
+          helper = '''function joinNiceThings(items: string[]) {\n  if (items.length <= 1) return items[0] ?? "";\n  if (items.length === 2) return `${items[0]} a ${items[1]}`;\n  return `${items.slice(0, -1).join(", ")} a ${items.at(-1)}`;\n}\n\n'''
+          if helper not in s:
+              s = s.replace(helper_marker, helper + helper_marker, 1)
+          daily.write_text(s)
+
+          index = Path('src/routes/index.tsx')
+          s = index.read_text()
+          import_marker = 'import { useEffect, useMemo, useState } from "react";\n'
+          memory_import = 'import { importantDatesForToday, loadAssistantMemory, type TeacherMemory } from "@/lib/assistant-memory-data";\n'
+          if memory_import not in s:
+              s = s.replace(import_marker, import_marker + memory_import, 1)
+          state_marker = '  const [briefing, setBriefing] = useState<DailyBriefing | null>(null);\n'
+          memory_state = '  const [personalMemoryEnabled, setPersonalMemoryEnabled] = useState(false);\n  const [personalMemories, setPersonalMemories] = useState<TeacherMemory[]>([]);\n'
+          if memory_state not in s:
+              s = s.replace(state_marker, state_marker + memory_state, 1)
+          old_load = '''      const current = classes[0];\n      await loadWeekLessons(current.id, mondayOf(now));\n      setBriefing(await loadDailyBriefing(current, todayIso));\n      setState("ready");'''
+          new_load = '''      const current = classes[0];\n      const memoryPromise = loadAssistantMemory().catch(() => null);\n      await loadWeekLessons(current.id, mondayOf(now));\n      const [dailyBriefing, memory] = await Promise.all([\n        loadDailyBriefing(current, todayIso),\n        memoryPromise,\n      ]);\n      setBriefing(dailyBriefing);\n      setPersonalMemoryEnabled(Boolean(memory?.settings.memory_enabled));\n      setPersonalMemories(memory?.memories ?? []);\n      setState("ready");'''
+          if old_load in s:
+              s = s.replace(old_load, new_load, 1)
+          old_greeting = '  const greeting = buildTimeAwareGreeting(briefing, now);'
+          new_greeting = '''  const todayNiceThings = personalMemoryEnabled\n    ? importantDatesForToday(personalMemories, now).map((memory) => memory.content)\n    : [];\n  const greeting = buildTimeAwareGreeting(briefing, now, todayNiceThings);'''
+          if old_greeting in s:
+              s = s.replace(old_greeting, new_greeting, 1)
+          index.write_text(s)
+          PY
+      - name: Format changed files
+        run: bunx prettier --write src/lib/assistant-memory-data.ts src/lib/daily-briefing-data.ts src/routes/index.tsx src/routes/pamet.tsx
+      - name: Lint
+        run: bun run lint
+      - name: Build
+        run: bun run build
+      - name: Commit verified implementation and remove runner
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/important-dates-verify.yml
+          git add src/lib/assistant-memory-data.ts src/lib/daily-briefing-data.ts src/routes/index.tsx src/routes/pamet.tsx
+          git commit -m "feat: surface opt-in important dates in daily greeting"
+          git push origin main
