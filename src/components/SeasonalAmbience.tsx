@@ -93,13 +93,19 @@ export function SeasonalAmbience() {
   return (
     <>
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className={`absolute -left-28 top-[18%] h-72 w-72 rounded-full ${meta.glowA} opacity-20 blur-3xl`} />
-        <div className={`absolute -right-28 bottom-[8%] h-80 w-80 rounded-full ${meta.glowB} opacity-20 blur-3xl`} />
+        <div
+          className={`absolute -left-28 top-[18%] h-72 w-72 rounded-full ${meta.glowA} opacity-20 blur-3xl`}
+        />
+        <div
+          className={`absolute -right-28 bottom-[8%] h-80 w-80 rounded-full ${meta.glowB} opacity-20 blur-3xl`}
+        />
         <DecorativeMarks season={season} />
       </div>
 
       <div className="fixed left-4 top-4 z-40 hidden sm:block">
-        <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-sm backdrop-blur-xl ${meta.chip} ${meta.accent}`}>
+        <div
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-sm backdrop-blur-xl ${meta.chip} ${meta.accent}`}
+        >
           <SeasonIcon className="h-3.5 w-3.5" />
           {meta.label} v Moje třída
         </div>
@@ -111,14 +117,36 @@ export function SeasonalAmbience() {
             <div className="flex items-center justify-between px-1 pb-2">
               <div>
                 <div className="text-xs font-bold text-[#3f5955]">Co dnes prozkoumat?</div>
-                <div className="mt-0.5 text-[11px] text-[#8a9693]">Jen malá zkratka, nic neruší.</div>
+                <div className="mt-0.5 text-[11px] text-[#8a9693]">
+                  Jen malá zkratka, nic neruší.
+                </div>
               </div>
-              <button onClick={() => setExploreOpen(false)} className="rounded-full px-2 py-1 text-xs text-[#88928f] hover:bg-[#f5f3ee]">×</button>
+              <button
+                onClick={() => setExploreOpen(false)}
+                className="rounded-full px-2 py-1 text-xs text-[#88928f] hover:bg-[#f5f3ee]"
+              >
+                ×
+              </button>
             </div>
             <div className="grid gap-1">
-              <ExploreLink to="/asistentka" icon={Bot} title="Asistentka" text="Probrat den nebo něco vymyslet" />
-              <ExploreLink to="/vytvarna-vychova" icon={Palette} title="Výtvarná výchova" text="Inspirace a obrazové nápady" />
-              <ExploreLink to="/pamet" icon={Sparkles} title="Co si pamatuješ" text="Osobní preference a milé drobnosti" />
+              <ExploreLink
+                to="/asistentka"
+                icon={Bot}
+                title="Asistentka"
+                text="Probrat den nebo něco vymyslet"
+              />
+              <ExploreLink
+                to="/vytvarna-vychova"
+                icon={Palette}
+                title="Výtvarná výchova"
+                text="Inspirace a obrazové nápady"
+              />
+              <ExploreLink
+                to="/pamet"
+                icon={Sparkles}
+                title="Co si pamatuješ"
+                text="Osobní preference a milé drobnosti"
+              />
             </div>
           </div>
         ) : null}
@@ -152,9 +180,22 @@ export function SeasonalAmbience() {
   );
 }
 
-function ExploreLink({ to, icon: Icon, title, text }: { to: "/asistentka" | "/vytvarna-vychova" | "/pamet"; icon: typeof Sparkles; title: string; text: string }) {
+function ExploreLink({
+  to,
+  icon: Icon,
+  title,
+  text,
+}: {
+  to: "/asistentka" | "/vytvarna-vychova" | "/pamet";
+  icon: typeof Sparkles;
+  title: string;
+  text: string;
+}) {
   return (
-    <Link to={to} className="group flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-[#f7faf8]">
+    <Link
+      to={to}
+      className="group flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-[#f7faf8]"
+    >
       <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#eef5f1] text-[#46716b] transition group-hover:scale-105">
         <Icon className="h-4 w-4" />
       </div>
