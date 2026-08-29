@@ -71,7 +71,11 @@ export type CompanionRequest = {
   sameDayContext?: string | undefined;
   personalPreferences?: string[] | undefined;
   recentConversation?: CompanionConversationTurn[] | undefined;
-  availableLessons?: Array<{ lessonId: string | undefined; subject: string; topic?: string }>;
+  availableLessons?: Array<{
+    lessonId: string;
+    subject: string;
+    topic?: string | undefined;
+  }>;
 };
 
 export type CompanionPedagogicalProposal =
@@ -81,7 +85,10 @@ export type CompanionPedagogicalProposal =
 export type CompanionResult = {
   mode: "conversation" | "navigate" | "propose";
   reply: string;
-  navigation?: { target: CompanionNavigationTarget | undefined; lessonId?: string };
+  navigation?: {
+    target: CompanionNavigationTarget;
+    lessonId?: string | undefined;
+  };
   proposal?: CompanionPedagogicalProposal | undefined;
   /** Minimal carry-forward summary for today only; never a transcript. */
   sameDaySummary?: string | undefined;
