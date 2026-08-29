@@ -118,7 +118,6 @@ export function buildNowAction(briefing: DailyBriefing, now: Date): ContextualAc
 
 export async function loadRecentUnfinishedPreparation(
   classId: string,
-  todayIso: string,
 ): Promise<RecentDraft | null> {
   const prepResult = await db
     .from("lesson_preparations")
@@ -135,7 +134,6 @@ export async function loadRecentUnfinishedPreparation(
     .from("lesson_instances")
     .select("id,lesson_date,subject_name,topic,title,status")
     .in("id", lessonIds)
-    .lte("lesson_date", todayIso)
     .in("status", ["planned", "draft"]);
   if (lessonResult.error) throw lessonResult.error;
   const lessonsById = new Map(

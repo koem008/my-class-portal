@@ -1,12 +1,41 @@
-import { ArrowRight, CheckCircle2, Clock3, MoonStar, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, History, MoonStar, Sparkles } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import type { DailyBriefing } from "@/lib/daily-briefing-data";
-import { buildNowAction } from "@/lib/contextual-day-data";
+import {
+  buildNowAction,
+  loadRecentUnfinishedPreparation,
+  type RecentDraft,
+} from "@/lib/contextual-day-data";
 
 export function ContextualDayLayer({ briefing, now }: { briefing: DailyBriefing; now: Date }) {
   const action = buildNowAction(briefing, now);
-  if (!action) return null;
+  const [recentDraft, setRecentDraft] = useState<RecentDraft | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    void loadRecentUnfinishedPreparation(briefing.classInfo.id)
+      .then((draft) => {
+        if (active) setRecentDraft(draft);
+      })
+      .catch(() => {
+        if (active) setRecentDraft(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [briefing.classInfo.id]);
+
+  return (
+    <div className="mt-5 grid gap-3">
+      {action ? <NowCard action={action} /> : null}
+      {recentDraft ? <ContinuationCard draft={recentDraft} now={now} /> : null}
+    </div>
+  );
+}
+
+function NowCard({ action }: { action: ReturnType<typeof buildNowAction> & {} }) {
+  if (!action) return null;
   const meta = {
     now: {
       Icon: Clock3,
@@ -30,7 +59,6 @@ export function ContextualDayLayer({ briefing, now }: { briefing: DailyBriefing;
     },
   }[action.tone];
   const Icon = meta.Icon;
-
   const content = (
     <div
       className={`group flex items-center gap-4 rounded-[26px] border p-4 shadow-[0_10px_30px_rgba(65,78,72,.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(65,78,72,.09)] ${meta.shell}`}
@@ -49,17 +77,53 @@ export function ContextualDayLayer({ briefing, now }: { briefing: DailyBriefing;
       <ArrowRight className="h-5 w-5 shrink-0 text-[#9aa5a2] transition group-hover:translate-x-0.5" />
     </div>
   );
-
   if (action.to === "/hodina/$lessonId" && action.lessonId)
     return (
-      <Link to="/hodina/$lessonId" params={{ lessonId: action.lessonId }} className="mt-5 block">
+      <Link to="/hodina/$lessonId" params={{ lessonId: action.lessonId }} className="block">
         {content}
       </Link>
     );
-
   return (
-    <Link to={action.to} className="mt-5 block">
+    <Link to={action.to} className="block">
       {content}
     </Link>
   );
+}
+
+function ContinuationCard({ draft, now }: { draft: RecentDraft; now: Date }) {
+  return (
+    <Link
+      to="/hodina/$lessonId"
+      params={{ lessonId: draft.lessonId }}
+      className="group flex items-center gap-4 rounded-[24px] border border-[#e4dfd6] bg-white/88 p-4 shadow-[0_8px_24px_rgba(65,78,72,.04)] transition hover:-translate-y-0.5 hover:border-[#d4ded8] hover:shadow-[0_12px_30px_rgba(65,78,72,.08)]"
+    >
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#f3eee8] text-[#8a6e59]">
+        <History className="h-4.5 w-4.5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-bold uppercase tracking-[.14em] text-[#8c8177]">
+          Naposledy rozdělané
+        </div>
+        <div className="mt-1 text-sm font-bold text-[#374d49]">
+          {draft.subject}
+          {draft.topic ? ` · ${draft.topic}` : ""}
+        </div>
+        <div className="mt-1 text-xs text-[#7f8b88]">
+          {relativeEditedLabel(draft.updatedAt, now)} · pokračovat v přípravě
+        </div>
+      </div>
+      <ArrowRight className="h-4.5 w-4.5 shrink-0 text-[#a0aaa7] transition group-hover:translate-x-0.5" />
+    </Link>
+  );
+}
+
+function relativeEditedLabel(updatedAt: string, now: Date) {
+  const updated = new Date(updatedAt);
+  if (Number.isNaN(updated.getTime())) return "Rozpracovaná příprava";
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const day = new Date(updated.getFullYear(), updated.getMonth(), updated.getDate()).getTime();
+  const days = Math.round((today - day) / 86_400_000);
+  if (days === 0) return "Rozpracováno dnes";
+  if (days === 1) return "Rozpracováno včera";
+  return `Upraveno ${new Intl.DateTimeFormat("cs-CZ", { day: "numeric", month: "numeric" }).format(updated)}`;
 }
