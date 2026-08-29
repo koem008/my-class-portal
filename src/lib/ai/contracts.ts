@@ -37,10 +37,69 @@ export type LessonAiRequest = {
   context: LessonAiContext;
 };
 
+export type AiUsage = {
+  provider: "anthropic" | "openai" | "elevenlabs" | "google";
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  characters?: number;
+  audioSeconds?: number;
+  images?: number;
+};
+
 export type LessonAiResult = {
   title: string;
   content: Record<string, unknown>;
   warnings: string[];
+  usage?: AiUsage;
+};
+
+export type SpeechTranscriptionRequest = {
+  /** Raw bytes are supplied only to the server-only adapter and are never persisted here. */
+  audio: Uint8Array;
+  mimeType: string;
+  fileName?: string;
+  language?: "cs";
+};
+
+export type SpeechTranscriptionResult = {
+  text: string;
+  language?: string;
+  usage?: AiUsage;
+};
+
+export type SpeechSynthesisRequest = {
+  text: string;
+  voiceId?: string;
+};
+
+export type SpeechSynthesisResult = {
+  audio: Uint8Array;
+  mimeType: "audio/mpeg";
+  usage?: AiUsage;
+};
+
+export type ArtImageStyle = "friendly_illustration" | "paper_collage" | "watercolor" | "graphic";
+export type ArtImageAspectRatio = "1:1" | "4:3" | "3:4" | "16:9";
+
+/**
+ * Privacy-safe image request for Art Education. This contract intentionally accepts no source
+ * portrait, pupil identity, likeness or student alias. It is for generic inspiration/reference
+ * imagery only.
+ */
+export type ArtImageRequest = {
+  grade: number;
+  topic: string;
+  purpose: string;
+  curriculumOutcomeCodes: string[];
+  style?: ArtImageStyle;
+  aspectRatio?: ArtImageAspectRatio;
+};
+
+export type ArtImageResult = {
+  imageBase64: string;
+  mimeType: string;
+  usage?: AiUsage;
 };
 
 const forbiddenKeys = new Set([
@@ -55,6 +114,11 @@ const forbiddenKeys = new Set([
   "address",
   "rodne_cislo",
   "rodnecislo",
+  "parent_name",
+  "parent_email",
+  "parent_phone",
+  "likeness",
+  "portrait",
 ]);
 
 export function assertPrivacySafePayload(value: unknown, path = "payload"): void {
@@ -86,5 +150,17 @@ export function buildProviderInput(request: LessonAiRequest): Record<string, unk
     previous_lesson_summary: request.context.previousLessonSummary ?? null,
     teacher_instruction: request.context.teacherInstruction ?? null,
     pseudonym_needs: request.context.pseudonymNeeds ?? [],
+  };
+}
+
+export function buildArtImageProviderInput(request: ArtImageRequest): Record<string, unknown> {
+  assertPrivacySafePayload(request);
+  return {
+    grade: request.grade,
+    topic: request.topic,
+    purpose: request.purpose,
+    curriculum_outcome_codes: request.curriculumOutcomeCodes,
+    style: request.style ?? "friendly_illustration",
+    aspect_ratio: request.aspectRatio ?? "4:3",
   };
 }
