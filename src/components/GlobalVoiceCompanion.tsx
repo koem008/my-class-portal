@@ -68,8 +68,8 @@ export function GlobalVoiceCompanion() {
       streamRef.current = stream;
       chunksRef.current = [];
 
-      const supportedMime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(
-        (type) => MediaRecorder.isTypeSupported(type),
+      const supportedMime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) =>
+        MediaRecorder.isTypeSupported(type),
       );
       const recorder = supportedMime
         ? new MediaRecorder(stream, { mimeType: supportedMime })
@@ -123,8 +123,7 @@ export function GlobalVoiceCompanion() {
 
         const noSpeechTooLong =
           !heardSpeechRef.current && now - startedAtRef.current >= NO_SPEECH_TIMEOUT_MS;
-        const speechEnded =
-          heardSpeechRef.current && now - lastSpeechAtRef.current >= SILENCE_MS;
+        const speechEnded = heardSpeechRef.current && now - lastSpeechAtRef.current >= SILENCE_MS;
         const maxReached = now - startedAtRef.current >= MAX_RECORDING_MS;
 
         if (noSpeechTooLong) {
