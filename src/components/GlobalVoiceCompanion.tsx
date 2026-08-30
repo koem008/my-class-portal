@@ -203,7 +203,9 @@ export function GlobalVoiceCompanion() {
         void (async () => {
           let speech;
           try {
-            speech = await synthesizeAssistantVoice({ data: { text: conciseReply.slice(0, 700) } });
+            speech = await synthesizeAssistantVoice({
+              data: { text: conciseReply.slice(0, 700) },
+            });
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             console.error("[TTS_API_ERROR]", error);
@@ -296,7 +298,9 @@ export function GlobalVoiceCompanion() {
           <div className="mt-3 max-h-[22dvh] space-y-2 overflow-y-auto pr-1">
             {transcript && (
               <div className="rounded-xl bg-[#f4f5f1] px-3 py-2">
-                <div className="text-[9px] font-bold uppercase tracking-[.12em] text-[#82908f]">Ty</div>
+                <div className="text-[9px] font-bold uppercase tracking-[.12em] text-[#82908f]">
+                  Ty
+                </div>
                 <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#34484a]">{transcript}</p>
               </div>
             )}
