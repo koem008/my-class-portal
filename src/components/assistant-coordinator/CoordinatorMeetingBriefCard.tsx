@@ -1,5 +1,5 @@
 import { Check, ClipboardCopy, MessageSquareText } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { AssistantCoordinationItem } from "@/lib/assistant-coordinator-items";
 import type { AssistantPresenceException } from "@/lib/assistant-coordinator-data";
 
@@ -40,20 +40,25 @@ export function CoordinatorMeetingBriefCard({
     return { urgent, upcoming, withoutDate, changes };
   }, [items, exceptions, today]);
 
-  const total = brief.urgent.length + brief.upcoming.length + brief.withoutDate.length + brief.changes.length;
+  const total =
+    brief.urgent.length + brief.upcoming.length + brief.withoutDate.length + brief.changes.length;
 
   const text = useMemo(() => {
     const lines = ["Podklady pro poradu AP"];
     if (brief.urgent.length) {
       lines.push("", "K vyřešení:");
       brief.urgent.forEach((item) =>
-        lines.push(`- ${item.title}${item.assistantName ? ` · ${item.assistantName}` : ""}${item.due_on ? ` · ${formatDate(item.due_on)}` : ""}`),
+        lines.push(
+          `- ${item.title}${item.assistantName ? ` · ${item.assistantName}` : ""}${item.due_on ? ` · ${formatDate(item.due_on)}` : ""}`,
+        ),
       );
     }
     if (brief.upcoming.length) {
       lines.push("", "Navazující termíny:");
       brief.upcoming.forEach((item) =>
-        lines.push(`- ${item.title}${item.assistantName ? ` · ${item.assistantName}` : ""}${item.due_on ? ` · ${formatDate(item.due_on)}` : ""}`),
+        lines.push(
+          `- ${item.title}${item.assistantName ? ` · ${item.assistantName}` : ""}${item.due_on ? ` · ${formatDate(item.due_on)}` : ""}`,
+        ),
       );
     }
     if (brief.withoutDate.length) {
@@ -65,7 +70,9 @@ export function CoordinatorMeetingBriefCard({
     if (brief.changes.length) {
       lines.push("", "Organizační změny:");
       brief.changes.forEach((row) =>
-        lines.push(`- ${formatDate(row.exception_date)} · ${row.assistantName} · ${row.kind === "absent" ? "nepřítomnost" : "změna plánu"}${row.note ? ` · ${row.note}` : ""}`),
+        lines.push(
+          `- ${formatDate(row.exception_date)} · ${row.assistantName} · ${row.kind === "absent" ? "nepřítomnost" : "změna plánu"}${row.note ? ` · ${row.note}` : ""}`,
+        ),
       );
     }
     return lines.join("\n");
@@ -86,10 +93,13 @@ export function CoordinatorMeetingBriefCard({
             <MessageSquareText className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[.15em] text-[#8a7d9c]">Podklady pro poradu</div>
+            <div className="text-[10px] font-black uppercase tracking-[.15em] text-[#8a7d9c]">
+              Podklady pro poradu
+            </div>
             <h2 className="mt-1 text-lg font-black">Co stojí za krátké projití</h2>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-[#87918e]">
-              Přehled vzniká jen z už uložených organizačních follow-upů a změn. Nic neposuzuje a nic neposílá do AI.
+              Přehled vzniká jen z už uložených organizačních follow-upů a změn. Nic neposuzuje a
+              nic neposílá do AI.
             </p>
           </div>
         </div>
@@ -107,14 +117,24 @@ export function CoordinatorMeetingBriefCard({
       {total === 0 ? (
         <div className="mt-5 rounded-[24px] border border-dashed border-[#ddd6e4] bg-white/70 px-5 py-7 text-center">
           <p className="text-sm font-black">Na poradu teď nic zvláštního nečeká.</p>
-          <p className="mt-1 text-xs text-[#929a96]">Aplikace sem body přidá, až vznikne follow-up nebo organizační změna.</p>
+          <p className="mt-1 text-xs text-[#929a96]">
+            Aplikace sem body přidá, až vznikne follow-up nebo organizační změna.
+          </p>
         </div>
       ) : (
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           {brief.urgent.length > 0 && (
             <BriefGroup title="K vyřešení" tone="attention">
               {brief.urgent.map((item) => (
-                <BriefItem key={item.id} title={item.title} meta={[item.assistantName, item.className, item.due_on ? formatDate(item.due_on) : null]} />
+                <BriefItem
+                  key={item.id}
+                  title={item.title}
+                  meta={[
+                    item.assistantName,
+                    item.className,
+                    item.due_on ? formatDate(item.due_on) : null,
+                  ]}
+                />
               ))}
             </BriefGroup>
           )}
@@ -132,14 +152,26 @@ export function CoordinatorMeetingBriefCard({
           {brief.upcoming.length > 0 && (
             <BriefGroup title="Navazující termíny" tone="calm">
               {brief.upcoming.map((item) => (
-                <BriefItem key={item.id} title={item.title} meta={[item.assistantName, item.className, item.due_on ? formatDate(item.due_on) : null]} />
+                <BriefItem
+                  key={item.id}
+                  title={item.title}
+                  meta={[
+                    item.assistantName,
+                    item.className,
+                    item.due_on ? formatDate(item.due_on) : null,
+                  ]}
+                />
               ))}
             </BriefGroup>
           )}
           {brief.withoutDate.length > 0 && (
             <BriefGroup title="Bez termínu" tone="neutral">
               {brief.withoutDate.map((item) => (
-                <BriefItem key={item.id} title={item.title} meta={[item.assistantName, item.className]} />
+                <BriefItem
+                  key={item.id}
+                  title={item.title}
+                  meta={[item.assistantName, item.className]}
+                />
               ))}
             </BriefGroup>
           )}
@@ -156,7 +188,7 @@ function BriefGroup({
 }: {
   title: string;
   tone: "attention" | "warm" | "calm" | "neutral";
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const toneClass = {
     attention: "border-[#efd8cd] bg-[#fff7f2]",
@@ -166,7 +198,9 @@ function BriefGroup({
   }[tone];
   return (
     <div className={`rounded-[22px] border p-4 ${toneClass}`}>
-      <div className="text-[10px] font-black uppercase tracking-[.13em] text-[#807b86]">{title}</div>
+      <div className="text-[10px] font-black uppercase tracking-[.13em] text-[#807b86]">
+        {title}
+      </div>
       <div className="mt-3 space-y-3">{children}</div>
     </div>
   );

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CoordinatorItemsCard } from "@/components/assistant-coordinator/CoordinatorItemsCard";
+import { CoordinatorMeetingBriefCard } from "@/components/assistant-coordinator/CoordinatorMeetingBriefCard";
 import type { AssistantCoordinationItem } from "@/lib/assistant-coordinator-items";
 import {
   activateCoordinatorAccess,
@@ -534,6 +535,8 @@ function AssistantCoordinatorPage() {
           classes={classes}
           onOpenItemsChange={setCoordinationItems}
         />
+
+        <CoordinatorMeetingBriefCard items={coordinationItems} exceptions={exceptions} />
 
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
           <section className="rounded-[30px] border border-[#e9e3d9] bg-white p-5 shadow-[0_16px_50px_rgba(65,75,70,.06)] md:p-6">
