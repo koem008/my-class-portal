@@ -24,6 +24,7 @@ import type {
   LessonAiAction,
 } from "@/lib/ai/contracts";
 import {
+  buildPlanningPseudonymNeeds,
   createLearningSignal,
   createMaterial,
   deactivateLearningSignal,
@@ -315,6 +316,7 @@ function LessonWorkspacePage() {
             previousLessonSummary:
               continuity.map((item) => `${item.title}: ${item.detail}`).join("\n") || undefined,
             teacherInstruction: aiInstruction.trim() || undefined,
+            pseudonymNeeds: buildPlanningPseudonymNeeds(signals, lesson.topic),
             assessmentOptions:
               aiAction === "quiz" || aiAction === "test"
                 ? {

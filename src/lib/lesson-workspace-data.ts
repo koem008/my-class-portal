@@ -497,6 +497,45 @@ export async function updateLessonStatus(lessonId: string, status: LessonStatus)
     .eq("id", lessonId);
   if (error) throw error;
 }
+export type PlanningPseudonymNeed = { aliasId: string; alias: string; need: string };
+
+export function buildPlanningPseudonymNeeds(
+  signals: LearningSignal[],
+  currentTopic: string | null,
+): PlanningPseudonymNeed[] {
+  const topic = currentTopic?.trim().toLocaleLowerCase("cs-CZ");
+  const relevant = signals.filter((signal) => {
+    const signalTopic = signal.topic?.trim().toLocaleLowerCase("cs-CZ");
+    return !topic || !signalTopic || signalTopic === topic;
+  });
+  const latestByAlias = new Map<string, LearningSignal>();
+  for (const signal of relevant)
+    if (!latestByAlias.has(signal.student_alias_id))
+      latestByAlias.set(signal.student_alias_id, signal);
+
+  return Array.from(latestByAlias.values()).flatMap((signal) => {
+    const alias = signal.student_alias?.alias?.trim();
+    if (!alias) return [];
+    const fallback =
+      signal.kind === "needs_practice"
+        ? "Připravit kratší a jednodušší procvičení."
+        : signal.kind === "advanced"
+          ? "Nabídnout náročnější rozšiřující variantu."
+          : signal.kind === "mastered"
+            ? "Základní procvičení není potřeba; nabídnout rozšíření."
+            : signal.kind === "follow_up"
+              ? "Ověřit porozumění a krátce se k tématu vrátit."
+              : "Zařadit přiměřené průběžné procvičení bez zbytečného opakování.";
+    return [
+      {
+        aliasId: signal.student_alias_id,
+        alias,
+        need: signal.note?.trim() || fallback,
+      },
+    ];
+  });
+}
+
 export function buildContinuitySuggestions(
   progress: LessonProgress | null,
   signals: LearningSignal[],
