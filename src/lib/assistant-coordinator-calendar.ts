@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { CoordinationItemKind } from "@/lib/assistant-coordinator-items";
 
-const db = supabase as unknown as SupabaseClient<any>;
+const db = supabase as unknown as SupabaseClient;
 
 const neutralTitles: Record<CoordinationItemKind, string> = {
   note: "Koordinace AP · poznámka",
