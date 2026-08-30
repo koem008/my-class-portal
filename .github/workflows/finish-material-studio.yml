@@ -1,5 +1,6 @@
 name: Finish Material Studio
 
+# Temporary one-shot integration gate. Remove after the verified commit lands.
 on:
   push:
     paths:
