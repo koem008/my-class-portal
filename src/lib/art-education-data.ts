@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { addDays, loadAccessibleClasses, loadWeekLessons, mondayOf } from "@/lib/schedule-data";
 const db = supabase as unknown as SupabaseClient<any>;
 
 export type ArtTheme = {
@@ -60,22 +61,35 @@ export async function loadArtOutcomeTitles(codes: string[]) {
 }
 
 export async function loadUpcomingArtLessons(limit = 12): Promise<UpcomingArtLesson[]> {
+  const classes = await loadAccessibleClasses();
+  if (!classes.length) return [];
+  const selectedClass = classes[0];
+
+  // Match /rozvrh semantics: materialize timetable slots before checking lesson_instances.
+  // Include the next weeks as well so opening the studio on a weekend still sees Friday's lesson.
+  const firstMonday = mondayOf(new Date());
+  for (let week = 0; week < 5; week += 1) {
+    await loadWeekLessons(selectedClass.id, addDays(firstMonday, week * 7));
+  }
+
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await db
     .from("lesson_instances")
     .select(
       "id,school_id,class_id,academic_year_id,lesson_date,slot_order,starts_at,ends_at,subject_name,title,topic,status,curriculum_subject_id,curriculum_topic_id,teacher_note",
     )
+    .eq("class_id", selectedClass.id)
+    .eq("academic_year_id", selectedClass.academic_year_id)
     .gte("lesson_date", today)
     .neq("status", "cancelled")
     .order("lesson_date", { ascending: true })
     .order("slot_order", { ascending: true })
     .limit(100);
   if (error) throw error;
-  const art = (data ?? []).filter((row: any) =>
+  const artLessons = (data ?? []).filter((row: any) =>
     /výtvar|vfv|art/i.test(String(row.subject_name ?? "")),
   );
-  return art.slice(0, limit) as UpcomingArtLesson[];
+  return artLessons.slice(0, limit) as UpcomingArtLesson[];
 }
 
 export function artThemeToPreparation(theme: ArtTheme) {

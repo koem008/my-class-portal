@@ -97,10 +97,7 @@ function CreativeStudioPage() {
         </section>
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
-          <Link
-            to="/materialy"
-            className="premium-tile group rounded-[34px] p-6 md:p-8"
-          >
+          <Link to="/materialy" className="premium-tile group rounded-[34px] p-6 md:p-8">
             <div className="relative z-10 flex h-full flex-col">
               <div className="flex items-start justify-between gap-4">
                 <div className="grid h-14 w-14 place-items-center rounded-[20px] bg-[#e3f2ec] text-[#1f6c64] shadow-sm">
@@ -117,8 +114,11 @@ function CreativeStudioPage() {
                 materiály. Ruční tvorba je vždy dostupná; AI je jen pomocník.
               </p>
               <div className="mt-7 flex flex-wrap gap-2 text-[11px] font-black text-[#58706a]">
-                {['Pracovní list', 'Test', 'Kvíz', 'Prezentace', 'Projekt'].map((item) => (
-                  <span key={item} className="rounded-full border border-[#dce7e2] bg-white/70 px-3 py-1.5">
+                {["Pracovní list", "Test", "Kvíz", "Prezentace", "Projekt"].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-[#dce7e2] bg-white/70 px-3 py-1.5"
+                  >
                     {item}
                   </span>
                 ))}
@@ -140,7 +140,9 @@ function CreativeStudioPage() {
               <div className="mt-8 text-[11px] font-black uppercase tracking-[.15em] text-[#92766a]">
                 Obraz, film a inspirace
               </div>
-              <h2 className="mt-2 text-3xl font-black tracking-[-.04em]">Výtvarné a filmové studio</h2>
+              <h2 className="mt-2 text-3xl font-black tracking-[-.04em]">
+                Výtvarné a filmové studio
+              </h2>
               <p className="mt-3 text-sm leading-6 text-[#7d7b76]">
                 Vlastní přípravy, výtvarné náměty, inspirační ilustrace a přímá návaznost na hodinu.
               </p>
@@ -149,9 +151,21 @@ function CreativeStudioPage() {
         </section>
 
         <section className="mt-5 grid gap-4 md:grid-cols-3">
-          <Feature icon={Layers3} title="Vrstvy místo chaosu" text="Nápad → koncept → úprava → uložení ke konkrétní hodině." />
-          <Feature icon={Sparkles} title="AI bez diktátu" text="AI připraví návrh, ale nic se neuloží bez tvého potvrzení." />
-          <Feature icon={Palette} title="Vlastní styl" text="Ruční tvorba zůstává plnohodnotná a dostupná u každého výstupu." />
+          <Feature
+            icon={Layers3}
+            title="Vrstvy místo chaosu"
+            text="Nápad → koncept → úprava → uložení ke konkrétní hodině."
+          />
+          <Feature
+            icon={Sparkles}
+            title="AI bez diktátu"
+            text="AI připraví návrh, ale nic se neuloží bez tvého potvrzení."
+          />
+          <Feature
+            icon={Palette}
+            title="Vlastní styl"
+            text="Ruční tvorba zůstává plnohodnotná a dostupná u každého výstupu."
+          />
         </section>
 
         <section className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-[28px] border border-[#dfddd5] bg-white/68 p-5 shadow-[0_12px_35px_rgba(56,76,70,.05)] backdrop-blur-xl">

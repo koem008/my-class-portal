@@ -104,7 +104,7 @@ export function SeasonalAmbience() {
         <DecorativeMarks season={season} />
       </div>
 
-      <div className="fixed left-4 top-4 z-40 hidden sm:block">
+      <div className="pointer-events-none fixed right-24 top-5 z-10 hidden xl:block">
         <div
           className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-sm backdrop-blur-xl ${meta.chip} ${meta.accent}`}
         >
@@ -119,7 +119,9 @@ export function SeasonalAmbience() {
             <div className="flex items-center justify-between px-1 pb-2">
               <div>
                 <div className="text-xs font-bold text-[#493f67]">Co dnes prozkoumat?</div>
-                <div className="mt-0.5 text-[11px] text-[#80758f]">Rychlá cesta k tomu, co právě potřebuješ.</div>
+                <div className="mt-0.5 text-[11px] text-[#80758f]">
+                  Rychlá cesta k tomu, co právě potřebuješ.
+                </div>
               </div>
               <button
                 onClick={() => setExploreOpen(false)}
@@ -129,9 +131,24 @@ export function SeasonalAmbience() {
               </button>
             </div>
             <div className="grid gap-1">
-              <ExploreLink to="/asistentka" icon={Bot} title="Asistentka" text="Probrat den nebo něco vymyslet" />
-              <ExploreLink to="/kreativni-studio" icon={Palette} title="Kreativní studio" text="Materiály, výtvarno, film a nápady" />
-              <ExploreLink to="/pamet" icon={Sparkles} title="Co si pamatuješ" text="Osobní preference a důležité drobnosti" />
+              <ExploreLink
+                to="/asistentka"
+                icon={Bot}
+                title="Asistentka"
+                text="Probrat den nebo něco vymyslet"
+              />
+              <ExploreLink
+                to="/kreativni-studio"
+                icon={Palette}
+                title="Kreativní studio"
+                text="Materiály, výtvarno, film a nápady"
+              />
+              <ExploreLink
+                to="/pamet"
+                icon={Sparkles}
+                title="Co si pamatuješ"
+                text="Osobní preference a důležité drobnosti"
+              />
             </div>
           </div>
         ) : null}
@@ -232,7 +249,10 @@ function ExploreLink({
   text: string;
 }) {
   return (
-    <Link to={to} className="group flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-[#f4ecff]">
+    <Link
+      to={to}
+      className="group flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-[#f4ecff]"
+    >
       <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#e4f5ef] text-[#3d8c79] transition group-hover:scale-105">
         <Icon className="h-4 w-4" />
       </div>

@@ -257,7 +257,7 @@ export function parseCompanionPayload(value: unknown): Omit<CompanionResult, "us
     throw new Error("AI odpověď není platná.");
   const summary = sameDay(item.sameDaySummary);
   if (item.mode === "conversation") {
-    if (item.navigation !== undefined || item.proposal !== undefined)
+    if (item.navigation != null || item.proposal != null)
       throw new Error("Konverzace nesmí spouštět akci.");
     return {
       mode: "conversation",
@@ -267,7 +267,7 @@ export function parseCompanionPayload(value: unknown): Omit<CompanionResult, "us
     };
   }
   if (item.mode === "navigate") {
-    if (item.proposal !== undefined) throw new Error("Navigace nesmí současně zapisovat data.");
+    if (item.proposal != null) throw new Error("Navigace nesmí současně zapisovat data.");
     return {
       mode: "navigate",
       reply: item.reply.trim(),
@@ -277,7 +277,7 @@ export function parseCompanionPayload(value: unknown): Omit<CompanionResult, "us
     };
   }
   if (item.mode === "propose") {
-    if (item.navigation !== undefined) throw new Error("Návrh změny nesmí současně navigovat.");
+    if (item.navigation != null) throw new Error("Návrh změny nesmí současně navigovat.");
     return {
       mode: "propose",
       reply: item.reply.trim(),

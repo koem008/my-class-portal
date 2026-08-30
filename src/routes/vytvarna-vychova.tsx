@@ -189,7 +189,8 @@ function ArtStudioPage() {
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
                 Pedagogické náměty pro 5. ročník navázané na oficiální výstupy revidovaného RVP.
-                Hotovou šablonu můžeš použít jedním klikem, nebo celou přípravu napsat klasicky ručně.
+                Hotovou šablonu můžeš použít jedním klikem, nebo celou přípravu napsat klasicky
+                ručně.
               </p>
             </div>
           </div>
@@ -254,7 +255,8 @@ function ArtStudioPage() {
                 </div>
                 <h2 className="mt-1 text-xl font-bold">Vlastní výtvarná příprava</h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Každé pole vyplňuješ přímo. Po uložení vznikne běžná příprava a materiál u vybrané hodiny.
+                  Každé pole vyplňuješ přímo. Po uložení vznikne běžná příprava a materiál u vybrané
+                  hodiny.
                 </p>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <label className="text-xs font-bold text-slate-600 md:col-span-2">
