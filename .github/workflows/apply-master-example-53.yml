@@ -1,4 +1,4 @@
-name: Apply master example 53
+name: Apply final Definition of Done
 
 on:
   push:
@@ -16,10 +16,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Apply point 53 patch
-        run: python scripts/finish_master_example_53.py
-      - name: Format changed files
-        run: npx prettier --write src/lib/assistant-memory-data.ts src/lib/daily-briefing-data.ts src/routes/pamet.tsx src/routes/asistentka.tsx
+      - name: Rewrite master Definition of Done
+        run: python scripts/rewrite_master_dod.py
       - name: Commit changes
         shell: bash
         run: |
@@ -29,6 +27,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/assistant-memory-data.ts src/lib/daily-briefing-data.ts src/routes/pamet.tsx src/routes/asistentka.tsx
-          git commit -m "feat: complete personal companion daily context"
+          git add docs/MASTER_PROMPT_MOJE_TRIDA.md
+          git commit -m "docs: make MVP Definition of Done verifiable"
           git push origin HEAD:main
