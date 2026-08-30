@@ -31,6 +31,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('src/lib/lesson-workspace-data.ts')
           text = path.read_text()
@@ -58,24 +59,18 @@ jobs:
 
           path = Path('src/lib/ai/companion-policy.ts')
           text = path.read_text()
-          marker = '''  {
-            target: "classroom",
-            label: "Třída",
-            path: "/trida",
-            keywords: ["třída", "pseudonymy", "žáci"],
-          },
-          '''
-          addition = marker + '''  {
-            target: "materials",
-            label: "Materiálové studio",
-            path: "/materialy",
-            keywords: ["materiály", "pracovní listy", "testy", "kvízy", "kartičky", "projekty"],
-          },
-          '''
-          if marker not in text and 'target: "materials"' not in text:
-              raise SystemExit('Navigation item marker missing')
           if 'target: "materials"' not in text:
-              text = text.replace(marker, addition)
+              block = '''  {
+    target: "materials",
+    label: "Materiálové studio",
+    path: "/materialy",
+    keywords: ["materiály", "pracovní listy", "testy", "kvízy", "kartičky", "projekty"],
+  },
+'''
+              match = re.search(r'\n  \{\n    target: "memory",', text)
+              if not match:
+                  raise SystemExit('Navigation insertion point missing')
+              text = text[:match.start()+1] + block + text[match.start()+1:]
           path.write_text(text)
           PY
 
