@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { buildPersonalDailyContext, personalContextLines } from "../src/lib/personal-companion-context";
+import {
+  buildPersonalDailyContext,
+  personalContextLines,
+} from "../src/lib/personal-companion-context";
 import type { AssistantSettings, TeacherMemory } from "../src/lib/assistant-memory-data";
 
 const settings: AssistantSettings = {
@@ -97,7 +100,16 @@ describe("personal daily context", () => {
   });
 
   test("fails closed when personal memory is disabled", () => {
-    const context = buildPersonalDailyContext({ ...settings, memory_enabled: false }, memories, "2026-08-31");
-    expect(context).toEqual({ enabled: false, commitments: [], importantDates: [], preferences: [] });
+    const context = buildPersonalDailyContext(
+      { ...settings, memory_enabled: false },
+      memories,
+      "2026-08-31",
+    );
+    expect(context).toEqual({
+      enabled: false,
+      commitments: [],
+      importantDates: [],
+      preferences: [],
+    });
   });
 });
