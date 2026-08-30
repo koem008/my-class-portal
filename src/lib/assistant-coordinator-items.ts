@@ -25,7 +25,8 @@ export type AssistantCoordinationItem = {
 
 type ItemRow = Omit<AssistantCoordinationItem, "assistantName" | "className">;
 
-const forbiddenCoordinatorContent = /\b(adhd|autis(?:mus|tický|tická|tické)?|pas|dyslex(?:ie|ii)|dysgraf(?:ie|ii)|dyskalk(?:ulie|ulii)|diagn[oó]z(?:a|y|u|ou)?|rodn[ée]\s*č[ií]slo|datum\s*narozen[ií])\b/i;
+const forbiddenCoordinatorContent =
+  /\b(adhd|autis(?:mus|tický|tická|tické)?|pas|dyslex(?:ie|ii)|dysgraf(?:ie|ii)|dyskalk(?:ulie|ulii)|diagn[oó]z(?:a|y|u|ou)?|rodn[ée]\s*č[ií]slo|datum\s*narozen[ií])\b/i;
 
 async function authUserId() {
   const { data, error } = await supabase.auth.getUser();
@@ -43,11 +44,7 @@ function assertOrganizationalContent(title: string, body?: string) {
   }
 }
 
-async function writeAudit(
-  schoolId: string,
-  action: string,
-  entityId: string,
-) {
+async function writeAudit(schoolId: string, action: string, entityId: string) {
   const actorUserId = await authUserId();
   const { error } = await db.from("assistant_coordination_audit_log").insert({
     school_id: schoolId,
@@ -81,8 +78,8 @@ export async function loadAssistantCoordinationItems(
 
   return ((data ?? []) as ItemRow[]).map((row) => ({
     ...row,
-    assistantName: row.assistant_id ? assistantMap.get(row.assistant_id) ?? null : null,
-    className: row.class_id ? classMap.get(row.class_id) ?? null : null,
+    assistantName: row.assistant_id ? (assistantMap.get(row.assistant_id) ?? null) : null,
+    className: row.class_id ? (classMap.get(row.class_id) ?? null) : null,
   }));
 }
 

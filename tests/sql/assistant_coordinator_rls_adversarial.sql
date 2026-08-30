@@ -67,6 +67,12 @@ insert into public.assistant_presence_exceptions(
   ('aaaaaaaa-0000-0000-0000-000000000090','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','aaaaaaaa-0000-0000-0000-000000000030','2026-09-07','absent','Organizačně nepřítomen','11111111-1111-1111-1111-111111111111'),
   ('bbbbbbbb-0000-0000-0000-000000000090','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','bbbbbbbb-0000-0000-0000-000000000030','2026-09-07','changed','Jiný blok','44444444-4444-4444-4444-444444444444');
 
+insert into public.assistant_coordination_items(
+  id,school_id,kind,title,body,assistant_id,class_id,due_on,status,created_by
+) values
+  ('aaaaaaaa-0000-0000-0000-0000000000a0','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','task','Follow-up A','Organizační fixture','aaaaaaaa-0000-0000-0000-000000000030','aaaaaaaa-0000-0000-0000-000000000010','2026-09-09','open','11111111-1111-1111-1111-111111111111'),
+  ('bbbbbbbb-0000-0000-0000-0000000000a0','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','task','Follow-up B','Organizační fixture','bbbbbbbb-0000-0000-0000-000000000030','bbbbbbbb-0000-0000-0000-000000000010','2026-09-09','open','44444444-4444-4444-4444-444444444444');
+
 -- Seed sensitive content to prove the coordinator cannot see it through the alias reference.
 insert into public.special_education_cases(
   id,school_id,class_id,student_alias_id,status,focus_summary,created_by
@@ -130,6 +136,12 @@ select pg_temp.assert_count(
   'ordinary teacher must not see assistant presence exceptions'
 );
 
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_coordination_items),
+  0,
+  'ordinary teacher must not see assistant coordination items'
+);
+
 -- 2) Coordinator A sees own tenant only, never School B.
 select set_config('request.jwt.claim.sub','22222222-2222-2222-2222-222222222222',true);
 select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',true);
@@ -169,6 +181,17 @@ select pg_temp.assert_count(
   'coordinator A must not see School B presence exception'
 );
 
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_coordination_items where school_id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  1,
+  'coordinator A should see own coordination item'
+);
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_coordination_items where school_id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+  0,
+  'coordinator A must not see School B coordination item'
+);
+
 -- Cross-tenant writes must fail closed at RLS, not merely disappear from reads.
 do $$
 begin
@@ -199,6 +222,23 @@ begin
       '22222222-2222-2222-2222-222222222222'
     );
     raise exception 'ASSERTION FAILED: coordinator A inserted School B presence exception';
+  exception
+    when others then
+      if sqlerrm like 'ASSERTION FAILED:%' then raise; end if;
+  end;
+end $$;
+
+do $$
+begin
+  begin
+    insert into public.assistant_coordination_items(
+      school_id,kind,title,assistant_id,class_id,status,created_by
+    ) values (
+      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','task','Unauthorized follow-up',
+      'bbbbbbbb-0000-0000-0000-000000000030','bbbbbbbb-0000-0000-0000-000000000010',
+      'open','22222222-2222-2222-2222-222222222222'
+    );
+    raise exception 'ASSERTION FAILED: coordinator A inserted School B coordination item';
   exception
     when others then
       if sqlerrm like 'ASSERTION FAILED:%' then raise; end if;

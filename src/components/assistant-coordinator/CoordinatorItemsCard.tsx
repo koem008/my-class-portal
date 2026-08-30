@@ -1,4 +1,12 @@
-import { Check, CheckCircle2, ClipboardList, Loader2, Plus, StickyNote, Trash2 } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ClipboardList,
+  Loader2,
+  Plus,
+  StickyNote,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CoordinatorClass, TeachingAssistant } from "@/lib/assistant-coordinator-data";
 import {
@@ -60,7 +68,10 @@ export function CoordinatorItemsCard({
   }, [schoolId, assistants, classes]);
 
   const openItems = useMemo(() => items.filter((item) => item.status === "open"), [items]);
-  const doneItems = useMemo(() => items.filter((item) => item.status === "done").slice(0, 4), [items]);
+  const doneItems = useMemo(
+    () => items.filter((item) => item.status === "done").slice(0, 4),
+    [items],
+  );
 
   async function addItem() {
     if (!title.trim()) return;

@@ -13,6 +13,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { CoordinatorItemsCard } from "@/components/assistant-coordinator/CoordinatorItemsCard";
 import {
   activateCoordinatorAccess,
   buildCoordinatorNowCard,
@@ -524,6 +525,12 @@ function AssistantCoordinatorPage() {
             </div>
           )}
         </section>
+
+        <CoordinatorItemsCard
+          schoolId={context.access.schoolId}
+          assistants={assistants}
+          classes={classes}
+        />
 
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
           <section className="rounded-[30px] border border-[#e9e3d9] bg-white p-5 shadow-[0_16px_50px_rgba(65,75,70,.06)] md:p-6">
