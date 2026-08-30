@@ -7,13 +7,48 @@ import {
 
 export const COMPANION_NAVIGATION_ITEMS = [
   { target: "home", label: "Dnes", path: "/", keywords: ["dnes", "úvod", "domů"] },
-  { target: "schedule", label: "Rozvrh", path: "/rozvrh", keywords: ["rozvrh", "hodiny", "týden"] },
-  { target: "calendar", label: "Kalendář", path: "/kalendar", keywords: ["kalendář", "události", "termíny"] },
-  { target: "classroom", label: "Třída", path: "/trida", keywords: ["třída", "pseudonymy", "žáci"] },
-  { target: "memory", label: "Co si o mně pamatuješ", path: "/pamet", keywords: ["paměť", "preference", "důležitá data"] },
-  { target: "art_studio", label: "Výtvarná výchova", path: "/vytvarna-vychova", keywords: ["výtvarná", "ateliér", "obrázky"] },
-  { target: "special_education", label: "Speciální pedagogika", path: "/specialni-pedagogika", keywords: ["speciální pedagogika", "podpora", "případy"] },
-  { target: "assistants", label: "Asistenti pedagoga", path: "/asistenti", keywords: ["asistenti", "AP", "koordinace"] },
+  {
+    target: "schedule",
+    label: "Rozvrh",
+    path: "/rozvrh",
+    keywords: ["rozvrh", "hodiny", "týden"],
+  },
+  {
+    target: "calendar",
+    label: "Kalendář",
+    path: "/kalendar",
+    keywords: ["kalendář", "události", "termíny"],
+  },
+  {
+    target: "classroom",
+    label: "Třída",
+    path: "/trida",
+    keywords: ["třída", "pseudonymy", "žáci"],
+  },
+  {
+    target: "memory",
+    label: "Co si o mně pamatuješ",
+    path: "/pamet",
+    keywords: ["paměť", "preference", "důležitá data"],
+  },
+  {
+    target: "art_studio",
+    label: "Výtvarná výchova",
+    path: "/vytvarna-vychova",
+    keywords: ["výtvarná", "ateliér", "obrázky"],
+  },
+  {
+    target: "special_education",
+    label: "Speciální pedagogika",
+    path: "/specialni-pedagogika",
+    keywords: ["speciální pedagogika", "podpora", "případy"],
+  },
+  {
+    target: "assistants",
+    label: "Asistenti pedagoga",
+    path: "/asistenti",
+    keywords: ["asistenti", "AP", "koordinace"],
+  },
 ] as const satisfies ReadonlyArray<{
   target: Exclude<CompanionNavigationTarget, "lesson">;
   label: string;
