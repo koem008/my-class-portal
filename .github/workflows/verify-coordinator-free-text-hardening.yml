@@ -1,0 +1,165 @@
+name: Verify Coordinator Free Text Hardening
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-coordinator-free-text-hardening.yml'
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Apply one coordinator content policy to remaining free-text paths
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Client data layer: every remaining free-text path reuses the same policy.
+          p = Path('src/lib/assistant-coordinator-data.ts')
+          s = p.read_text()
+          marker = 'import { supabase } from "@/integrations/supabase/client";\n'
+          policy_import = 'import { assertCoordinatorOrganizationalContent } from "@/lib/assistant-coordinator-content-policy";\n'
+          if policy_import not in s:
+            if marker not in s: raise SystemExit('supabase import marker missing')
+            s = s.replace(marker, marker + policy_import, 1)
+
+          old = '''  const createdBy = await authUserId();\n  const displayName = input.displayName.trim();\n  if (!displayName) throw new Error("Uveďte jméno asistenta pedagoga.");\n  const { data, error } = await db'''
+          new = '''  const createdBy = await authUserId();\n  const displayName = input.displayName.trim();\n  if (!displayName) throw new Error("Uveďte jméno asistenta pedagoga.");\n  const workloadNote = input.workloadNote?.trim() || "";\n  if (workloadNote)\n    assertCoordinatorOrganizationalContent("Pracovní rozsah AP", workloadNote);\n  const { data, error } = await db'''
+          if old in s:
+            s = s.replace(old, new, 1)
+          elif 'assertCoordinatorOrganizationalContent("Pracovní rozsah AP", workloadNote)' not in s:
+            raise SystemExit('assistant workload policy marker missing')
+          s = s.replace('      workload_note: input.workloadNote?.trim() || null,', '      workload_note: workloadNote || null,', 1)
+
+          old = '''  const createdBy = await authUserId();\n  const { data, error } = await db\n    .from("teaching_assistant_assignments")'''
+          new = '''  const createdBy = await authUserId();\n  const note = input.note?.trim() || "";\n  if (input.studentAliasId && note) {\n    throw new Error(\n      "U podpory konkrétního pseudonymu se volný text neukládá. Použij jen bezpečnou vazbu na pseudonym.",\n    );\n  }\n  if (note) assertCoordinatorOrganizationalContent("Organizační přiřazení AP", note);\n  const { data, error } = await db\n    .from("teaching_assistant_assignments")'''
+          if old in s:
+            s = s.replace(old, new, 1)
+          elif 'U podpory konkrétního pseudonymu se volný text neukládá.' not in s:
+            raise SystemExit('assignment policy marker missing')
+          s = s.replace('      assignment_note: input.note?.trim() || null,', '      assignment_note: note || null,', 1)
+
+          old = '''  const createdBy = await authUserId();\n  if (input.weekday < 1 || input.weekday > 5) throw new Error("Vyberte pracovní den.");'''
+          new = '''  const createdBy = await authUserId();\n  const locationNote = input.locationNote?.trim() || "";\n  if (locationNote)\n    assertCoordinatorOrganizationalContent("Místo pracovního bloku", locationNote);\n  if (input.weekday < 1 || input.weekday > 5) throw new Error("Vyberte pracovní den.");'''
+          if old in s:
+            s = s.replace(old, new, 1)
+          elif 'assertCoordinatorOrganizationalContent("Místo pracovního bloku", locationNote)' not in s:
+            raise SystemExit('work-slot policy marker missing')
+          s = s.replace('      location_note: input.locationNote?.trim() || null,', '      location_note: locationNote || null,', 1)
+
+          old = '''  const createdBy = await authUserId();\n  if (!input.exceptionDate) throw new Error("Vyberte datum změny.");'''
+          new = '''  const createdBy = await authUserId();\n  const note = input.note?.trim() || "";\n  if (note) assertCoordinatorOrganizationalContent("Organizační změna AP", note);\n  if (!input.exceptionDate) throw new Error("Vyberte datum změny.");'''
+          # occurrence should now be the presence function; assignment already has different following text.
+          if old in s:
+            s = s.replace(old, new, 1)
+          elif 'assertCoordinatorOrganizationalContent("Organizační změna AP", note)' not in s:
+            raise SystemExit('presence policy marker missing')
+          # Replace only the presence note occurrence remaining.
+          target = '      note: input.note?.trim() || null,\n      created_by: createdBy,\n    })\n    .select("id")\n    .single();\n  if (error) throw error;\n  await writeAudit(\n    input.schoolId,\n    "presence_exception_created",'
+          replacement = '      note: note || null,\n      created_by: createdBy,\n    })\n    .select("id")\n    .single();\n  if (error) throw error;\n  await writeAudit(\n    input.schoolId,\n    "presence_exception_created",'
+          if target in s:
+            s = s.replace(target, replacement, 1)
+          elif '"presence_exception_created"' in s and 'note: note || null' not in s[s.rfind('export async function createAssistantPresenceException'):]:
+            raise SystemExit('presence note write marker missing')
+          p.write_text(s)
+
+          # UI: student-linked assignment cannot even carry adjacent free text.
+          p = Path('src/routes/asistenti.tsx')
+          s = p.read_text()
+          select_old = '<Select value={selectedAlias} onChange={setSelectedAlias} label="Bez vazby na dítě">'
+          select_new = '''<Select\n                value={selectedAlias}\n                onChange={(value) => {\n                  setSelectedAlias(value);\n                  if (value) setAssignmentNote("");\n                }}\n                label="Bez vazby na dítě"\n              >'''
+          if select_old in s:
+            s = s.replace(select_old, select_new, 1)
+          elif 'if (value) setAssignmentNote("");' not in s:
+            raise SystemExit('alias select marker missing')
+
+          input_old = '''              <Input\n                value={assignmentNote}\n                onChange={setAssignmentNote}\n                placeholder="Organizační poznámka (volitelné)"\n              />'''
+          input_new = '''              <div>\n                <Input\n                  value={assignmentNote}\n                  onChange={setAssignmentNote}\n                  placeholder={\n                    selectedAlias\n                      ? "U pseudonymu se volný text neukládá"\n                      : "Organizační poznámka ke třídě (volitelné)"\n                  }\n                  disabled={Boolean(selectedAlias)}\n                />\n                {selectedAlias && (\n                  <p className="mt-1 px-1 text-[10px] leading-4 text-[#8b7f96]">\n                    Vazba na pseudonym stačí sama. Citlivé informace patří do svého chráněného kontextu.\n                  </p>\n                )}\n              </div>'''
+          if input_old in s:
+            s = s.replace(input_old, input_new, 1)
+          elif 'Vazba na pseudonym stačí sama.' not in s:
+            raise SystemExit('assignment input marker missing')
+
+          s = s.replace(
+            'placeholder="Krátká poznámka k pracovnímu rozsahu"',
+            'placeholder="Pracovní rozsah / organizace (bez zdravotních údajů)"',
+            1,
+          )
+          s = s.replace(
+            'placeholder="Místo / organizační poznámka (volitelné)"',
+            'placeholder="Místo / organizace (bez údajů o dítěti)"',
+            1,
+          )
+          s = s.replace(
+            'placeholder="Co organizačně platí"',
+            'placeholder="Co organizačně platí — ne důvod nepřítomnosti"',
+            1,
+          )
+
+          input_sig_old = '''  placeholder,\n  type = "text",\n}: {\n  value: string;\n  onChange: (value: string) => void;\n  placeholder: string;\n  type?: string;\n}) {'''
+          input_sig_new = '''  placeholder,\n  type = "text",\n  disabled = false,\n}: {\n  value: string;\n  onChange: (value: string) => void;\n  placeholder: string;\n  type?: string;\n  disabled?: boolean;\n}) {'''
+          if input_sig_old in s:
+            s = s.replace(input_sig_old, input_sig_new, 1)
+          elif 'disabled?: boolean;' not in s:
+            raise SystemExit('Input signature marker missing')
+          value_marker = '      value={value}\n      onChange={(event) => onChange(event.target.value)}\n'
+          if '      disabled={disabled}\n' not in s:
+            if value_marker not in s: raise SystemExit('Input disabled marker missing')
+            s = s.replace(value_marker, '      value={value}\n      disabled={disabled}\n      onChange={(event) => onChange(event.target.value)}\n', 1)
+          s = s.replace(
+            'className="w-full rounded-2xl border border-[#e4ded3] bg-[#fffefa] px-4 py-3 text-sm outline-none transition focus:border-[#9bbeb5] focus:ring-4 focus:ring-[#eaf4f0]"',
+            'className="w-full rounded-2xl border border-[#e4ded3] bg-[#fffefa] px-4 py-3 text-sm outline-none transition focus:border-[#9bbeb5] focus:ring-4 focus:ring-[#eaf4f0] disabled:cursor-not-allowed disabled:bg-[#f4f1f6] disabled:text-[#9b96a2]"',
+            1,
+          )
+          p.write_text(s)
+
+          # DB adversarial tests: direct SQL must not bypass any of the four guards.
+          p = Path('tests/sql/assistant_coordinator_rls_adversarial.sql')
+          s = p.read_text()
+          marker = '-- Completion outcome stays inside the same organizational-only boundary.\n'
+          tests = '''-- Every legacy coordinator free-text path is organizational-only at DB level.\nupdate public.teaching_assistants\nset workload_note='0,5 úvazku · ranní podpora'\nwhere id='aaaaaaaa-0000-0000-0000-000000000030';\n\ndo $$\nbegin\n  begin\n    update public.teaching_assistants set workload_note='Podpora kvůli ADHD'\n    where id='aaaaaaaa-0000-0000-0000-000000000030';\n    raise exception 'ASSERTION FAILED: diagnostic workload_note unexpectedly succeeded';\n  exception when check_violation then null; end;\nend;\n$$;\n\ndo $$\nbegin\n  begin\n    update public.teaching_assistant_assignments set assignment_note='Jen organizační poznámka'\n    where id='aaaaaaaa-0000-0000-0000-000000000040';\n    raise exception 'ASSERTION FAILED: alias-linked assignment free text unexpectedly succeeded';\n  exception when check_violation then null; end;\nend;\n$$;\n\ndo $$\nbegin\n  begin\n    update public.assistant_work_slots set location_note='Učebna pro dyslexii'\n    where id='aaaaaaaa-0000-0000-0000-000000000080';\n    raise exception 'ASSERTION FAILED: diagnostic location_note unexpectedly succeeded';\n  exception when check_violation then null; end;\nend;\n$$;\n\ndo $$\nbegin\n  begin\n    update public.assistant_presence_exceptions set note='Nepřítomnost kvůli diagnóze ADHD'\n    where id='aaaaaaaa-0000-0000-0000-000000000090';\n    raise exception 'ASSERTION FAILED: diagnostic presence note unexpectedly succeeded';\n  exception when check_violation then null; end;\nend;\n$$;\n\n'''
+          if 'diagnostic workload_note unexpectedly succeeded' not in s:
+            if marker not in s: raise SystemExit('outcome test marker missing')
+            s = s.replace(marker, tests + marker, 1)
+          p.write_text(s)
+
+          # Static invariants for the hardening migration and client layer.
+          migration = Path('supabase/migrations/20260830070000_assistant_coordinator_free_text_hardening.sql').read_text()
+          for required in [
+            'teaching_assistants_workload_organizational_only',
+            'teaching_assistant_assignments_note_organizational_only',
+            'teaching_assistant_assignments_alias_has_no_free_text',
+            'assistant_work_slots_location_organizational_only',
+            'assistant_presence_exceptions_note_organizational_only',
+            'student_alias_id is null or assignment_note is null',
+          ]:
+            if required not in migration:
+              raise SystemExit(f'hardening migration invariant missing: {required}')
+
+          data = Path('src/lib/assistant-coordinator-data.ts').read_text()
+          for required in [
+            'assertCoordinatorOrganizationalContent("Pracovní rozsah AP", workloadNote)',
+            'assertCoordinatorOrganizationalContent("Organizační přiřazení AP", note)',
+            'assertCoordinatorOrganizationalContent("Místo pracovního bloku", locationNote)',
+            'assertCoordinatorOrganizationalContent("Organizační změna AP", note)',
+          ]:
+            if required not in data:
+              raise SystemExit(f'client content-policy invariant missing: {required}')
+          PY
+      - run: bunx prettier --write src/lib/assistant-coordinator-data.ts src/routes/asistenti.tsx
+      - run: bun run lint
+      - run: bun run build
+      - name: Commit verified free-text hardening
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/migrations/20260830070000_assistant_coordinator_free_text_hardening.sql tests/sql/assistant_coordinator_rls_adversarial.sql src/lib/assistant-coordinator-data.ts src/routes/asistenti.tsx src/routeTree.gen.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "security: harden coordinator free-text boundaries"
+            git push origin main
+          fi
