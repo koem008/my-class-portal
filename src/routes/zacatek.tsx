@@ -18,10 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  completeFirstRun,
-  type OnboardingTimetableSlot,
-} from "@/lib/onboarding-data";
+import { completeFirstRun, type OnboardingTimetableSlot } from "@/lib/onboarding-data";
 import {
   loadDistrictChoices,
   type AssistantTone,
@@ -96,12 +93,12 @@ function FirstRunPage() {
     if (step === 1)
       return Boolean(
         districtName &&
-          grade >= 1 &&
-          grade <= 5 &&
-          /^\d{4}\/\d{4}$/.test(academicYearLabel.trim()) &&
-          academicYearStartsOn &&
-          academicYearEndsOn &&
-          academicYearEndsOn > academicYearStartsOn,
+        grade >= 1 &&
+        grade <= 5 &&
+        /^\d{4}\/\d{4}$/.test(academicYearLabel.trim()) &&
+        academicYearStartsOn &&
+        academicYearEndsOn &&
+        academicYearEndsOn > academicYearStartsOn,
       );
     if (step === 2)
       return (
@@ -240,16 +237,29 @@ function FirstRunPage() {
                 {step === 3 && "Teď už jen tvoje tempo."}
               </h1>
               <p className="mt-4 text-sm leading-7 text-white/72">
-                {step === 0 && "Škola a třída jsou základ, na který se pak bezpečně váže celý pracovní prostor."}
-                {step === 1 && "Okres, ročník a školní rok jsou potřeba pro správné prázdniny, kalendář a plánování."}
-                {step === 2 && "Každá hodina se potom sama propíše do pracovního dne. Žádné přepisování tabulek dokola."}
-                {step === 3 && "Vyber anonymní motivy třídy, pojmenuj asistentku a označ jen role, které opravdu děláš."}
+                {step === 0 &&
+                  "Škola a třída jsou základ, na který se pak bezpečně váže celý pracovní prostor."}
+                {step === 1 &&
+                  "Okres, ročník a školní rok jsou potřeba pro správné prázdniny, kalendář a plánování."}
+                {step === 2 &&
+                  "Každá hodina se potom sama propíše do pracovního dne. Žádné přepisování tabulek dokola."}
+                {step === 3 &&
+                  "Vyber anonymní motivy třídy, pojmenuj asistentku a označ jen role, které opravdu děláš."}
               </p>
 
               <div className="mt-7 space-y-3">
-                <LittleNote tone="bg-[#f7dcbf] text-[#795338]" text="Skutečná jména dětí sem nepatří." />
-                <LittleNote tone="bg-[#dcefe7] text-[#2f685f]" text="Rozvrh i nastavení můžeš později upravit." />
-                <LittleNote tone="bg-[#e8e0f5] text-[#67598b]" text="Citlivé role mají vlastní bezpečnostní oprávnění." />
+                <LittleNote
+                  tone="bg-[#f7dcbf] text-[#795338]"
+                  text="Skutečná jména dětí sem nepatří."
+                />
+                <LittleNote
+                  tone="bg-[#dcefe7] text-[#2f685f]"
+                  text="Rozvrh i nastavení můžeš později upravit."
+                />
+                <LittleNote
+                  tone="bg-[#e8e0f5] text-[#67598b]"
+                  text="Citlivé role mají vlastní bezpečnostní oprávnění."
+                />
               </div>
 
               <div className="mt-7 flex items-start gap-2 text-xs leading-5 text-white/58">
@@ -298,7 +308,9 @@ function FirstRunPage() {
                       className="mt-2 h-12 w-full rounded-[20px] border border-[#e5ded2] bg-white px-4 text-sm font-bold outline-none focus:border-[#8db9ae]"
                     >
                       {[1, 2, 3, 4, 5].map((value) => (
-                        <option key={value} value={value}>{value}. ročník</option>
+                        <option key={value} value={value}>
+                          {value}. ročník
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -311,8 +323,16 @@ function FirstRunPage() {
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <DateField label="Začátek školního roku" value={academicYearStartsOn} onChange={setAcademicYearStartsOn} />
-                  <DateField label="Konec školního roku" value={academicYearEndsOn} onChange={setAcademicYearEndsOn} />
+                  <DateField
+                    label="Začátek školního roku"
+                    value={academicYearStartsOn}
+                    onChange={setAcademicYearStartsOn}
+                  />
+                  <DateField
+                    label="Konec školního roku"
+                    value={academicYearEndsOn}
+                    onChange={setAcademicYearEndsOn}
+                  />
                 </div>
                 <label className="block text-xs font-black text-[#60746e]">
                   Okres školy
@@ -323,7 +343,9 @@ function FirstRunPage() {
                   >
                     <option value="">Vyber okres…</option>
                     {districts.map((district) => (
-                      <option key={district} value={district}>{district}</option>
+                      <option key={district} value={district}>
+                        {district}
+                      </option>
                     ))}
                   </select>
                   <span className="mt-2 block font-medium leading-5 text-[#8c9794]">
@@ -336,30 +358,47 @@ function FirstRunPage() {
             {step === 2 && (
               <StepCard eyebrow="3 · Rozvrh" title="Jak vypadá tvůj běžný týden?" icon={Clock3}>
                 <p className="rounded-2xl bg-[#eef7f2] px-4 py-3 text-xs leading-5 text-[#56716a]">
-                  Přidej skutečné hodiny. Nic ukázkového se nevytváří. Později je můžeš kdykoli změnit v Rozvrhu.
+                  Přidej skutečné hodiny. Nic ukázkového se nevytváří. Později je můžeš kdykoli
+                  změnit v Rozvrhu.
                 </p>
                 <div className="space-y-3">
                   {timetableSlots.map((slot, index) => (
-                    <div key={`${index}-${slot.weekday}-${slot.slotOrder}`} className="rounded-[22px] border border-[#e7e2d9] bg-white p-3 shadow-sm">
+                    <div
+                      key={`${index}-${slot.weekday}-${slot.slotOrder}`}
+                      className="rounded-[22px] border border-[#e7e2d9] bg-white p-3 shadow-sm"
+                    >
                       <div className="grid gap-2 md:grid-cols-[1.1fr_.55fr_.75fr_.75fr_1.5fr_auto] md:items-end">
                         <MiniSelect
                           label="Den"
                           value={String(slot.weekday)}
                           onChange={(value) => patchSlot(index, { weekday: Number(value) })}
-                          options={days.map((day) => ({ value: String(day.value), label: day.label }))}
+                          options={days.map((day) => ({
+                            value: String(day.value),
+                            label: day.label,
+                          }))}
                         />
                         <MiniNumber
                           label="Hodina"
                           value={slot.slotOrder}
                           onChange={(value) => patchSlot(index, { slotOrder: value })}
                         />
-                        <MiniTime label="Od" value={slot.startsAt} onChange={(value) => patchSlot(index, { startsAt: value })} />
-                        <MiniTime label="Do" value={slot.endsAt} onChange={(value) => patchSlot(index, { endsAt: value })} />
+                        <MiniTime
+                          label="Od"
+                          value={slot.startsAt}
+                          onChange={(value) => patchSlot(index, { startsAt: value })}
+                        />
+                        <MiniTime
+                          label="Do"
+                          value={slot.endsAt}
+                          onChange={(value) => patchSlot(index, { endsAt: value })}
+                        />
                         <label className="text-[11px] font-black text-[#667873]">
                           Předmět
                           <input
                             value={slot.subjectName}
-                            onChange={(event) => patchSlot(index, { subjectName: event.target.value })}
+                            onChange={(event) =>
+                              patchSlot(index, { subjectName: event.target.value })
+                            }
                             placeholder="Matematika"
                             className="mt-1 h-10 w-full rounded-xl border border-[#dedfd9] bg-[#fcfcfa] px-3 text-sm font-semibold outline-none focus:border-[#83a59b]"
                           />
@@ -410,13 +449,17 @@ function FirstRunPage() {
                     className="mt-2 h-12 w-full rounded-[20px] border border-[#e5ded2] bg-white px-4 text-sm font-bold outline-none focus:border-[#8db9ae]"
                   >
                     {(Object.keys(assistantToneLabels) as AssistantTone[]).map((tone) => (
-                      <option key={tone} value={tone}>{assistantToneLabels[tone]}</option>
+                      <option key={tone} value={tone}>
+                        {assistantToneLabels[tone]}
+                      </option>
                     ))}
                   </select>
                 </label>
 
                 <div>
-                  <div className="mb-3 text-xs font-black text-[#60746e]">Pseudonymní sada třídy</div>
+                  <div className="mb-3 text-xs font-black text-[#60746e]">
+                    Pseudonymní sada třídy
+                  </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {(Object.keys(pseudonymLabels) as PseudonymSetKey[]).map((key) => {
                       const selected = pseudonymSetKey === key;
@@ -431,7 +474,9 @@ function FirstRunPage() {
                             <div className="text-sm font-black">{pseudonymLabels[key].title}</div>
                             {selected && <Check className="h-4 w-4 text-[#39766c]" />}
                           </div>
-                          <div className="mt-1 text-xs text-[#89948f]">{pseudonymLabels[key].examples}</div>
+                          <div className="mt-1 text-xs text-[#89948f]">
+                            {pseudonymLabels[key].examples}
+                          </div>
                         </button>
                       );
                     })}
@@ -441,9 +486,30 @@ function FirstRunPage() {
                 <div>
                   <div className="mb-3 text-xs font-black text-[#60746e]">Tvoje pracovní role</div>
                   <div className="grid gap-3">
-                    <Choice checked={teachesArt} onChange={setTeachesArt} icon={Palette} title="Výtvarná a filmová výchova" text="Kreativní studio, inspirace a materiály." tone="peach" />
-                    <Choice checked={isSpecialEducator} onChange={setIsSpecialEducator} icon={ShieldCheck} title="Speciální pedagogika" text="Oddělený citlivý pracovní prostor s vlastním oprávněním." tone="lavender" />
-                    <Choice checked={isAssistantCoordinator} onChange={setIsAssistantCoordinator} icon={UsersRound} title="Koordinátorka asistentů pedagoga" text="Přehled AP, přiřazení, rozvrhy, follow-upy a porady v oddělené bezpečnostní doméně." tone="mint" />
+                    <Choice
+                      checked={teachesArt}
+                      onChange={setTeachesArt}
+                      icon={Palette}
+                      title="Výtvarná a filmová výchova"
+                      text="Kreativní studio, inspirace a materiály."
+                      tone="peach"
+                    />
+                    <Choice
+                      checked={isSpecialEducator}
+                      onChange={setIsSpecialEducator}
+                      icon={ShieldCheck}
+                      title="Speciální pedagogika"
+                      text="Oddělený citlivý pracovní prostor s vlastním oprávněním."
+                      tone="lavender"
+                    />
+                    <Choice
+                      checked={isAssistantCoordinator}
+                      onChange={setIsAssistantCoordinator}
+                      icon={UsersRound}
+                      title="Koordinátorka asistentů pedagoga"
+                      text="Přehled AP, přiřazení, rozvrhy, follow-upy a porady v oddělené bezpečnostní doméně."
+                      tone="mint"
+                    />
                   </div>
                 </div>
               </StepCard>
@@ -480,7 +546,11 @@ function FirstRunPage() {
                   disabled={saving || !canContinue}
                   className="inline-flex min-h-12 items-center gap-2 rounded-[20px] bg-[#2c756f] px-5 py-3 text-sm font-black text-white shadow-[0_14px_30px_rgba(44,117,111,.2)] disabled:opacity-35"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
                   {saving ? "Skládám tvůj prostor…" : "Hotovo. Jdu dovnitř"}
                 </button>
               )}
@@ -492,13 +562,27 @@ function FirstRunPage() {
   );
 }
 
-function StepCard({ eyebrow, title, icon: Icon, children }: { eyebrow: string; title: string; icon: LucideIcon; children: React.ReactNode }) {
+function StepCard({
+  eyebrow,
+  title,
+  icon: Icon,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <div className="flex items-start gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eef7f2] text-[#47756c]"><Icon className="h-5 w-5" /></div>
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eef7f2] text-[#47756c]">
+          <Icon className="h-5 w-5" />
+        </div>
         <div>
-          <div className="text-[10px] font-black uppercase tracking-[.16em] text-[#789087]">{eyebrow}</div>
+          <div className="text-[10px] font-black uppercase tracking-[.16em] text-[#789087]">
+            {eyebrow}
+          </div>
           <h2 className="mt-1 text-2xl font-black tracking-[-.035em] sm:text-3xl">{title}</h2>
         </div>
       </div>
@@ -507,68 +591,188 @@ function StepCard({ eyebrow, title, icon: Icon, children }: { eyebrow: string; t
   );
 }
 
-function Field({ label, value, onChange, placeholder, optional = false, accent }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; optional?: boolean; accent: Accent }) {
-  const ring = accent === "mint" ? "focus:border-[#8db9ae]" : accent === "peach" ? "focus:border-[#d8a47e]" : "focus:border-[#aaa0cf]";
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  optional = false,
+  accent,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  optional?: boolean;
+  accent: Accent;
+}) {
+  const ring =
+    accent === "mint"
+      ? "focus:border-[#8db9ae]"
+      : accent === "peach"
+        ? "focus:border-[#d8a47e]"
+        : "focus:border-[#aaa0cf]";
   return (
     <label className="block">
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-black text-[#5f7370]">{label}</span>
         {optional && <span className="text-[11px] text-[#9aa3a1]">volitelné</span>}
       </div>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className={`mt-2 h-12 w-full rounded-[20px] border border-[#e5ded2] bg-white px-4 text-sm font-semibold outline-none transition ${ring}`} />
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className={`mt-2 h-12 w-full rounded-[20px] border border-[#e5ded2] bg-white px-4 text-sm font-semibold outline-none transition ${ring}`}
+      />
     </label>
   );
 }
 
-function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <label className="block text-xs font-black text-[#60746e]">
       {label}
-      <input type="date" value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 h-12 w-full rounded-[20px] border border-[#e5ded2] bg-white px-4 text-sm font-semibold outline-none focus:border-[#8db9ae]" />
+      <input
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 h-12 w-full rounded-[20px] border border-[#e5ded2] bg-white px-4 text-sm font-semibold outline-none focus:border-[#8db9ae]"
+      />
     </label>
   );
 }
 
-function MiniSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
+function MiniSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
   return (
     <label className="text-[11px] font-black text-[#667873]">
       {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-[#dedfd9] bg-[#fcfcfa] px-2 text-xs font-semibold">
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 h-10 w-full rounded-xl border border-[#dedfd9] bg-[#fcfcfa] px-2 text-xs font-semibold"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
       </select>
     </label>
   );
 }
 
-function MiniNumber({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function MiniNumber({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
   return (
     <label className="text-[11px] font-black text-[#667873]">
       {label}
-      <input type="number" min={1} max={12} value={value} onChange={(event) => onChange(Number(event.target.value) || 1)} className="mt-1 h-10 w-full rounded-xl border border-[#dedfd9] bg-[#fcfcfa] px-2 text-xs font-semibold" />
+      <input
+        type="number"
+        min={1}
+        max={12}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value) || 1)}
+        className="mt-1 h-10 w-full rounded-xl border border-[#dedfd9] bg-[#fcfcfa] px-2 text-xs font-semibold"
+      />
     </label>
   );
 }
 
-function MiniTime({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function MiniTime({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <label className="text-[11px] font-black text-[#667873]">
       {label}
-      <input type="time" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-[#dedfd9] bg-[#fcfcfa] px-2 text-xs font-semibold" />
+      <input
+        type="time"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 h-10 w-full rounded-xl border border-[#dedfd9] bg-[#fcfcfa] px-2 text-xs font-semibold"
+      />
     </label>
   );
 }
 
 function LittleNote({ tone, text }: { tone: string; text: string }) {
-  return <div className={`-rotate-1 rounded-[20px] px-4 py-3 text-xs font-black leading-5 shadow-sm ${tone}`}>{text}</div>;
+  return (
+    <div
+      className={`-rotate-1 rounded-[20px] px-4 py-3 text-xs font-black leading-5 shadow-sm ${tone}`}
+    >
+      {text}
+    </div>
+  );
 }
 
-function Choice({ checked, onChange, icon: Icon, title, text, tone }: { checked: boolean; onChange: (value: boolean) => void; icon: LucideIcon; title: string; text: string; tone: Accent }) {
-  const active = tone === "peach" ? "border-[#ecc5a7] bg-[#fff2e6]" : tone === "lavender" ? "border-[#cfc4e8] bg-[#f3effb]" : "border-[#bcd8cf] bg-[#eef7f2]";
+function Choice({
+  checked,
+  onChange,
+  icon: Icon,
+  title,
+  text,
+  tone,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  icon: LucideIcon;
+  title: string;
+  text: string;
+  tone: Accent;
+}) {
+  const active =
+    tone === "peach"
+      ? "border-[#ecc5a7] bg-[#fff2e6]"
+      : tone === "lavender"
+        ? "border-[#cfc4e8] bg-[#f3effb]"
+        : "border-[#bcd8cf] bg-[#eef7f2]";
   return (
-    <label className={`flex cursor-pointer gap-3 rounded-[22px] border p-4 transition ${checked ? active : "border-[#e5e1d8] bg-white"}`}>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="mt-1 h-4 w-4" />
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 text-[#5b7770]"><Icon className="h-5 w-5" /></div>
-      <div><div className="text-sm font-black">{title}</div><p className="mt-1 text-xs leading-5 text-[#788684]">{text}</p></div>
+    <label
+      className={`flex cursor-pointer gap-3 rounded-[22px] border p-4 transition ${checked ? active : "border-[#e5e1d8] bg-white"}`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-1 h-4 w-4"
+      />
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 text-[#5b7770]">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <div className="text-sm font-black">{title}</div>
+        <p className="mt-1 text-xs leading-5 text-[#788684]">{text}</p>
+      </div>
     </label>
   );
 }
