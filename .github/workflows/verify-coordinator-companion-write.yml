@@ -1,0 +1,162 @@
+name: Verify Coordinator Companion Write
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-coordinator-companion-write.yml'
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Add confirmed coordinator proposal flow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Reuse one central coordinator content safety policy for manual + voice-confirmed writes.
+          p = Path('src/lib/assistant-coordinator-items.ts')
+          s = p.read_text()
+          import_marker = 'import type { CoordinatorClass, TeachingAssistant } from "@/lib/assistant-coordinator-data";\n'
+          policy_import = 'import { assertCoordinatorOrganizationalContent } from "@/lib/assistant-coordinator-content-policy";\n'
+          if policy_import not in s:
+            if import_marker not in s: raise SystemExit('items import marker missing')
+            s = s.replace(import_marker, import_marker + policy_import, 1)
+          start = s.find('const forbiddenCoordinatorContent =')
+          if start >= 0:
+            end_marker = '\n\nasync function authUserId()'
+            end = s.find(end_marker, start)
+            if end < 0: raise SystemExit('items policy block end missing')
+            s = s[:start] + s[end+2:]
+          old_assert_start = s.find('function assertOrganizationalContent(')
+          if old_assert_start >= 0:
+            end_marker = '\n\nasync function writeAudit('
+            end = s.find(end_marker, old_assert_start)
+            if end < 0: raise SystemExit('old assert function end missing')
+            s = s[:old_assert_start] + s[end+2:]
+          old = '''  const title = input.title.trim();\n  const body = input.body?.trim() || "";\n  if (!title) throw new Error("Napiš, co potřebuješ zachytit.");\n  if (title.length > 180) throw new Error("Nadpis je příliš dlouhý.");\n  if (body.length > 800) throw new Error("Poznámka je příliš dlouhá.");\n  assertOrganizationalContent(title, body);'''
+          new = '''  const { title, body } = assertCoordinatorOrganizationalContent(input.title, input.body);'''
+          if old in s:
+            s = s.replace(old, new, 1)
+          elif 'assertCoordinatorOrganizationalContent(input.title, input.body)' not in s:
+            raise SystemExit('manual coordinator content policy call missing')
+          p.write_text(s)
+
+          # Contract: add local date + narrow organizational proposal. No tenant/id linkage comes from AI.
+          p = Path('src/lib/ai/contracts.ts')
+          s = p.read_text()
+          if '  localDate?: string | undefined;\n' not in s:
+            marker = '  tone: CompanionTone;\n'
+            if marker not in s: raise SystemExit('local date contract marker missing')
+            s = s.replace(marker, marker + '  localDate?: string | undefined;\n', 1)
+          old = '''export type CompanionPedagogicalProposal =\n  | { type: "save_preparation_note"; lessonId: string; text: string }\n  | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string | undefined };'''
+          new = '''export type CompanionPedagogicalProposal =\n  | { type: "save_preparation_note"; lessonId: string; text: string }\n  | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string | undefined }\n  | {\n      type: "create_coordinator_item";\n      kind: "note" | "task" | "follow_up";\n      title: string;\n      body?: string | undefined;\n      dueOn?: string | undefined;\n    };'''
+          if old in s:
+            s = s.replace(old, new, 1)
+          elif 'type: "create_coordinator_item"' not in s:
+            raise SystemExit('proposal contract marker missing')
+          p.write_text(s)
+
+          # Strict parser: coordinator proposal has no lessonId and remains proposal/confirmation-only.
+          p = Path('src/lib/ai/companion-policy.ts')
+          s = p.read_text()
+          start = s.index('function parseProposal(')
+          end = s.index('\nexport function parseCompanionPayload', start)
+          replacement = '''function parseProposal(value: unknown): CompanionPedagogicalProposal {\n  const item = record(value);\n  if (!item || typeof item.type !== "string") throw new Error("AI návrh změny není platný.");\n  if (item.type === "create_coordinator_item") {\n    if (!(["note", "task", "follow_up"] as const).includes(item.kind as "note" | "task" | "follow_up"))\n      throw new Error("Koordinační návrh má neplatný typ.");\n    if (typeof item.title !== "string" || !item.title.trim())\n      throw new Error("Koordinační návrh je prázdný.");\n    const body = typeof item.body === "string" && item.body.trim() ? item.body.trim() : undefined;\n    const dueOn = typeof item.dueOn === "string" && item.dueOn.trim() ? item.dueOn.trim() : undefined;\n    return {\n      type: item.type,\n      kind: item.kind as "note" | "task" | "follow_up",\n      title: item.title.trim(),\n      body,\n      dueOn,\n    };\n  }\n  if (typeof item.lessonId !== "string") throw new Error("AI návrh změny není platný.");\n  if (item.type === "save_preparation_note") {\n    if (typeof item.text !== "string" || !item.text.trim())\n      throw new Error("Návrh přípravy je prázdný.");\n    return { type: item.type, lessonId: item.lessonId, text: item.text.trim() };\n  }\n  if (item.type === "mark_lesson_completed")\n    return {\n      type: item.type,\n      lessonId: item.lessonId,\n      completedSummary:\n        typeof item.completedSummary === "string" && item.completedSummary.trim()\n          ? item.completedSummary.trim()\n          : undefined,\n    };\n  throw new Error("AI navrhla nepovolený typ změny.");\n}\n'''
+          s = s[:start] + replacement + s[end:]
+          p.write_text(s)
+
+          # Server validator + confirmation. Server derives coordinator school from authenticated role.
+          p = Path('src/lib/ai/functions.ts')
+          s = p.read_text()
+          import_marker = 'import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";\n'
+          policy_import = 'import { assertCoordinatorOrganizationalContent } from "@/lib/assistant-coordinator-content-policy";\n'
+          if policy_import not in s:
+            s = s.replace(import_marker, import_marker + policy_import, 1)
+          if '  localDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),\n' not in s:
+            marker = '  tone: z.enum(["friendly", "calm", "efficient", "custom"]),\n'
+            if marker not in s: raise SystemExit('functions local date marker missing')
+            s = s.replace(marker, marker + '  localDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),\n', 1)
+          schema_marker = '''  z.object({\n    type: z.literal("mark_lesson_completed"),\n    lessonId: z.string().uuid(),\n    completedSummary: z.string().trim().max(4_000).optional(),\n  }),\n]);'''
+          schema_replacement = '''  z.object({\n    type: z.literal("mark_lesson_completed"),\n    lessonId: z.string().uuid(),\n    completedSummary: z.string().trim().max(4_000).optional(),\n  }),\n  z.object({\n    type: z.literal("create_coordinator_item"),\n    kind: z.enum(["note", "task", "follow_up"]),\n    title: z.string().trim().min(1).max(180),\n    body: z.string().trim().max(800).optional(),\n    dueOn: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),\n  }),\n]);'''
+          if schema_marker in s:
+            s = s.replace(schema_marker, schema_replacement, 1)
+          elif 'type: z.literal("create_coordinator_item")' not in s:
+            raise SystemExit('proposal schema marker missing')
+
+          handler_marker = '''  .handler(async ({ data, context }) => {\n    const lessonResult = await context.supabase'''
+          handler_add = '''  .handler(async ({ data, context }) => {\n    if (data.type === "create_coordinator_item") {\n      const userResult = await context.supabase.auth.getUser();\n      if (userResult.error || !userResult.data.user)\n        throw userResult.error ?? new Error("Pro tuto akci je nutné přihlášení.");\n      const accessResult = await context.supabase\n        .from("assistant_coordinators")\n        .select("school_id")\n        .eq("user_id", userResult.data.user.id)\n        .eq("is_active", true)\n        .limit(2);\n      if (accessResult.error) throw accessResult.error;\n      if (!accessResult.data || accessResult.data.length !== 1)\n        throw new Error("Koordinátorský kontext není jednoznačně autorizovaný. Nic nebylo uloženo.");\n\n      const { title, body } = assertCoordinatorOrganizationalContent(data.title, data.body);\n      const schoolId = accessResult.data[0].school_id;\n      const inserted = await context.supabase\n        .from("assistant_coordination_items")\n        .insert({\n          school_id: schoolId,\n          kind: data.kind,\n          title,\n          body: body || null,\n          due_on: data.dueOn ?? null,\n          created_by: userResult.data.user.id,\n        })\n        .select("id")\n        .single();\n      if (inserted.error) throw inserted.error;\n      const audit = await context.supabase.from("assistant_coordination_audit_log").insert({\n        school_id: schoolId,\n        actor_user_id: userResult.data.user.id,\n        action: "coordination_item_created_via_companion",\n        entity_type: "assistant_coordination_item",\n        entity_id: inserted.data.id,\n      });\n      if (audit.error) throw audit.error;\n      return { ok: true, message: "Koordinační položka byla uložena až po vašem potvrzení." };\n    }\n\n    const lessonResult = await context.supabase'''
+          if handler_marker in s:
+            s = s.replace(handler_marker, handler_add, 1)
+          elif 'coordination_item_created_via_companion' not in s:
+            raise SystemExit('confirm handler marker missing')
+          p.write_text(s)
+
+          # Provider prompt: allow coordinator proposal only with coordinatorSummary; relative dates use localDate.
+          p = Path('src/lib/ai/provider.server.ts')
+          s = p.read_text()
+          s = s.replace(
+            '"propose: jen když AKTUÁLNÍ message sama explicitně žádá změnu pedagogických dat. SameDayContext smí pomoci pochopit odkaz, ale nikdy nesmí být sám zdrojem návrhu zápisu.",',
+            '"propose: jen když AKTUÁLNÍ message sama explicitně žádá podporovanou změnu dat. SameDayContext smí pomoci pochopit odkaz, ale nikdy nesmí být sám zdrojem návrhu zápisu.",',
+            1,
+          )
+          s = s.replace(
+            '"Povolené proposal typy: save_preparation_note {lessonId,text}; mark_lesson_completed {lessonId,completedSummary?}. Změnu nikdy sama neprovádíš.",',
+            '"Povolené proposal typy: save_preparation_note {lessonId,text}; mark_lesson_completed {lessonId,completedSummary?}; create_coordinator_item {kind,title,body?,dueOn?}. create_coordinator_item smíš navrhnout pouze když je coordinatorSummary přítomný; nesmí obsahovat diagnózu, zdravotní údaj ani identitu dítěte. Pro relativní termín použij localDate. Změnu nikdy sama neprovádíš.",',
+            1,
+          )
+          parse_marker = '''  const usage = asRecord(raw.usage);\n  return {\n    ...result,'''
+          guard = '''  if (\n    result.mode === "propose" &&\n    result.proposal?.type === "create_coordinator_item" &&\n    !request.coordinatorSummary\n  ) {\n    throw new ExternalAiProviderError(\n      "anthropic",\n      "UNAUTHORIZED_ACTION",\n      "Koordinátorský kontext není dostupný. Nic nebylo změněno.",\n    );\n  }\n  const usage = asRecord(raw.usage);\n  return {\n    ...result,'''
+          if parse_marker in s:
+            s = s.replace(parse_marker, guard, 1)
+          elif '"UNAUTHORIZED_ACTION"' not in s:
+            raise SystemExit('provider authorization guard marker missing')
+          p.write_text(s)
+
+          # UI request gets exact local date and renders coordinator proposal explicitly.
+          p = Path('src/routes/asistentka.tsx')
+          s = p.read_text()
+          tone_marker = '''          tone:\n            settings?.tone ||\n            ({ Přátelská: "friendly", Klidná: "calm", Efektivní: "efficient" } as const)[tone],\n'''
+          if '          localDate: todayIso,\n' not in s:
+            if tone_marker not in s: raise SystemExit('asistentka tone marker missing')
+            s = s.replace(tone_marker, tone_marker + '          localDate: todayIso,\n', 1)
+
+          old_ui = '''                      {pendingProposal.type === "save_preparation_note"\n                        ? `Uložit jako poznámku k přípravě: ${pendingProposal.text}`\n                        : `Označit hodinu jako dokončenou${pendingProposal.completedSummary ? `: ${pendingProposal.completedSummary}` : "."}`}'''
+          new_ui = '''                      {pendingProposal.type === "save_preparation_note"\n                        ? `Uložit jako poznámku k přípravě: ${pendingProposal.text}`\n                        : pendingProposal.type === "mark_lesson_completed"\n                          ? `Označit hodinu jako dokončenou${pendingProposal.completedSummary ? `: ${pendingProposal.completedSummary}` : "."}`\n                          : `${pendingProposal.kind === "follow_up" ? "Uložit follow-up" : pendingProposal.kind === "note" ? "Uložit organizační poznámku" : "Uložit úkol"}: ${pendingProposal.title}${pendingProposal.dueOn ? ` · termín ${new Date(`${pendingProposal.dueOn}T12:00:00`).toLocaleDateString("cs-CZ")}` : ""}`}'''
+          if old_ui in s:
+            s = s.replace(old_ui, new_ui, 1)
+          elif 'pendingProposal.type === "mark_lesson_completed"' not in s:
+            raise SystemExit('proposal UI marker missing')
+          p.write_text(s)
+
+          # Security invariants: AI proposal cannot choose tenant, AP, class or pupil linkage.
+          contracts = Path('src/lib/ai/contracts.ts').read_text()
+          start = contracts.index('type: "create_coordinator_item"')
+          end = contracts.index('};', start)
+          block = contracts[start:end].lower()
+          for token in ['schoolid', 'assistantid', 'classid', 'student', 'alias', 'caseid']:
+            if token in block:
+              raise SystemExit(f'coordinator voice proposal illegally controls linkage: {token}')
+          functions = Path('src/lib/ai/functions.ts').read_text()
+          if '.from("assistant_coordinators")' not in functions or '.eq("user_id", userResult.data.user.id)' not in functions:
+            raise SystemExit('server does not derive coordinator authorization from authenticated user')
+          if 'assertCoordinatorOrganizationalContent(data.title, data.body)' not in functions:
+            raise SystemExit('server confirmation lacks coordinator content policy')
+          PY
+      - run: bunx prettier --write src/lib/assistant-coordinator-content-policy.ts src/lib/assistant-coordinator-items.ts src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx
+      - run: bun run lint
+      - run: bun run build
+      - name: Commit verified confirmed coordinator voice write
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/assistant-coordinator-content-policy.ts src/lib/assistant-coordinator-items.ts src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/routeTree.gen.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: add confirmed coordinator companion writes"
+            git push origin main
+          fi
