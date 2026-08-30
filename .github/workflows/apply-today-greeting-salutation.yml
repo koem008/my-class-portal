@@ -1,0 +1,46 @@
+name: Fix Today greeting salutation
+
+on:
+  push:
+    branches:
+      - fix/today-greeting-salutation
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/today-greeting-salutation
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Apply source fix
+        run: python scripts/fix_today_greeting_salutation.py
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Format
+        run: bunx prettier --write src/lib/daily-briefing-data.ts
+      - name: Lint
+        run: bun run lint
+      - name: Build
+        run: bun run build
+      - name: Verify source distinction
+        shell: bash
+        run: |
+          grep -q 'teacher_assistant_settings' src/lib/daily-briefing-data.ts
+          grep -q 'preferred_salutation' src/lib/daily-briefing-data.ts
+          ! grep -q 'teacher_profiles").select("display_name")' src/lib/daily-briefing-data.ts
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/daily-briefing-data.ts
+          git commit -m "Use preferred salutation for Today greeting"
+          git push origin HEAD:fix/today-greeting-salutation
