@@ -28,6 +28,12 @@ jobs:
       - name: Reset database and apply all migrations from empty
         run: supabase db reset
 
+      - name: Verify assistant coordinator RLS boundaries
+        run: |
+          psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -v ON_ERROR_STOP=1 \
+            -f tests/sql/assistant_coordinator_rls_adversarial.sql
+
       - name: Show local Supabase status
         if: always()
         run: supabase status || true
