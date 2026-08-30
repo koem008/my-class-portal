@@ -27,8 +27,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Integrate Material Studio
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           path = Path('src/lib/lesson-workspace-data.ts')
@@ -58,24 +59,25 @@ jobs:
           path = Path('src/lib/ai/companion-policy.ts')
           text = path.read_text()
           marker = '''  {
-    target: "classroom",
-    label: "Třída",
-    path: "/trida",
-    keywords: ["třída", "pseudonymy", "žáci"],
-  },
-'''
+            target: "classroom",
+            label: "Třída",
+            path: "/trida",
+            keywords: ["třída", "pseudonymy", "žáci"],
+          },
+          '''
           addition = marker + '''  {
-    target: "materials",
-    label: "Materiálové studio",
-    path: "/materialy",
-    keywords: ["materiály", "pracovní listy", "testy", "kvízy", "kartičky", "projekty"],
-  },
-'''
+            target: "materials",
+            label: "Materiálové studio",
+            path: "/materialy",
+            keywords: ["materiály", "pracovní listy", "testy", "kvízy", "kartičky", "projekty"],
+          },
+          '''
           if marker not in text and 'target: "materials"' not in text:
               raise SystemExit('Navigation item marker missing')
           if 'target: "materials"' not in text:
               text = text.replace(marker, addition)
           path.write_text(text)
+          PY
 
       - name: Format
         run: bunx prettier --write src/lib/lesson-workspace-data.ts 'src/routes/hodina.$lessonId.tsx' src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/companion-policy.test.ts src/lib/material-studio-data.ts src/routes/materialy.tsx src/components/QuickNavigation.tsx src/routes/__root.tsx
