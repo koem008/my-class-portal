@@ -44,7 +44,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Format changed code
-        run: bunx prettier --write src/lib/ai/functions.ts src/lib/ai/companion-policy.ts src/lib/ai/provider.server.ts src/lib/personal-companion-context.ts src/components/GlobalVoiceCompanion.tsx src/components/SeasonalAmbience.tsx src/routes/__root.tsx src/routes/index.tsx src/routes/pamet.tsx src/lib/art-education-data.ts tests/companion-policy.test.ts tests/personal-companion-context.test.ts
+        run: bunx prettier --write src/lib/ai/functions.ts src/lib/ai/companion-policy.ts src/lib/ai/provider.server.ts src/lib/personal-companion-context.ts src/components/GlobalVoiceCompanion.tsx src/components/SeasonalAmbience.tsx src/routes/__root.tsx src/routes/index.tsx src/routes/pamet.tsx src/routes/kreativni-studio.tsx src/routes/materialy.tsx src/routes/vytvarna-vychova.tsx src/lib/art-education-data.ts tests/companion-policy.test.ts tests/personal-companion-context.test.ts
 
       - name: Focused tests
         run: bun test tests/companion-policy.test.ts tests/personal-companion-context.test.ts
