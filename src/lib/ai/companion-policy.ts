@@ -26,6 +26,12 @@ export const COMPANION_NAVIGATION_ITEMS = [
     keywords: ["třída", "pseudonymy", "žáci"],
   },
   {
+    target: "materials",
+    label: "Materiálové studio",
+    path: "/materialy",
+    keywords: ["materiály", "pracovní listy", "testy", "kvízy", "kartičky", "projekty"],
+  },
+  {
     target: "memory",
     label: "Co si o mně pamatuješ",
     path: "/pamet",

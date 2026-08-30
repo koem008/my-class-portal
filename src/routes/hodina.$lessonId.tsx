@@ -55,6 +55,9 @@ const materialLabels: Record<MaterialKind, string> = {
   activity: "Aktivita",
   differentiation: "Diferenciace",
   homework: "Domácí úkol",
+  flashcards: "Kartičky",
+  game: "Hra",
+  project: "Projekt",
   other: "Jiný materiál",
 };
 const signalLabels: Record<LearningSignalKind, string> = {

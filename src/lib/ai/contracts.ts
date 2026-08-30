@@ -60,6 +60,7 @@ export type CompanionNavigationTarget =
   | "schedule"
   | "calendar"
   | "classroom"
+  | "materials"
   | "memory"
   | "art_studio"
   | "special_education"

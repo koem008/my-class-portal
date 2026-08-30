@@ -16,6 +16,9 @@ export type MaterialKind =
   | "activity"
   | "differentiation"
   | "homework"
+  | "flashcards"
+  | "game"
+  | "project"
   | "other";
 
 export type LessonInstance = {

@@ -61,7 +61,9 @@ function materialText(content: Record<string, unknown> | null): string {
 export async function loadMaterialStudio(): Promise<MaterialStudioItem[]> {
   const materialsResult = await db
     .from("lesson_materials")
-    .select("id,school_id,class_id,lesson_id,kind,title,content,difficulty,export_status,created_at")
+    .select(
+      "id,school_id,class_id,lesson_id,kind,title,content,difficulty,export_status,created_at",
+    )
     .order("created_at", { ascending: false })
     .limit(500);
   if (materialsResult.error) throw materialsResult.error;
