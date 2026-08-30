@@ -70,9 +70,7 @@ export async function loadGlobalCompanionContext(
   const lessons = (lessonsResult.data ?? []) as LessonRow[];
   const topicIds = Array.from(
     new Set(
-      lessons
-        .map((lesson) => lesson.curriculum_topic_id)
-        .filter((id): id is string => Boolean(id)),
+      lessons.map((lesson) => lesson.curriculum_topic_id).filter((id): id is string => Boolean(id)),
     ),
   );
 
