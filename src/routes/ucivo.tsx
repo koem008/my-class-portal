@@ -105,7 +105,9 @@ function CurriculumPage() {
             {subjectCount === 0 ? (
               <div className="mt-6 rounded-[28px] border border-dashed border-[#ddd8cf] bg-white p-8 text-center">
                 <BookOpenCheck className="mx-auto h-7 w-7 text-[#789087]" />
-                <h2 className="mt-3 font-black">Pro tento ročník tu zatím není publikované učivo</h2>
+                <h2 className="mt-3 font-black">
+                  Pro tento ročník tu zatím není publikované učivo
+                </h2>
                 <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#7e8b89]">
                   Aplikace nebude zobrazovat vymyšlené předměty ani témata. Jakmile budou v
                   kurikulární databázi publikovaná skutečná data, objeví se tady automaticky.
@@ -125,7 +127,9 @@ function CurriculumPage() {
                           <div className="text-[10px] font-black uppercase tracking-[.15em] text-[#81918b]">
                             {version.code}
                           </div>
-                          <h2 className="mt-1 text-xl font-black tracking-[-.025em]">{version.name}</h2>
+                          <h2 className="mt-1 text-xl font-black tracking-[-.025em]">
+                            {version.name}
+                          </h2>
                           {version.description && (
                             <p className="mt-2 max-w-3xl text-sm leading-6 text-[#7d8986]">
                               {version.description}
@@ -165,7 +169,9 @@ function CurriculumPage() {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[22px] border border-[#ebe7df] bg-white px-4 py-3">
-      <div className="text-[10px] font-black uppercase tracking-[.12em] text-[#8b9894]">{label}</div>
+      <div className="text-[10px] font-black uppercase tracking-[.12em] text-[#8b9894]">
+        {label}
+      </div>
       <div className="mt-1 text-lg font-black text-[#3b5550]">{value}</div>
     </div>
   );
@@ -204,22 +210,30 @@ function SubjectCard({
             {subject.topics.length} témat · {outcomeCount} očekávaných výstupů
           </div>
         </div>
-        <ChevronDown className={`h-5 w-5 shrink-0 text-[#6d817b] transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`h-5 w-5 shrink-0 text-[#6d817b] transition ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && (
         <div className="border-t border-[#ebe8e1] bg-white px-4 py-4">
           {subject.topics.length === 0 && subject.ungroupedOutcomes.length === 0 ? (
-            <p className="text-sm text-[#85918d]">K tomuto předmětu zatím nejsou publikovaná témata ani výstupy.</p>
+            <p className="text-sm text-[#85918d]">
+              K tomuto předmětu zatím nejsou publikovaná témata ani výstupy.
+            </p>
           ) : (
             <div className="space-y-4">
               {subject.topics.map((topic) => (
                 <div key={topic.id} className="rounded-2xl bg-[#f7f6f2] p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    {topic.code && <span className="text-[10px] font-black text-[#74847f]">{topic.code}</span>}
+                    {topic.code && (
+                      <span className="text-[10px] font-black text-[#74847f]">{topic.code}</span>
+                    )}
                     <h3 className="text-sm font-black">{topic.name}</h3>
                   </div>
-                  {topic.description && <p className="mt-2 text-xs leading-5 text-[#7f8c88]">{topic.description}</p>}
+                  {topic.description && (
+                    <p className="mt-2 text-xs leading-5 text-[#7f8c88]">{topic.description}</p>
+                  )}
                   {topic.outcomes.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {topic.outcomes.map((outcome) => (
@@ -240,11 +254,7 @@ function SubjectCard({
   );
 }
 
-function Outcome({
-  outcome,
-}: {
-  outcome: CurriculumOverviewSubject["ungroupedOutcomes"][number];
-}) {
+function Outcome({ outcome }: { outcome: CurriculumOverviewSubject["ungroupedOutcomes"][number] }) {
   return (
     <div className="rounded-xl border border-[#e7e5df] bg-white px-3 py-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -255,7 +265,9 @@ function Outcome({
         )}
         <div className="text-xs font-black text-[#405750]">{outcome.title}</div>
       </div>
-      {outcome.description && <p className="mt-1.5 text-xs leading-5 text-[#7f8b87]">{outcome.description}</p>}
+      {outcome.description && (
+        <p className="mt-1.5 text-xs leading-5 text-[#7f8b87]">{outcome.description}</p>
+      )}
       {(outcome.periodLabel || outcome.minimumLevel) && (
         <div className="mt-2 text-[10px] font-bold text-[#909995]">
           {[outcome.periodLabel, outcome.minimumLevel].filter(Boolean).join(" · ")}

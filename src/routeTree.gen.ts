@@ -21,6 +21,7 @@ import { Route as PrihlaseniRouteImport } from './routes/prihlaseni'
 import { Route as RozvrhRouteImport } from './routes/rozvrh'
 import { Route as SpecialniPedagogikaRouteImport } from './routes/specialni-pedagogika'
 import { Route as TridaRouteImport } from './routes/trida'
+import { Route as UcivoRouteImport } from './routes/ucivo'
 import { Route as VytvarnaVychovaRouteImport } from './routes/vytvarna-vychova'
 import { Route as ZacatekRouteImport } from './routes/zacatek'
 import { Route as HodinaLessonIdRouteImport } from './routes/hodina.$lessonId'
@@ -88,6 +89,11 @@ const TridaRoute = TridaRouteImport.update({
   path: '/trida',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UcivoRoute = UcivoRouteImport.update({
+  id: '/ucivo',
+  path: '/ucivo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VytvarnaVychovaRoute = VytvarnaVychovaRouteImport.update({
   id: '/vytvarna-vychova',
   path: '/vytvarna-vychova',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/rozvrh': typeof RozvrhRoute
   '/specialni-pedagogika': typeof SpecialniPedagogikaRouteWithChildren
   '/trida': typeof TridaRoute
+  '/ucivo': typeof UcivoRoute
   '/vytvarna-vychova': typeof VytvarnaVychovaRoute
   '/zacatek': typeof ZacatekRoute
   '/hodina/$lessonId': typeof HodinaLessonIdRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/rozvrh': typeof RozvrhRoute
   '/specialni-pedagogika': typeof SpecialniPedagogikaRouteWithChildren
   '/trida': typeof TridaRoute
+  '/ucivo': typeof UcivoRoute
   '/vytvarna-vychova': typeof VytvarnaVychovaRoute
   '/zacatek': typeof ZacatekRoute
   '/hodina/$lessonId': typeof HodinaLessonIdRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/rozvrh': typeof RozvrhRoute
   '/specialni-pedagogika': typeof SpecialniPedagogikaRouteWithChildren
   '/trida': typeof TridaRoute
+  '/ucivo': typeof UcivoRoute
   '/vytvarna-vychova': typeof VytvarnaVychovaRoute
   '/zacatek': typeof ZacatekRoute
   '/hodina/$lessonId': typeof HodinaLessonIdRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/rozvrh'
     | '/specialni-pedagogika'
     | '/trida'
+    | '/ucivo'
     | '/vytvarna-vychova'
     | '/zacatek'
     | '/hodina/$lessonId'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/rozvrh'
     | '/specialni-pedagogika'
     | '/trida'
+    | '/ucivo'
     | '/vytvarna-vychova'
     | '/zacatek'
     | '/hodina/$lessonId'
@@ -237,6 +248,7 @@ export interface FileRouteTypes {
     | '/rozvrh'
     | '/specialni-pedagogika'
     | '/trida'
+    | '/ucivo'
     | '/vytvarna-vychova'
     | '/zacatek'
     | '/hodina/$lessonId'
@@ -258,6 +270,7 @@ export interface RootRouteChildren {
   RozvrhRoute: typeof RozvrhRoute
   SpecialniPedagogikaRoute: typeof SpecialniPedagogikaRouteWithChildren
   TridaRoute: typeof TridaRoute
+  UcivoRoute: typeof UcivoRoute
   VytvarnaVychovaRoute: typeof VytvarnaVychovaRoute
   ZacatekRoute: typeof ZacatekRoute
   HodinaLessonIdRoute: typeof HodinaLessonIdRoute
@@ -347,6 +360,13 @@ declare module '@tanstack/react-router' {
       path: '/trida'
       fullPath: '/trida'
       preLoaderRoute: typeof TridaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ucivo': {
+      id: '/ucivo'
+      path: '/ucivo'
+      fullPath: '/ucivo'
+      preLoaderRoute: typeof UcivoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/vytvarna-vychova': {
@@ -444,6 +464,7 @@ const rootRouteChildren: RootRouteChildren = {
   RozvrhRoute: RozvrhRoute,
   SpecialniPedagogikaRoute: SpecialniPedagogikaRouteWithChildren,
   TridaRoute: TridaRoute,
+  UcivoRoute: UcivoRoute,
   VytvarnaVychovaRoute: VytvarnaVychovaRoute,
   ZacatekRoute: ZacatekRoute,
   HodinaLessonIdRoute: HodinaLessonIdRoute,

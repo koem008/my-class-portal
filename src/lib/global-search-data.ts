@@ -197,6 +197,7 @@ export async function searchGlobalContent(query: string): Promise<GlobalSearchRe
     category: "curriculum",
     title: row.name,
     subtitle: [row.code, row.description].filter(Boolean).join(" · ").slice(0, 180),
+    path: "/ucivo",
   }));
 
   const curriculumOutcomes = [
@@ -207,6 +208,7 @@ export async function searchGlobalContent(query: string): Promise<GlobalSearchRe
     category: "curriculum",
     title: row.title,
     subtitle: [row.official_code, row.description].filter(Boolean).join(" · ").slice(0, 180),
+    path: "/ucivo",
   }));
 
   const calendarResults = [

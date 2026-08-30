@@ -25,6 +25,18 @@ const categoryLabels: Record<GlobalSearchCategory, string> = {
 const NAVIGATION_ITEMS = [
   ...COMPANION_NAVIGATION_ITEMS,
   {
+    target: "curriculum-local",
+    label: "Učivo",
+    path: "/ucivo",
+    keywords: ["učivo", "kurikulum", "RVP", "výstupy", "témata"] as const,
+  },
+  {
+    target: "assistant-local",
+    label: "Asistentka",
+    path: "/asistentka",
+    keywords: ["asistentka", "AI", "hlas", "chat", "mluvit"] as const,
+  },
+  {
     target: "settings-local",
     label: "Nastavení",
     path: "/nastaveni",

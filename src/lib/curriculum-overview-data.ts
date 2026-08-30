@@ -190,9 +190,7 @@ export async function loadCurriculumOverview(): Promise<CurriculumOverview> {
               code: topic.code,
               name: topic.name,
               description: topic.description,
-              outcomes: outcomes
-                .filter((outcome) => outcome.topic_id === topic.id)
-                .map(mapOutcome),
+              outcomes: outcomes.filter((outcome) => outcome.topic_id === topic.id).map(mapOutcome),
             })),
             ungroupedOutcomes: outcomes
               .filter((outcome) => outcome.subject_id === subject.id && outcome.topic_id === null)
