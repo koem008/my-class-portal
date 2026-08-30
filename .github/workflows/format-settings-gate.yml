@@ -46,4 +46,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/workspace-settings-data.ts src/routes/nastaveni.tsx src/lib/global-assistant-context.ts src/routeTree.gen.ts
           git commit -m "fix: format workspace settings and global companion"
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
