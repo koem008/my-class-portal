@@ -2348,6 +2348,9 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          date_day: number | null
+          date_month: number | null
+          date_year: number | null
           explicitly_confirmed: boolean
           id: string
           is_active: boolean
@@ -2358,6 +2361,9 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          date_day?: number | null
+          date_month?: number | null
+          date_year?: number | null
           explicitly_confirmed?: boolean
           id?: string
           is_active?: boolean
@@ -2368,6 +2374,9 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          date_day?: number | null
+          date_month?: number | null
+          date_year?: number | null
           explicitly_confirmed?: boolean
           id?: string
           is_active?: boolean
@@ -2637,6 +2646,7 @@ export type Database = {
         | "planning_preference"
         | "recurring_commitment"
         | "personal_note"
+        | "important_date"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2839,6 +2849,7 @@ export const Constants = {
         "planning_preference",
         "recurring_commitment",
         "personal_note",
+        "important_date",
       ],
     },
   },
