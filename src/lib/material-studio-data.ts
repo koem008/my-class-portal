@@ -24,6 +24,17 @@ export type MaterialStudioItem = {
   className: string;
 };
 
+export type MaterialStudioTarget = {
+  lessonId: string;
+  schoolId: string;
+  classId: string;
+  lessonDate: string;
+  subject: string;
+  topic: string;
+  grade: number | null;
+  className: string;
+};
+
 type MaterialRow = {
   id: string;
   school_id: string;
@@ -46,6 +57,7 @@ type LessonRow = {
   title: string | null;
 };
 
+type ManualLessonRow = LessonRow & { school_id: string };
 type ClassRow = { id: string; name: string; grade: number | null };
 
 function materialText(content: Record<string, unknown> | null): string {
@@ -114,4 +126,75 @@ export async function loadMaterialStudio(): Promise<MaterialStudioItem[]> {
       },
     ];
   });
+}
+
+export async function loadMaterialStudioTargets(): Promise<MaterialStudioTarget[]> {
+  const lessonsResult = await db
+    .from("lesson_instances")
+    .select("id,school_id,class_id,lesson_date,subject_name,topic,title")
+    .neq("status", "cancelled")
+    .order("lesson_date", { ascending: false })
+    .order("slot_order", { ascending: true })
+    .limit(300);
+  if (lessonsResult.error) throw lessonsResult.error;
+
+  const lessons = (lessonsResult.data ?? []) as ManualLessonRow[];
+  if (!lessons.length) return [];
+
+  const classIds = Array.from(new Set(lessons.map((lesson) => lesson.class_id)));
+  const classesResult = await db.from("classes").select("id,name,grade").in("id", classIds);
+  if (classesResult.error) throw classesResult.error;
+  const classById = new Map(
+    ((classesResult.data ?? []) as ClassRow[]).map((classInfo) => [classInfo.id, classInfo]),
+  );
+
+  return lessons.map((lesson) => {
+    const classInfo = classById.get(lesson.class_id);
+    return {
+      lessonId: lesson.id,
+      schoolId: lesson.school_id,
+      classId: lesson.class_id,
+      lessonDate: lesson.lesson_date,
+      subject: lesson.subject_name,
+      topic: lesson.topic ?? lesson.title ?? "Bez tématu",
+      grade: classInfo?.grade ?? null,
+      className: classInfo?.name ?? "Třída",
+    };
+  });
+}
+
+export async function createManualMaterial(input: {
+  target: MaterialStudioTarget;
+  kind: MaterialKind;
+  title: string;
+  text: string;
+  difficulty: MaterialStudioDifficulty;
+}) {
+  const title = input.title.trim();
+  if (!title) throw new Error("Doplň název materiálu.");
+
+  const lessonResult = await db
+    .from("lesson_instances")
+    .select("id,school_id,class_id")
+    .eq("id", input.target.lessonId)
+    .single();
+  if (lessonResult.error) throw lessonResult.error;
+  if (
+    lessonResult.data.school_id !== input.target.schoolId ||
+    lessonResult.data.class_id !== input.target.classId
+  ) {
+    throw new Error("Vybraná hodina už neodpovídá načtenému pracovnímu prostoru.");
+  }
+
+  const inserted = await db.from("lesson_materials").insert({
+    school_id: input.target.schoolId,
+    class_id: input.target.classId,
+    lesson_id: input.target.lessonId,
+    kind: input.kind,
+    title,
+    content: { text: input.text, source: "manual" },
+    difficulty: input.difficulty,
+    export_status: "draft",
+  });
+  if (inserted.error) throw inserted.error;
 }

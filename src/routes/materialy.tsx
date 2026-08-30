@@ -6,17 +6,27 @@ import {
   FileStack,
   Filter,
   Loader2,
+  Plus,
   Search,
   Sparkles,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { loadMaterialStudio, type MaterialStudioItem } from "@/lib/material-studio-data";
+import type { MaterialKind } from "@/lib/lesson-workspace-data";
+import {
+  createManualMaterial,
+  loadMaterialStudio,
+  loadMaterialStudioTargets,
+  type MaterialStudioDifficulty,
+  type MaterialStudioItem,
+  type MaterialStudioTarget,
+} from "@/lib/material-studio-data";
 
 export const Route = createFileRoute("/materialy")({ component: MaterialStudioPage });
 
 type LoadState = "loading" | "ready" | "error";
 
-const kindLabels: Record<string, string> = {
+const kindLabels: Record<MaterialKind, string> = {
   lesson_plan: "Příprava",
   board_notes: "Zápis",
   worksheet: "Pracovní list",
@@ -33,7 +43,9 @@ const kindLabels: Record<string, string> = {
   other: "Jiný materiál",
 };
 
-const difficultyLabels: Record<string, string> = {
+const materialKinds = Object.keys(kindLabels) as MaterialKind[];
+
+const difficultyLabels: Record<Exclude<MaterialStudioDifficulty, null>, string> = {
   easy: "Lehká",
   standard: "Standardní",
   advanced: "Pokročilá",
@@ -52,10 +64,16 @@ function isoDateLabel(value: string) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
+function targetLabel(target: MaterialStudioTarget) {
+  return `${isoDateLabel(target.lessonDate)} · ${target.className} · ${target.subject} · ${target.topic}`;
+}
+
 function MaterialStudioPage() {
   const [state, setState] = useState<LoadState>("loading");
   const [items, setItems] = useState<MaterialStudioItem[]>([]);
+  const [targets, setTargets] = useState<MaterialStudioTarget[]>([]);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState("");
@@ -63,13 +81,29 @@ function MaterialStudioPage() {
   const [kind, setKind] = useState("");
   const [grade, setGrade] = useState("");
   const [difficulty, setDifficulty] = useState("");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [manualLessonId, setManualLessonId] = useState("");
+  const [manualKind, setManualKind] = useState<MaterialKind>("worksheet");
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualText, setManualText] = useState("");
+  const [manualDifficulty, setManualDifficulty] = useState<MaterialStudioDifficulty>(null);
 
   async function reload() {
     setState("loading");
     setError("");
     try {
-      const data = await loadMaterialStudio();
+      const [data, targetData] = await Promise.all([
+        loadMaterialStudio(),
+        loadMaterialStudioTargets(),
+      ]);
       setItems(data);
+      setTargets(targetData);
+      setManualLessonId((current) =>
+        current && targetData.some((target) => target.lessonId === current)
+          ? current
+          : (targetData[0]?.lessonId ?? ""),
+      );
       setState("ready");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Materiály se nepodařilo načíst.");
@@ -124,6 +158,39 @@ function MaterialStudioPage() {
     setDifficulty("");
   }
 
+  function openManualEditor() {
+    setNotice("");
+    setManualTitle("");
+    setManualText("");
+    setManualKind("worksheet");
+    setManualDifficulty(null);
+    setManualLessonId((current) => current || targets[0]?.lessonId || "");
+    setEditorOpen(true);
+  }
+
+  async function saveManual() {
+    const target = targets.find((item) => item.lessonId === manualLessonId);
+    if (!target || !manualTitle.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      await createManualMaterial({
+        target,
+        kind: manualKind,
+        title: manualTitle,
+        text: manualText,
+        difficulty: manualDifficulty,
+      });
+      setEditorOpen(false);
+      setNotice("Materiál byl uložen ručně jako koncept. AI nebyla potřeba.");
+      await reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Materiál se nepodařilo uložit.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (state === "loading") {
     return (
       <StateCard
@@ -173,19 +240,41 @@ function MaterialStudioPage() {
               </h1>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-[#75817d]">
                 Jedna knihovna pro pracovní listy, testy, kvízy, řešení, prezentace, kartičky, hry,
-                projekty, zápisy i domácí úkoly. Materiál se sem dostane automaticky z hodiny — nic
-                nepřepisuješ podruhé.
+                projekty, zápisy i domácí úkoly. Každý typ můžeš vytvořit ručně nebo v konkrétní
+                hodině s pomocí AI.
               </p>
             </div>
           </div>
-          <Link
-            to="/rozvrh"
-            className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-black text-white shadow-[0_12px_28px_rgba(39,103,101,.18)]"
-          >
-            <Sparkles className="h-4 w-4" />
-            Vytvořit materiál v hodině
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={openManualEditor}
+              disabled={!targets.length}
+              className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-[#cfded8] bg-white px-4 py-2.5 text-sm font-black text-[#276765] shadow-sm disabled:opacity-40"
+            >
+              <Plus className="h-4 w-4" />
+              Přidat ručně
+            </button>
+            <Link
+              to="/rozvrh"
+              className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-black text-white shadow-[0_12px_28px_rgba(39,103,101,.18)]"
+            >
+              <Sparkles className="h-4 w-4" />
+              Vytvořit v hodině
+            </Link>
+          </div>
         </header>
+
+        {notice && (
+          <div className="mt-4 rounded-2xl border border-[#d8e9e2] bg-[#eef8f3] px-4 py-3 text-sm text-[#356862]">
+            {notice}
+          </div>
+        )}
+        {error && (
+          <div className="mt-4 rounded-2xl border border-[#efd9d7] bg-[#fff4f2] px-4 py-3 text-sm text-[#955b58]">
+            {error}
+          </div>
+        )}
 
         <section className="mt-7 overflow-hidden rounded-[32px] border border-[#e6e3db] bg-white shadow-[0_18px_60px_rgba(68,80,75,.07)]">
           <div className="border-b border-[#eeeae1] bg-[linear-gradient(120deg,#eef7f2_0%,#fff8ed_48%,#f3effb_100%)] p-5 md:p-6">
@@ -245,7 +334,7 @@ function MaterialStudioPage() {
                 value={kind}
                 onChange={setKind}
                 label="Typ"
-                options={kinds.map((value) => ({ value, label: kindLabels[value] ?? value }))}
+                options={kinds.map((value) => ({ value, label: kindLabels[value as MaterialKind] ?? value }))}
               />
               <Select
                 value={grade}
@@ -285,15 +374,24 @@ function MaterialStudioPage() {
               Tvoje knihovna zatím čeká na první materiál.
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#7b8783]">
-              Otevři libovolnou hodinu a ulož pracovní list, test, aktivitu nebo jiný materiál. Tady
-              se objeví automaticky.
+              Materiál můžeš přidat přímo ručně, nebo otevřít konkrétní hodinu a připravit ho tam.
             </p>
-            <Link
-              to="/rozvrh"
-              className="mt-5 inline-flex rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-black text-white"
-            >
-              Otevřít rozvrh
-            </Link>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={openManualEditor}
+                disabled={!targets.length}
+                className="inline-flex rounded-2xl border border-[#cfded8] bg-white px-4 py-2.5 text-sm font-black text-[#276765] disabled:opacity-40"
+              >
+                Přidat ručně
+              </button>
+              <Link
+                to="/rozvrh"
+                className="inline-flex rounded-2xl bg-[#276765] px-4 py-2.5 text-sm font-black text-white"
+              >
+                Otevřít rozvrh
+              </Link>
+            </div>
           </section>
         ) : filtered.length === 0 ? (
           <section className="mt-6 rounded-[30px] border border-dashed border-[#dddcd5] bg-white/65 px-6 py-12 text-center">
@@ -315,6 +413,123 @@ function MaterialStudioPage() {
           </section>
         )}
       </div>
+
+      {editorOpen && (
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-[#23322e]/35 p-4 backdrop-blur-sm">
+          <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-[30px] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[.15em] text-[#5e817c]">
+                  Klasický zápis
+                </div>
+                <h2 className="mt-1 text-2xl font-black">Přidat materiál ručně</h2>
+                <p className="mt-2 text-sm leading-6 text-[#75817d]">
+                  Žádný AI příkaz. Vyber hodinu, typ materiálu a napiš obsah přímo do polí.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditorOpen(false)}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#f4f3ef] text-[#71807c]"
+                aria-label="Zavřít"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {targets.length === 0 ? (
+              <div className="mt-5 rounded-2xl bg-[#fff6e9] p-4 text-sm text-[#815f46]">
+                Nejdřív musí existovat konkrétní hodina v rozvrhu. Materiál se vždy váže na hodinu.
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-4">
+                <label className="text-xs font-black text-[#61716c]">
+                  Hodina
+                  <select
+                    value={manualLessonId}
+                    onChange={(event) => setManualLessonId(event.target.value)}
+                    className="mt-1.5 w-full rounded-2xl border border-[#dddcd5] bg-white px-3 py-3 text-sm font-medium"
+                  >
+                    {targets.map((target) => (
+                      <option key={target.lessonId} value={target.lessonId}>
+                        {targetLabel(target)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-xs font-black text-[#61716c]">
+                    Typ
+                    <select
+                      value={manualKind}
+                      onChange={(event) => setManualKind(event.target.value as MaterialKind)}
+                      className="mt-1.5 w-full rounded-2xl border border-[#dddcd5] bg-white px-3 py-3 text-sm font-medium"
+                    >
+                      {materialKinds.map((value) => (
+                        <option key={value} value={value}>
+                          {kindLabels[value]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs font-black text-[#61716c]">
+                    Obtížnost
+                    <select
+                      value={manualDifficulty ?? ""}
+                      onChange={(event) =>
+                        setManualDifficulty(
+                          (event.target.value || null) as MaterialStudioDifficulty,
+                        )
+                      }
+                      className="mt-1.5 w-full rounded-2xl border border-[#dddcd5] bg-white px-3 py-3 text-sm font-medium"
+                    >
+                      <option value="">Bez označení</option>
+                      {Object.entries(difficultyLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <label className="text-xs font-black text-[#61716c]">
+                  Název
+                  <input
+                    value={manualTitle}
+                    onChange={(event) => setManualTitle(event.target.value)}
+                    maxLength={240}
+                    placeholder="Např. Pracovní list – vyjmenovaná slova"
+                    className="mt-1.5 w-full rounded-2xl border border-[#dddcd5] bg-white px-3 py-3 text-sm font-medium"
+                  />
+                </label>
+
+                <label className="text-xs font-black text-[#61716c]">
+                  Obsah
+                  <textarea
+                    value={manualText}
+                    onChange={(event) => setManualText(event.target.value)}
+                    rows={12}
+                    placeholder="Napiš obsah materiálu…"
+                    className="mt-1.5 w-full resize-y rounded-2xl border border-[#dddcd5] bg-white px-3 py-3 text-sm leading-6"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => void saveManual()}
+                  disabled={saving || !manualLessonId || !manualTitle.trim()}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#276765] px-5 py-3 text-sm font-black text-white disabled:opacity-40"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  {saving ? "Ukládám…" : "Uložit materiál"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
