@@ -2,8 +2,8 @@ import { Loader2, Mic, MicOff, Volume2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { runCompanionAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";
 
-const SILENCE_MS = 1400;
-const NO_SPEECH_TIMEOUT_MS = 10000;
+const SILENCE_MS = 850;
+const NO_SPEECH_TIMEOUT_MS = 8000;
 const MAX_RECORDING_MS = 45000;
 const SPEECH_THRESHOLD = 0.025;
 
@@ -49,17 +49,16 @@ export function GlobalVoiceCompanion() {
       stopEverything(true);
       return;
     }
+
     setOpen(true);
     setTranscript("");
     setReply("");
-    setNotice("Povoluji mikrofon…");
+    setNotice("Připojuji mikrofon…");
     setState("processing");
 
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-        throw new Error(
-          "Tento prohlížeč nepodporuje hlasový vstup. Zkuste aktuální Chrome nebo Edge.",
-        );
+        throw new Error("Tento prohlížeč nepodporuje hlasový vstup.");
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -89,6 +88,7 @@ export function GlobalVoiceCompanion() {
         window.AudioContext ||
         (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextCtor) throw new Error("Prohlížeč neumí rozpoznat konec řeči.");
+
       const audioContext = new AudioContextCtor();
       audioContextRef.current = audioContext;
       const source = audioContext.createMediaStreamSource(stream);
@@ -101,9 +101,9 @@ export function GlobalVoiceCompanion() {
       heardSpeechRef.current = false;
       startedAtRef.current = performance.now();
       lastSpeechAtRef.current = startedAtRef.current;
-      recorder.start(250);
+      recorder.start(200);
       setState("listening");
-      setNotice("Poslouchám… mluv přirozeně.");
+      setNotice("Poslouchám…");
 
       const watchVoice = () => {
         if (recorder.state !== "recording") return;
@@ -121,22 +121,22 @@ export function GlobalVoiceCompanion() {
           lastSpeechAtRef.current = now;
         }
 
-        const noSpeechTooLong =
-          !heardSpeechRef.current && now - startedAtRef.current >= NO_SPEECH_TIMEOUT_MS;
-        const speechEnded = heardSpeechRef.current && now - lastSpeechAtRef.current >= SILENCE_MS;
-        const maxReached = now - startedAtRef.current >= MAX_RECORDING_MS;
-
-        if (noSpeechTooLong) {
+        if (!heardSpeechRef.current && now - startedAtRef.current >= NO_SPEECH_TIMEOUT_MS) {
           setNotice("Neslyším řeč. Zkus to znovu.");
           stopEverything(false);
           setState("idle");
           return;
         }
-        if (speechEnded || maxReached) {
-          setNotice("Rozumím, zpracovávám…");
+
+        if (
+          (heardSpeechRef.current && now - lastSpeechAtRef.current >= SILENCE_MS) ||
+          now - startedAtRef.current >= MAX_RECORDING_MS
+        ) {
+          setNotice("Zpracovávám…");
           stopEverything(true);
           return;
         }
+
         animationRef.current = requestAnimationFrame(watchVoice);
       };
       animationRef.current = requestAnimationFrame(watchVoice);
@@ -148,7 +148,7 @@ export function GlobalVoiceCompanion() {
         message.includes("Permission") ||
           message.includes("denied") ||
           message.includes("NotAllowed")
-          ? "Mikrofon je v prohlížeči zablokovaný. Povol ho pro tento web a zkus to znovu."
+          ? "Mikrofon je zablokovaný. Povol ho pro tento web a zkus to znovu."
           : message,
       );
     }
@@ -169,42 +169,42 @@ export function GlobalVoiceCompanion() {
     }
 
     setState("processing");
-    setNotice("Přepisuji a přemýšlím…");
+    setNotice("Přepisuji…");
+
     try {
       const blob = new Blob(chunks, { type: mimeType });
       const extension = mimeType.includes("mp4") ? "m4a" : "webm";
       const form = new FormData();
       form.append("audio", blob, `asistentka.${extension}`);
+
       const transcribed = await transcribeVoice({ data: form });
       const text = transcribed.text?.trim();
       if (!text) throw new Error("Nerozuměla jsem nahrávce. Zkus prosím mluvit znovu.");
       setTranscript(text);
+      setNotice("Přemýšlím…");
 
       const now = new Date();
       const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const result = await runCompanionAi({
         data: {
-          message: text,
+          message: `${text}\n\nPro hlasový režim odpověz co nejstručněji: běžně 1–3 krátké věty. Delší odpověď dej jen když o ni výslovně žádám. Nepoužívej markdownové nadpisy ani dlouhé seznamy.`,
           assistantName: "Asistentka",
           tone: "friendly",
           localDate,
         },
       });
-      setReply(result.reply);
-      setState("reply");
-      setNotice("Odpovídám…");
 
-      if (result.reply.trim()) {
-        try {
-          const speech = await synthesizeAssistantVoice({
-            data: { text: result.reply.slice(0, 2500) },
+      const conciseReply = result.reply.trim();
+      setReply(conciseReply);
+      setState("reply");
+      setNotice("Hotovo");
+
+      if (conciseReply) {
+        void synthesizeAssistantVoice({ data: { text: conciseReply.slice(0, 700) } })
+          .then((speech) => new Audio(`data:${speech.mimeType};base64,${speech.audioBase64}`).play())
+          .catch(() => {
+            setNotice("Text je hotový, hlas se nepodařilo přehrát.");
           });
-          const audio = new Audio(`data:${speech.mimeType};base64,${speech.audioBase64}`);
-          await audio.play();
-          setNotice("Můžeš pokračovat dalším dotazem.");
-        } catch {
-          setNotice("Odpověď je připravená. Hlasové přehrání se nepodařilo spustit.");
-        }
       }
     } catch (error) {
       setState("error");
@@ -229,19 +229,19 @@ export function GlobalVoiceCompanion() {
       )}
 
       {open && (
-        <section className="fixed bottom-4 right-3 z-[70] max-h-[62dvh] w-[calc(100vw-24px)] max-w-[390px] overflow-y-auto rounded-[24px] border border-[#e5e1d8] bg-[#fffefa] p-4 shadow-[0_22px_70px_rgba(32,48,44,.22)] sm:bottom-5 sm:right-5 sm:w-[390px] sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[.16em] text-[#4e7772]">
+        <section className="fixed bottom-3 right-3 z-[70] max-h-[42dvh] w-[calc(100vw-24px)] max-w-[320px] overflow-hidden rounded-[20px] border border-[#e5e1d8] bg-[#fffefa] p-3 shadow-[0_18px_55px_rgba(32,48,44,.2)] sm:bottom-5 sm:right-5 sm:w-[320px] sm:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[9px] font-bold uppercase tracking-[.16em] text-[#4e7772]">
                 Moje asistentka
               </div>
-              <h2 className="mt-0.5 text-lg font-bold text-[#24343f]">
+              <div className="mt-0.5 truncate text-sm font-bold text-[#24343f]">
                 {state === "listening"
-                  ? "Poslouchám tě"
+                  ? "Poslouchám"
                   : state === "processing"
                     ? "Zpracovávám"
                     : "Můžeme mluvit"}
-              </h2>
+              </div>
             </div>
             <button
               type="button"
@@ -251,66 +251,61 @@ export function GlobalVoiceCompanion() {
                 setOpen(false);
                 setState("idle");
               }}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f6f4ef] text-[#647471] transition hover:bg-[#eeece6]"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f6f4ef] text-[#647471]"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="mt-4 flex items-center gap-4">
+          <div className="mt-3 flex items-center gap-3">
             <button
               type="button"
               onClick={() => void beginConversation()}
               disabled={state === "processing"}
-              className={`grid h-20 w-20 shrink-0 place-items-center rounded-full text-white shadow-[0_12px_30px_rgba(39,103,101,.22)] transition disabled:opacity-60 ${state === "listening" ? "animate-pulse bg-[#b85f61]" : "bg-[#276765] hover:scale-105"}`}
+              className={`grid h-14 w-14 shrink-0 place-items-center rounded-full text-white shadow-[0_10px_24px_rgba(39,103,101,.2)] transition disabled:opacity-60 ${state === "listening" ? "animate-pulse bg-[#b85f61]" : "bg-[#276765]"}`}
             >
               {state === "processing" ? (
-                <Loader2 className="h-8 w-8 animate-spin" />
+                <Loader2 className="h-6 w-6 animate-spin" />
               ) : state === "listening" ? (
-                <MicOff className="h-8 w-8" />
+                <MicOff className="h-6 w-6" />
               ) : (
-                <Mic className="h-8 w-8" />
+                <Mic className="h-6 w-6" />
               )}
             </button>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold leading-5 text-[#53696a]">
-                {notice || "Klepni a mluv přirozeně."}
-              </p>
-              <p className="mt-1 text-[11px] leading-4 text-[#87928f]">
-                Po krátké pauze se nahrávání samo odešle.
-              </p>
-            </div>
+            <p className="min-w-0 flex-1 text-xs font-semibold leading-4 text-[#53696a]">
+              {notice || "Mluv přirozeně."}
+            </p>
           </div>
 
-          {transcript && (
-            <div className="mt-4 rounded-2xl bg-[#f4f5f1] p-3">
-              <div className="text-[10px] font-bold uppercase tracking-[.12em] text-[#82908f]">
-                Ty
+          <div className="mt-3 max-h-[22dvh] space-y-2 overflow-y-auto pr-1">
+            {transcript && (
+              <div className="rounded-xl bg-[#f4f5f1] px-3 py-2">
+                <div className="text-[9px] font-bold uppercase tracking-[.12em] text-[#82908f]">Ty</div>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#34484a]">{transcript}</p>
               </div>
-              <p className="mt-1 text-sm leading-5 text-[#34484a]">{transcript}</p>
-            </div>
-          )}
+            )}
 
-          {reply && (
-            <div className="mt-3 rounded-2xl bg-[#eaf6f0] p-3">
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.12em] text-[#4e7772]">
-                <Volume2 className="h-3.5 w-3.5" /> Asistentka
+            {reply && (
+              <div className="rounded-xl bg-[#eaf6f0] px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[.12em] text-[#4e7772]">
+                  <Volume2 className="h-3 w-3" /> Asistentka
+                </div>
+                <p className="mt-0.5 text-xs leading-4 text-[#34484a]">{reply}</p>
               </div>
-              <p className="mt-1 text-sm leading-5 text-[#34484a]">{reply}</p>
-            </div>
-          )}
+            )}
 
-          {state === "error" && notice && (
-            <div className="mt-3 max-h-28 overflow-y-auto rounded-2xl bg-[#fff3f1] p-3 text-xs leading-5 text-[#8c514f] [overflow-wrap:anywhere]">
-              {notice}
-            </div>
-          )}
+            {state === "error" && notice && (
+              <div className="max-h-20 overflow-y-auto rounded-xl bg-[#fff3f1] px-3 py-2 text-[11px] leading-4 text-[#8c514f] [overflow-wrap:anywhere]">
+                {notice}
+              </div>
+            )}
+          </div>
 
           {(state === "reply" || state === "error" || state === "idle") && (
             <button
               type="button"
               onClick={() => void beginConversation()}
-              className="mt-4 w-full rounded-xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white"
+              className="mt-3 w-full rounded-xl bg-[#276765] px-3 py-2 text-xs font-bold text-white"
             >
               Mluvit znovu
             </button>

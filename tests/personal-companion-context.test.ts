@@ -99,17 +99,19 @@ describe("personal daily context", () => {
     );
   });
 
-  test("fails closed when personal memory is disabled", () => {
+  test("keeps only non-sensitive form of address when personal memory is disabled", () => {
     const context = buildPersonalDailyContext(
       { ...settings, memory_enabled: false },
       memories,
       "2026-08-31",
     );
     expect(context).toEqual({
-      enabled: false,
+      enabled: true,
+      salutation: "Káťo",
       commitments: [],
       importantDates: [],
       preferences: [],
     });
+    expect(personalContextLines(context)).toEqual([]);
   });
 });
