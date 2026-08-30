@@ -215,6 +215,79 @@ export type Database = {
         }
         Relationships: []
       }
+      assistant_coordination_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          school_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          school_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_coordination_audit_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_coordinators: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          is_active: boolean
+          role: string
+          school_id: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          is_active?: boolean
+          role?: string
+          school_id: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          is_active?: boolean
+          role?: string
+          school_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_coordinators_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           academic_year_id: string
@@ -1661,6 +1734,54 @@ export type Database = {
           },
         ]
       }
+      special_education_external_documentation: {
+        Row: {
+          case_id: string
+          created_at: string
+          diagnosis_code: string
+          document_date: string
+          id: string
+          recorded_by: string
+          school_id: string
+          source_reference: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          diagnosis_code: string
+          document_date: string
+          id?: string
+          recorded_by: string
+          school_id: string
+          source_reference: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          diagnosis_code?: string
+          document_date?: string
+          id?: string
+          recorded_by?: string
+          school_id?: string
+          source_reference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_education_external_documentation_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "special_education_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_education_external_documentation_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       special_education_followups: {
         Row: {
           case_id: string
@@ -2348,6 +2469,9 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          date_day: number | null
+          date_month: number | null
+          date_year: number | null
           explicitly_confirmed: boolean
           id: string
           is_active: boolean
@@ -2358,6 +2482,9 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          date_day?: number | null
+          date_month?: number | null
+          date_year?: number | null
           explicitly_confirmed?: boolean
           id?: string
           is_active?: boolean
@@ -2368,6 +2495,9 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          date_day?: number | null
+          date_month?: number | null
+          date_year?: number | null
           explicitly_confirmed?: boolean
           id?: string
           is_active?: boolean
@@ -2400,6 +2530,121 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      teaching_assistant_assignments: {
+        Row: {
+          assignment_note: string | null
+          assistant_id: string
+          class_id: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          school_id: string
+          student_alias_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          assignment_note?: string | null
+          assistant_id: string
+          class_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          student_alias_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assignment_note?: string | null
+          assistant_id?: string
+          class_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          student_alias_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teaching_assistant_assignments_assistant_id_school_id_fkey"
+            columns: ["assistant_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_assistants"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "teaching_assistant_assignments_class_id_school_id_fkey"
+            columns: ["class_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "teaching_assistant_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teaching_assistant_assignments_student_alias_id_fkey"
+            columns: ["student_alias_id"]
+            isOneToOne: false
+            referencedRelation: "student_aliases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teaching_assistants: {
+        Row: {
+          created_at: string
+          created_by: string
+          display_name: string
+          id: string
+          is_active: boolean
+          school_id: string
+          updated_at: string
+          work_email: string | null
+          work_phone: string | null
+          workload_note: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          updated_at?: string
+          work_email?: string | null
+          work_phone?: string | null
+          workload_note?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          updated_at?: string
+          work_email?: string | null
+          work_phone?: string | null
+          workload_note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teaching_assistants_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       timetable_slots: {
         Row: {
@@ -2503,6 +2748,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assistant_assignment_scope_valid: {
+        Args: {
+          p_class_id: string
+          p_school_id: string
+          p_student_alias_id: string
+        }
+        Returns: boolean
+      }
       can_access_class: { Args: { _class_id: string }; Returns: boolean }
       class_day_blockers: {
         Args: { _class_id: string; _day: string }
@@ -2511,6 +2764,14 @@ export type Database = {
           event_id: string
           source: string
           title: string
+        }[]
+      }
+      coordinator_student_alias_options: {
+        Args: { p_class_id: string }
+        Returns: {
+          alias: string
+          avatar_key: string
+          id: string
         }[]
       }
       create_school_tenant: {
@@ -2535,9 +2796,17 @@ export type Database = {
           title: string
         }[]
       }
+      grant_assistant_coordinator_access: {
+        Args: { p_role?: string; p_school_id: string; p_user_id: string }
+        Returns: undefined
+      }
       grant_special_education_access: {
         Args: { p_role?: string; p_school_id: string; p_user_id: string }
         Returns: undefined
+      }
+      has_assistant_coordinator_access: {
+        Args: { p_school_id: string }
+        Returns: boolean
       }
       has_special_education_access: {
         Args: { p_school_id: string }
@@ -2637,6 +2906,7 @@ export type Database = {
         | "planning_preference"
         | "recurring_commitment"
         | "personal_note"
+        | "important_date"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2839,6 +3109,7 @@ export const Constants = {
         "planning_preference",
         "recurring_commitment",
         "personal_note",
+        "important_date",
       ],
     },
   },
