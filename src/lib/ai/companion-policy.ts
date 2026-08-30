@@ -5,16 +5,28 @@ import {
   type CompanionResult,
 } from "./contracts";
 
-const navigationTargets = new Set<CompanionNavigationTarget>([
-  "home",
-  "schedule",
-  "calendar",
-  "memory",
-  "art_studio",
-  "special_education",
-  "assistants",
+export const COMPANION_NAVIGATION_ITEMS = [
+  { target: "home", label: "Dnes", path: "/", keywords: ["dnes", "úvod", "domů"] },
+  { target: "schedule", label: "Rozvrh", path: "/rozvrh", keywords: ["rozvrh", "hodiny", "týden"] },
+  { target: "calendar", label: "Kalendář", path: "/kalendar", keywords: ["kalendář", "události", "termíny"] },
+  { target: "classroom", label: "Třída", path: "/trida", keywords: ["třída", "pseudonymy", "žáci"] },
+  { target: "memory", label: "Co si o mně pamatuješ", path: "/pamet", keywords: ["paměť", "preference", "důležitá data"] },
+  { target: "art_studio", label: "Výtvarná výchova", path: "/vytvarna-vychova", keywords: ["výtvarná", "ateliér", "obrázky"] },
+  { target: "special_education", label: "Speciální pedagogika", path: "/specialni-pedagogika", keywords: ["speciální pedagogika", "podpora", "případy"] },
+  { target: "assistants", label: "Asistenti pedagoga", path: "/asistenti", keywords: ["asistenti", "AP", "koordinace"] },
+] as const satisfies ReadonlyArray<{
+  target: Exclude<CompanionNavigationTarget, "lesson">;
+  label: string;
+  path: string;
+  keywords: readonly string[];
+}>;
+
+export const COMPANION_NAVIGATION_TARGETS: readonly CompanionNavigationTarget[] = [
+  ...COMPANION_NAVIGATION_ITEMS.map((item) => item.target),
   "lesson",
-]);
+];
+
+const navigationTargets = new Set<CompanionNavigationTarget>(COMPANION_NAVIGATION_TARGETS);
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -121,15 +133,10 @@ export function parseCompanionPayload(value: unknown): Omit<CompanionResult, "us
   }
   throw new Error("AI odpověď používá nepovolený režim.");
 }
+
 export function navigationPath(target: CompanionNavigationTarget): string {
-  const paths: Record<Exclude<CompanionNavigationTarget, "lesson">, string> = {
-    home: "/",
-    schedule: "/rozvrh",
-    calendar: "/kalendar",
-    memory: "/pamet",
-    art_studio: "/vytvarna-vychova",
-    special_education: "/specialni-pedagogika",
-    assistants: "/asistenti",
-  };
-  return target === "lesson" ? "/hodina/$lessonId" : paths[target];
+  if (target === "lesson") return "/hodina/$lessonId";
+  const item = COMPANION_NAVIGATION_ITEMS.find((entry) => entry.target === target);
+  if (!item) throw new Error("Navigační cíl není nakonfigurovaný.");
+  return item.path;
 }
