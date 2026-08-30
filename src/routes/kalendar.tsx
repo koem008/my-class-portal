@@ -15,6 +15,7 @@ import {
   deleteClassCalendarEvent,
   itemsForDate,
   loadCalendarRange,
+  rescheduleMovedLesson,
   type CalendarEventKind,
   type CalendarItem,
   type CalendarStudentAlias,
@@ -78,6 +79,7 @@ const selectableKinds: Array<[CalendarEventKind, string]> = [
 function CalendarPage() {
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [classInfo, setClassInfo] = useState<AccessibleClass | null>(null);
   const [items, setItems] = useState<CalendarItem[]>([]);
   const [aliases, setAliases] = useState<CalendarStudentAlias[]>([]);
@@ -138,7 +140,7 @@ function CalendarPage() {
     setSaving(true);
     setError("");
     try {
-      await createClassCalendarEvent(classInfo, {
+      const impacted = await createClassCalendarEvent(classInfo, {
         title,
         kind,
         startDate,
@@ -149,6 +151,13 @@ function CalendarPage() {
         studentAliasId: kind === "birthday" || kind === "name_day" ? aliasId : null,
       });
       setEditorOpen(false);
+      setNotice(
+        impacted.length
+          ? `${impacted.length} ${impacted.length === 1 ? "hodina čeká" : "hodiny čekají"} na vědomý přesun. Nic nebylo označeno jako odučené.`
+          : blocks
+            ? "Den je blokovaný. Běžné hodiny se v něm nebudou automaticky vytvářet."
+            : "Událost je uložená.",
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Událost se nepodařilo uložit.");
@@ -160,10 +169,30 @@ function CalendarPage() {
     setSaving(true);
     setError("");
     try {
-      await deleteClassCalendarEvent(id);
+      const restored = await deleteClassCalendarEvent(id);
+      setNotice(
+        restored > 0
+          ? `${restored} ${restored === 1 ? "hodina se vrátila" : "hodiny se vrátily"} do původního stavu, protože blokace byla odstraněna.`
+          : "Událost byla odstraněna.",
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Událost se nepodařilo smazat.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function moveLesson(lessonId: string, targetDay: string) {
+    setSaving(true);
+    setError("");
+    try {
+      await rescheduleMovedLesson(lessonId, targetDay);
+      setNotice("Hodina je přesunutá. Příprava i materiály zůstaly zachované.");
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Hodinu se nepodařilo přesunout.");
+      throw e;
     } finally {
       setSaving(false);
     }
@@ -255,6 +284,11 @@ function CalendarPage() {
             {error}
           </div>
         )}
+        {notice && (
+          <div className="mt-4 rounded-2xl border border-[#d8e9e2] bg-[#eef8f3] p-3 text-sm text-[#356862]">
+            {notice}
+          </div>
+        )}
 
         <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_350px]">
           <section>
@@ -286,7 +320,13 @@ function CalendarPage() {
               <p className="mt-2 text-lg font-bold">{formatDate(selected)}</p>
               <div className="mt-4 space-y-2">
                 {selectedItems.map((item) => (
-                  <EventCard key={item.id} item={item} onDelete={() => void removeEvent(item.id)} />
+                  <EventCard
+                    key={item.id}
+                    item={item}
+                    saving={saving}
+                    onDelete={() => void removeEvent(item.id)}
+                    onReschedule={moveLesson}
+                  />
                 ))}
                 {!selectedItems.length && (
                   <div className="rounded-2xl bg-[#faf9f5] p-4 text-sm text-[#899392]">
@@ -518,7 +558,17 @@ function Year({ items, onMonth }: { items: CalendarItem[]; onMonth: (d: Date) =>
     </div>
   );
 }
-function EventCard({ item, onDelete }: { item: CalendarItem; onDelete: () => void }) {
+function EventCard({
+  item,
+  saving,
+  onDelete,
+  onReschedule,
+}: {
+  item: CalendarItem;
+  saving: boolean;
+  onDelete: () => void;
+  onReschedule: (lessonId: string, targetDay: string) => Promise<void>;
+}) {
   return (
     <div
       className={`rounded-2xl border p-3 ${item.blocksLessons ? "border-[#efd6c9] bg-[#fff5ef]" : "border-[#e4e7e1] bg-[#fafbf9]"}`}
@@ -539,6 +589,22 @@ function EventCard({ item, onDelete }: { item: CalendarItem; onDelete: () => voi
           {item.sourceName && (
             <div className="mt-2 text-[10px] text-[#84908e]">Zdroj: {item.sourceName}</div>
           )}
+          {!!item.movedLessons?.length && (
+            <div className="mt-3 space-y-2 rounded-xl border border-[#ead8ce] bg-white/75 p-3">
+              <div className="text-[10px] font-black uppercase tracking-[.08em] text-[#98644c]">
+                Čeká na přesun · učivo zůstává neprobrané
+              </div>
+              {item.movedLessons.map((lesson) => (
+                <MovedLessonRow
+                  key={lesson.id}
+                  lesson={lesson}
+                  eventEnd={item.endsOn}
+                  saving={saving}
+                  onReschedule={onReschedule}
+                />
+              ))}
+            </div>
+          )}
         </div>
         {item.sourceType === "custom" && (
           <button
@@ -553,6 +619,62 @@ function EventCard({ item, onDelete }: { item: CalendarItem; onDelete: () => voi
     </div>
   );
 }
+function MovedLessonRow({
+  lesson,
+  eventEnd,
+  saving,
+  onReschedule,
+}: {
+  lesson: NonNullable<CalendarItem["movedLessons"]>[number];
+  eventEnd: string;
+  saving: boolean;
+  onReschedule: (lessonId: string, targetDay: string) => Promise<void>;
+}) {
+  const [targetDay, setTargetDay] = useState(() => nextSchoolDay(eventEnd));
+  return (
+    <div className="rounded-xl bg-[#fffaf6] p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-xs font-black">{lesson.subjectName}</div>
+          <div className="text-[10px] text-[#8d7b72]">
+            {lesson.slotOrder}. hodina · původně {lesson.lessonDate}
+          </div>
+        </div>
+        <Link
+          to="/hodina/$lessonId"
+          params={{ lessonId: lesson.id }}
+          className="text-[10px] font-bold text-[#39706a]"
+        >
+          Otevřít
+        </Link>
+      </div>
+      <div className="mt-2 flex gap-2">
+        <input
+          type="date"
+          value={targetDay}
+          onChange={(event) => setTargetDay(event.target.value)}
+          className="min-w-0 flex-1 rounded-xl border border-[#e4d8d1] bg-white px-2 py-1.5 text-xs"
+        />
+        <button
+          type="button"
+          disabled={saving || !targetDay}
+          onClick={() => void onReschedule(lesson.id, targetDay)}
+          className="rounded-xl bg-[#276765] px-3 py-1.5 text-[10px] font-black text-white disabled:opacity-40"
+        >
+          Přesunout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function nextSchoolDay(iso: string) {
+  const date = new Date(`${iso}T12:00:00`);
+  do date.setDate(date.getDate() + 1);
+  while (date.getDay() === 0 || date.getDay() === 6);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function Field({
   label,
   value,

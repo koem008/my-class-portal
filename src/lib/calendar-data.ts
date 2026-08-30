@@ -18,6 +18,13 @@ export type CalendarEventKind =
   | "training"
   | "absence"
   | "other";
+export type CalendarMovedLesson = {
+  id: string;
+  lessonDate: string;
+  slotOrder: number;
+  subjectName: string;
+  statusBeforeMove: string | null;
+};
 export type CalendarItem = {
   id: string;
   title: string;
@@ -34,6 +41,7 @@ export type CalendarItem = {
   sourceName?: string | null;
   sourceUrl?: string | null;
   studentAliasId?: string | null;
+  movedLessons?: CalendarMovedLesson[];
 };
 
 export type CalendarStudentAlias = { id: string; alias: string; avatar_key: string | null };
@@ -74,6 +82,34 @@ export async function loadCalendarRange(
   for (const result of [customResult, systemResult, aliasesResult])
     if (result.error) throw result.error;
 
+  const customIds = (customResult.data ?? []).map((row: any) => row.id as string);
+  const movedLessonsResult = customIds.length
+    ? await db
+        .from("lesson_instances")
+        .select(
+          "id,source_calendar_event_id,lesson_date,slot_order,subject_name,status,status_before_move",
+        )
+        .in("source_calendar_event_id", customIds)
+        .eq("status", "moved")
+        .order("lesson_date")
+        .order("slot_order")
+    : { data: [], error: null };
+  if (movedLessonsResult.error) throw movedLessonsResult.error;
+  const movedByEvent = new Map<string, CalendarMovedLesson[]>();
+  for (const row of movedLessonsResult.data ?? []) {
+    const eventId = (row as any).source_calendar_event_id as string | null;
+    if (!eventId) continue;
+    const list = movedByEvent.get(eventId) ?? [];
+    list.push({
+      id: (row as any).id,
+      lessonDate: (row as any).lesson_date,
+      slotOrder: Number((row as any).slot_order),
+      subjectName: String((row as any).subject_name),
+      statusBeforeMove: (row as any).status_before_move ?? null,
+    });
+    movedByEvent.set(eventId, list);
+  }
+
   const custom: CalendarItem[] = (customResult.data ?? []).map((row: any) => ({
     id: row.id,
     title: row.title,
@@ -89,6 +125,7 @@ export async function loadCalendarRange(
     blocksLessons: Boolean(row.blocks_lessons),
     sourceType: "custom",
     studentAliasId: row.student_alias_id ?? null,
+    movedLessons: movedByEvent.get(row.id) ?? [],
   }));
 
   const system: CalendarItem[] = (systemResult.data ?? []).map((row: any) => ({
@@ -138,28 +175,55 @@ export async function createClassCalendarEvent(
   if ((input.kind === "birthday" || input.kind === "name_day") && !input.studentAliasId)
     throw new Error("Vyberte pseudonym žáka.");
 
-  const { error } = await db.from("calendar_events").insert({
-    school_id: classInfo.school_id,
-    academic_year_id: classInfo.academic_year_id,
-    class_id: classInfo.id,
-    student_alias_id: input.studentAliasId ?? null,
-    created_by: authData.user.id,
-    scope: "class",
-    kind: input.kind,
-    title,
-    note: input.note?.trim() || null,
-    starts_at: pragueMidnightIso(input.startDate),
-    ends_at: pragueMidnightIso(addDays(endDate, 1)),
-    all_day: true,
-    affects_schedule: Boolean(input.affectsSchedule || input.blocksLessons),
-    blocks_lessons: Boolean(input.blocksLessons),
-  });
+  const { data: created, error } = await db
+    .from("calendar_events")
+    .insert({
+      school_id: classInfo.school_id,
+      academic_year_id: classInfo.academic_year_id,
+      class_id: classInfo.id,
+      student_alias_id: input.studentAliasId ?? null,
+      created_by: authData.user.id,
+      scope: "class",
+      kind: input.kind,
+      title,
+      note: input.note?.trim() || null,
+      starts_at: pragueMidnightIso(input.startDate),
+      ends_at: pragueMidnightIso(addDays(endDate, 1)),
+      all_day: true,
+      affects_schedule: Boolean(input.affectsSchedule || input.blocksLessons),
+      blocks_lessons: Boolean(input.blocksLessons),
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  if (!input.blocksLessons) return [] as CalendarMovedLesson[];
+
+  const reconciled = await db.rpc("reconcile_blocking_calendar_event", { _event_id: created.id });
+  if (reconciled.error) throw reconciled.error;
+  return ((reconciled.data ?? []) as Array<any>).map((row) => ({
+    id: row.lesson_id as string,
+    lessonDate: row.lesson_date as string,
+    slotOrder: Number(row.slot_order),
+    subjectName: String(row.subject_name),
+    statusBeforeMove: row.previous_status ? String(row.previous_status) : null,
+  }));
 }
 
 export async function deleteClassCalendarEvent(eventId: string) {
   if (eventId.startsWith("system:")) throw new Error("Systémový kalendář nelze mazat.");
-  const { error } = await db.from("calendar_events").delete().eq("id", eventId);
+  const { data, error } = await db.rpc("delete_class_calendar_event_safely", {
+    _event_id: eventId,
+  });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
+export async function rescheduleMovedLesson(lessonId: string, targetDay: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDay)) throw new Error("Vyberte platné nové datum.");
+  const { error } = await db.rpc("reschedule_moved_lesson", {
+    _lesson_id: lessonId,
+    _target_day: targetDay,
+  });
   if (error) throw error;
 }
 
