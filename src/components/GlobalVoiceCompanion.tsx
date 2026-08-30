@@ -21,6 +21,7 @@ export function GlobalVoiceCompanion() {
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const playbackContextRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
@@ -32,9 +33,30 @@ export function GlobalVoiceCompanion() {
       stopEverything(false);
       audioRef.current?.pause();
       audioRef.current = null;
+      void playbackContextRef.current?.close().catch(() => undefined);
+      playbackContextRef.current = null;
     },
     [],
   );
+
+  function getAudioContextCtor() {
+    return (
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    );
+  }
+
+  function unlockPlayback() {
+    try {
+      const AudioContextCtor = getAudioContextCtor();
+      if (!AudioContextCtor) return;
+      const context = playbackContextRef.current ?? new AudioContextCtor();
+      playbackContextRef.current = context;
+      if (context.state === "suspended") void context.resume().catch(() => undefined);
+    } catch (error) {
+      console.warn("[AUDIO_UNLOCK_ERROR]", error);
+    }
+  }
 
   function stopEverything(process = false) {
     if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
@@ -56,6 +78,25 @@ export function GlobalVoiceCompanion() {
 
   async function playSpeech(url = speechUrl) {
     if (!url) return;
+
+    const playbackContext = playbackContextRef.current;
+    if (playbackContext) {
+      try {
+        if (playbackContext.state === "suspended") await playbackContext.resume();
+        const response = await fetch(url);
+        const encodedAudio = await response.arrayBuffer();
+        const audioBuffer = await playbackContext.decodeAudioData(encodedAudio.slice(0));
+        const source = playbackContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(playbackContext.destination);
+        source.start(0);
+        setNotice("Hlas přehrávám.");
+        return;
+      } catch (error) {
+        console.warn("[WEB_AUDIO_PLAYBACK_ERROR]", error);
+      }
+    }
+
     try {
       const audio = audioRef.current ?? new Audio();
       audioRef.current = audio;
@@ -68,7 +109,7 @@ export function GlobalVoiceCompanion() {
       console.error("[AUDIO_PLAYBACK_ERROR]", error);
       setNotice(
         message.includes("NotAllowedError")
-          ? "iPhone blokuje automatické přehrání. Klepni na „Přehrát hlas“."
+          ? "iPhone zablokoval automatické přehrání. Klepni na „Přehrát hlas“."
           : `Přehrání v prohlížeči selhalo: ${message}`,
       );
     }
@@ -80,6 +121,9 @@ export function GlobalVoiceCompanion() {
       return;
     }
 
+    // Must run synchronously from the user's tap. Safari then keeps this Web Audio context
+    // authorized for the delayed TTS response even after STT/AI/TTS network requests finish.
+    unlockPlayback();
     audioRef.current?.pause();
     setSpeechUrl("");
     setOpen(true);
@@ -116,9 +160,7 @@ export function GlobalVoiceCompanion() {
         void processRecording(mimeType);
       };
 
-      const AudioContextCtor =
-        window.AudioContext ||
-        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      const AudioContextCtor = getAudioContextCtor();
       if (!AudioContextCtor) throw new Error("Prohlížeč neumí rozpoznat konec řeči.");
 
       const audioContext = new AudioContextCtor();
@@ -249,13 +291,7 @@ export function GlobalVoiceCompanion() {
 
         const url = `data:${speech.mimeType};base64,${speech.audioBase64}`;
         setSpeechUrl(url);
-
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        if (isIOS) {
-          setNotice("Odpověď je hotová. Klepni na „Přehrát hlas“.");
-        } else {
-          await playSpeech(url);
-        }
+        await playSpeech(url);
       }
     } catch (error) {
       setState("error");
@@ -352,7 +388,7 @@ export function GlobalVoiceCompanion() {
                     className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#276765] px-2.5 py-1.5 text-[11px] font-bold text-white"
                   >
                     <Play className="h-3.5 w-3.5" />
-                    Přehrát hlas
+                    Přehrát znovu
                   </button>
                 )}
               </div>
