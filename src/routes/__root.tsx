@@ -263,7 +263,8 @@ function AuthGate() {
         lastSpeechAt = now;
       }
 
-      const finishedSpeaking = speechDetected && now - lastSpeechAt > 1400 && now - startedAt > 1200;
+      const finishedSpeaking =
+        speechDetected && now - lastSpeechAt > 1400 && now - startedAt > 1200;
       const noSpeechTimeout = !speechDetected && now - startedAt > 7000;
       const hardTimeout = now - startedAt > 20000;
       if (finishedSpeaking || noSpeechTimeout || hardTimeout) {
