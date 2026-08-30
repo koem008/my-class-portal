@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { generateArtInspirationImage } from "@/lib/ai/functions";
-import { ArrowLeft, Brush, Clock3, Layers3, Sparkles } from "lucide-react";
+import { ArrowLeft, Brush, Clock3, Layers3, Plus, Sparkles } from "lucide-react";
 import {
   artThemeToPreparation,
   loadArtOutcomeTitles,
@@ -13,6 +13,13 @@ import {
 import { applyArtThemeToLesson, loadLessonWorkspace } from "@/lib/lesson-workspace-data";
 
 export const Route = createFileRoute("/vytvarna-vychova")({ component: ArtStudioPage });
+
+function lines(value: string) {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 function ArtStudioPage() {
   const navigate = useNavigate();
@@ -28,9 +35,21 @@ function ArtStudioPage() {
   const [imageResult, setImageResult] = useState<{ imageBase64: string; mimeType: string } | null>(
     null,
   );
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualSummary, setManualSummary] = useState("");
+  const [manualMinutes, setManualMinutes] = useState(45);
+  const [manualMaterials, setManualMaterials] = useState("");
+  const [manualGoals, setManualGoals] = useState("");
+  const [manualSteps, setManualSteps] = useState("");
+  const [manualEasy, setManualEasy] = useState("");
+  const [manualAdvanced, setManualAdvanced] = useState("");
+  const [manualReflection, setManualReflection] = useState("");
+
   useEffect(() => {
     void init();
   }, []);
+
   async function init() {
     setLoading(true);
     setError("");
@@ -48,6 +67,7 @@ function ArtStudioPage() {
       setLoading(false);
     }
   }
+
   async function choose(theme: ArtTheme) {
     setSelected(theme);
     try {
@@ -56,6 +76,7 @@ function ArtStudioPage() {
       setOutcomes([]);
     }
   }
+
   async function generateInspiration(theme: ArtTheme) {
     setImageGenerating(true);
     setError("");
@@ -107,6 +128,37 @@ function ArtStudioPage() {
       setSaving(false);
     }
   }
+
+  async function applyManualTheme() {
+    if (!selectedLessonId || !manualTitle.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      const workspace = await loadLessonWorkspace(selectedLessonId);
+      await applyArtThemeToLesson(
+        workspace.lesson,
+        {
+          title: manualTitle.trim(),
+          summary: manualSummary.trim(),
+          durationMinutes: Math.min(180, Math.max(5, manualMinutes || 45)),
+          materials: lines(manualMaterials),
+          objectives: lines(manualGoals),
+          steps: lines(manualSteps),
+          easyVariant: manualEasy.trim() || null,
+          advancedVariant: manualAdvanced.trim() || null,
+          reflectionPrompt: manualReflection.trim() || null,
+          rvpCodes: [],
+        },
+        workspace.preparation?.id,
+      );
+      await navigate({ to: "/hodina/$lessonId", params: { lessonId: selectedLessonId } });
+    } catch (e: any) {
+      setError(e?.message ?? "Vlastní přípravu se nepodařilo uložit.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#fff0df,transparent_30%),radial-gradient(circle_at_top_right,#eee9ff,transparent_34%),#fbfaf7] px-4 py-6 text-slate-800 md:px-8 md:py-9">
       <div className="mx-auto max-w-7xl">
@@ -122,6 +174,7 @@ function ArtStudioPage() {
             5. ročník · 2026/2027
           </div>
         </div>
+
         <section className="mt-5 rounded-[34px] bg-white/90 p-6 shadow-[0_24px_70px_rgba(80,70,100,.1)] md:p-9">
           <div className="flex items-start gap-4">
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-orange-100 text-orange-700">
@@ -136,11 +189,12 @@ function ArtStudioPage() {
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
                 Pedagogické náměty pro 5. ročník navázané na oficiální výstupy revidovaného RVP.
-                Témata jsou naše pracovní šablony, ne oficiální osnovy.
+                Hotovou šablonu můžeš použít jedním klikem, nebo celou přípravu napsat klasicky ručně.
               </p>
             </div>
           </div>
         </section>
+
         {loading && (
           <div className="mt-5 rounded-3xl bg-white p-7 text-slate-500">
             Načítám témata a budoucí hodiny…
@@ -152,7 +206,7 @@ function ArtStudioPage() {
             <h2 className="font-semibold">Nejdřív nastavte hodinu VV v rozvrhu</h2>
             <p className="mt-2 text-sm text-slate-600">
               Studio nevytváří fiktivní hodiny. Jakmile bude v rozvrhu skutečná budoucí výtvarná
-              výchova, půjde na ni téma použít jedním klikem.
+              výchova, půjde na ni téma použít nebo napsat ručně.
             </p>
             <Link
               to="/rozvrh"
@@ -162,6 +216,7 @@ function ArtStudioPage() {
             </Link>
           </section>
         )}
+
         {!loading && !error && lessons.length > 0 && (
           <>
             <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm">
@@ -182,7 +237,121 @@ function ArtStudioPage() {
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => setManualOpen((value) => !value)}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-900"
+              >
+                <Plus className="h-4 w-4" />
+                {manualOpen ? "Skrýt vlastní přípravu" : "Napsat vlastní přípravu ručně"}
+              </button>
             </section>
+
+            {manualOpen && (
+              <section className="mt-5 rounded-3xl border border-violet-100 bg-white p-5 shadow-sm md:p-6">
+                <div className="text-xs font-bold uppercase tracking-[.14em] text-violet-700">
+                  Bez AI
+                </div>
+                <h2 className="mt-1 text-xl font-bold">Vlastní výtvarná příprava</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Každé pole vyplňuješ přímo. Po uložení vznikne běžná příprava a materiál u vybrané hodiny.
+                </p>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <label className="text-xs font-bold text-slate-600 md:col-span-2">
+                    Název tématu
+                    <input
+                      value={manualTitle}
+                      onChange={(e) => setManualTitle(e.target.value)}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                      placeholder="Např. Město z geometrických tvarů"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600 md:col-span-2">
+                    Stručný záměr
+                    <textarea
+                      value={manualSummary}
+                      onChange={(e) => setManualSummary(e.target.value)}
+                      rows={3}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    Délka v minutách
+                    <input
+                      type="number"
+                      min={5}
+                      max={180}
+                      value={manualMinutes}
+                      onChange={(e) => setManualMinutes(Number(e.target.value))}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    Pomůcky — jedna položka na řádek
+                    <textarea
+                      value={manualMaterials}
+                      onChange={(e) => setManualMaterials(e.target.value)}
+                      rows={4}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    Cíle — jeden cíl na řádek
+                    <textarea
+                      value={manualGoals}
+                      onChange={(e) => setManualGoals(e.target.value)}
+                      rows={5}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    Průběh — jeden krok na řádek
+                    <textarea
+                      value={manualSteps}
+                      onChange={(e) => setManualSteps(e.target.value)}
+                      rows={5}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    Lehčí varianta
+                    <textarea
+                      value={manualEasy}
+                      onChange={(e) => setManualEasy(e.target.value)}
+                      rows={3}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    Rozšířená varianta
+                    <textarea
+                      value={manualAdvanced}
+                      onChange={(e) => setManualAdvanced(e.target.value)}
+                      rows={3}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600 md:col-span-2">
+                    Reflexe
+                    <textarea
+                      value={manualReflection}
+                      onChange={(e) => setManualReflection(e.target.value)}
+                      rows={3}
+                      className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm font-normal"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  disabled={saving || !manualTitle.trim()}
+                  onClick={() => void applyManualTheme()}
+                  className="mt-5 w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-40"
+                >
+                  {saving ? "Ukládám…" : "Uložit vlastní přípravu do hodiny"}
+                </button>
+              </section>
+            )}
+
             <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_.9fr]">
               <section className="grid gap-4 sm:grid-cols-2">
                 {themes.map((t) => (
@@ -351,6 +520,7 @@ function ThemeDetail({
     </div>
   );
 }
+
 function Block({ title, children }: { title: string; children: any }) {
   return (
     <section>
