@@ -1,6 +1,7 @@
 import {
   Check,
   CheckCircle2,
+  CalendarPlus,
   ClipboardList,
   Loader2,
   Plus,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CoordinatorClass, TeachingAssistant } from "@/lib/assistant-coordinator-data";
+import { ensureCoordinatorItemInCalendar } from "@/lib/assistant-coordinator-calendar";
 import {
   completeAssistantCoordinationItem,
   coordinationItemDueLabel,
@@ -50,6 +52,8 @@ export function CoordinatorItemsCard({
   const [assistantId, setAssistantId] = useState("");
   const [classId, setClassId] = useState("");
   const [dueOn, setDueOn] = useState("");
+  const [calendarSavingId, setCalendarSavingId] = useState<string | null>(null);
+  const [calendarAddedIds, setCalendarAddedIds] = useState<Set<string>>(() => new Set());
 
   const todayIso = localIsoDate();
 
@@ -99,6 +103,29 @@ export function CoordinatorItemsCard({
       setError(e instanceof Error ? e.message : "Záznam se nepodařilo uložit.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function addToCalendar(item: AssistantCoordinationItem) {
+    if (!item.due_on) return;
+    setCalendarSavingId(item.id);
+    setError("");
+    try {
+      await ensureCoordinatorItemInCalendar({
+        schoolId,
+        itemId: item.id,
+        kind: item.kind,
+        dueOn: item.due_on,
+      });
+      setCalendarAddedIds((current) => {
+        const next = new Set(current);
+        next.add(item.id);
+        return next;
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Položku se nepodařilo přidat do kalendáře.");
+    } finally {
+      setCalendarSavingId(null);
     }
   }
 
@@ -197,6 +224,30 @@ export function CoordinatorItemsCard({
                         )}
                       </div>
                       <div className="flex shrink-0 gap-1">
+                        {item.due_on && (
+                          <button
+                            disabled={saving || calendarSavingId === item.id}
+                            onClick={() => void addToCalendar(item)}
+                            className="inline-flex items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-black text-[#5e7184] transition hover:bg-[#edf3f7] disabled:opacity-40"
+                            aria-label={
+                              calendarAddedIds.has(item.id)
+                                ? "Přidáno do kalendáře"
+                                : "Přidat do kalendáře"
+                            }
+                            title={
+                              calendarAddedIds.has(item.id)
+                                ? "Už je v kalendáři"
+                                : "Přidat neutrální soukromou událost do kalendáře"
+                            }
+                          >
+                            {calendarSavingId === item.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <CalendarPlus className="h-4 w-4" />
+                            )}
+                            {calendarAddedIds.has(item.id) ? "Přidáno" : "Kalendář"}
+                          </button>
+                        )}
                         <button
                           disabled={saving}
                           onClick={() => void complete(item.id)}

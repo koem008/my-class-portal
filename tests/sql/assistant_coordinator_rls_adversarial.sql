@@ -73,6 +73,15 @@ insert into public.assistant_coordination_items(
   ('aaaaaaaa-0000-0000-0000-0000000000a0','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','task','Follow-up A','Organizační fixture','aaaaaaaa-0000-0000-0000-000000000030','aaaaaaaa-0000-0000-0000-000000000010','2026-09-09','open','11111111-1111-1111-1111-111111111111'),
   ('bbbbbbbb-0000-0000-0000-0000000000a0','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','task','Follow-up B','Organizační fixture','bbbbbbbb-0000-0000-0000-000000000030','bbbbbbbb-0000-0000-0000-000000000010','2026-09-09','open','44444444-4444-4444-4444-444444444444');
 
+insert into public.calendar_events(
+  id,school_id,academic_year_id,created_by,scope,kind,title,starts_at,ends_at,all_day,source
+) values (
+  'aaaaaaaa-0000-0000-0000-0000000000b0','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'aaaaaaaa-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222',
+  'private','meeting','Koordinace AP · follow-up','2026-09-09 00:00:00+02','2026-09-10 00:00:00+02',true,
+  'assistant_coordinator:aaaaaaaa-0000-0000-0000-0000000000a0'
+);
+
 -- Seed sensitive content to prove the coordinator cannot see it through the alias reference.
 insert into public.special_education_cases(
   id,school_id,class_id,student_alias_id,status,focus_summary,created_by
@@ -142,6 +151,12 @@ select pg_temp.assert_count(
   'ordinary teacher must not see assistant coordination items'
 );
 
+select pg_temp.assert_count(
+  (select count(*) from public.calendar_events where source like 'assistant_coordinator:%'),
+  0,
+  'ordinary teacher must not see coordinator private calendar event'
+);
+
 -- 2) Coordinator A sees own tenant only, never School B.
 select set_config('request.jwt.claim.sub','22222222-2222-2222-2222-222222222222',true);
 select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',true);
@@ -190,6 +205,12 @@ select pg_temp.assert_count(
   (select count(*) from public.assistant_coordination_items where school_id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
   0,
   'coordinator A must not see School B coordination item'
+);
+
+select pg_temp.assert_count(
+  (select count(*) from public.calendar_events where source like 'assistant_coordinator:%'),
+  1,
+  'coordinator should see own private calendar event'
 );
 
 -- Cross-tenant writes must fail closed at RLS, not merely disappear from reads.
