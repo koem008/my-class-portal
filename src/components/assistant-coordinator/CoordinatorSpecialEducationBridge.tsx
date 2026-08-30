@@ -115,7 +115,8 @@ export function CoordinatorSpecialEducationBridge({
                 {assignment.alias} · {assignment.className}
               </div>
               <div className="mt-0.5 text-xs text-[#817b87]">
-                AP: {assignment.assistantName} · případ {link.status === "active" ? "aktivní" : "sledovaný"}
+                AP: {assignment.assistantName} · případ{" "}
+                {link.status === "active" ? "aktivní" : "sledovaný"}
               </div>
             </div>
             <Link

@@ -15,6 +15,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CoordinatorItemsCard } from "@/components/assistant-coordinator/CoordinatorItemsCard";
 import { CoordinatorMeetingBriefCard } from "@/components/assistant-coordinator/CoordinatorMeetingBriefCard";
+import { CoordinatorSpecialEducationBridge } from "@/components/assistant-coordinator/CoordinatorSpecialEducationBridge";
 import type { AssistantCoordinationItem } from "@/lib/assistant-coordinator-items";
 import {
   activateCoordinatorAccess,
@@ -528,6 +529,11 @@ function AssistantCoordinatorPage() {
             </div>
           )}
         </section>
+
+        <CoordinatorSpecialEducationBridge
+          schoolId={context.access.schoolId}
+          assignments={assignments}
+        />
 
         <CoordinatorItemsCard
           schoolId={context.access.schoolId}
