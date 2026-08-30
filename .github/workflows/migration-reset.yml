@@ -40,6 +40,12 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f tests/sql/calendar_blocking_reconciliation.sql
 
+      - name: Verify confirmed lesson substitution
+        run: |
+          psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -v ON_ERROR_STOP=1 \
+            -f tests/sql/lesson_substitution_flow.sql
+
       - name: Show local Supabase status
         if: always()
         run: supabase status || true
