@@ -215,6 +215,79 @@ export type Database = {
         }
         Relationships: []
       }
+      assistant_coordination_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          school_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          school_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_coordination_audit_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_coordinators: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          is_active: boolean
+          role: string
+          school_id: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          is_active?: boolean
+          role?: string
+          school_id: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          is_active?: boolean
+          role?: string
+          school_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_coordinators_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           academic_year_id: string
@@ -2458,6 +2531,121 @@ export type Database = {
         }
         Relationships: []
       }
+      teaching_assistant_assignments: {
+        Row: {
+          assignment_note: string | null
+          assistant_id: string
+          class_id: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          school_id: string
+          student_alias_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          assignment_note?: string | null
+          assistant_id: string
+          class_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          student_alias_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assignment_note?: string | null
+          assistant_id?: string
+          class_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          student_alias_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teaching_assistant_assignments_assistant_id_school_id_fkey"
+            columns: ["assistant_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_assistants"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "teaching_assistant_assignments_class_id_school_id_fkey"
+            columns: ["class_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "teaching_assistant_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teaching_assistant_assignments_student_alias_id_fkey"
+            columns: ["student_alias_id"]
+            isOneToOne: false
+            referencedRelation: "student_aliases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teaching_assistants: {
+        Row: {
+          created_at: string
+          created_by: string
+          display_name: string
+          id: string
+          is_active: boolean
+          school_id: string
+          updated_at: string
+          work_email: string | null
+          work_phone: string | null
+          workload_note: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          updated_at?: string
+          work_email?: string | null
+          work_phone?: string | null
+          workload_note?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          updated_at?: string
+          work_email?: string | null
+          work_phone?: string | null
+          workload_note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teaching_assistants_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       timetable_slots: {
         Row: {
           academic_year_id: string
@@ -2560,6 +2748,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assistant_assignment_scope_valid: {
+        Args: {
+          p_class_id: string
+          p_school_id: string
+          p_student_alias_id: string
+        }
+        Returns: boolean
+      }
       can_access_class: { Args: { _class_id: string }; Returns: boolean }
       class_day_blockers: {
         Args: { _class_id: string; _day: string }
@@ -2568,6 +2764,14 @@ export type Database = {
           event_id: string
           source: string
           title: string
+        }[]
+      }
+      coordinator_student_alias_options: {
+        Args: { p_class_id: string }
+        Returns: {
+          alias: string
+          avatar_key: string
+          id: string
         }[]
       }
       create_school_tenant: {
@@ -2592,9 +2796,17 @@ export type Database = {
           title: string
         }[]
       }
+      grant_assistant_coordinator_access: {
+        Args: { p_role?: string; p_school_id: string; p_user_id: string }
+        Returns: undefined
+      }
       grant_special_education_access: {
         Args: { p_role?: string; p_school_id: string; p_user_id: string }
         Returns: undefined
+      }
+      has_assistant_coordinator_access: {
+        Args: { p_school_id: string }
+        Returns: boolean
       }
       has_special_education_access: {
         Args: { p_school_id: string }
