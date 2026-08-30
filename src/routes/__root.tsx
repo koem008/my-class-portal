@@ -3,13 +3,14 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  useNavigate,
   useRouter,
   useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { Loader2, Mic, ShieldCheck } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -142,7 +143,11 @@ function RootComponent() {
 
 function AuthGate() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const navigate = useNavigate();
   const [authState, setAuthState] = useState<AuthGateState>("checking");
+  const preflightStreamRef = useRef<MediaStream | null>(null);
+  const monitorCleanupRef = useRef<(() => void) | null>(null);
+  const launcherBusyRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -186,6 +191,15 @@ function AuthGate() {
     }
   }, [authState, pathname]);
 
+  useEffect(
+    () => () => {
+      monitorCleanupRef.current?.();
+      preflightStreamRef.current?.getTracks().forEach((track) => track.stop());
+      preflightStreamRef.current = null;
+    },
+    [],
+  );
+
   if (authState === "checking") return <AuthLoading />;
   if (authState === "anonymous") {
     if (pathname === "/prihlaseni") return <Outlet />;
@@ -193,17 +207,118 @@ function AuthGate() {
   }
   if (pathname === "/prihlaseni") return <AuthLoading />;
 
-  function activateAssistantVoice() {
-    if (typeof document === "undefined") return;
-    const voiceButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
-      (button) => button.className.includes("h-28") && button.className.includes("w-28"),
+  function findAssistantVoiceButton() {
+    if (typeof document === "undefined") return null;
+    return (
+      Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
+        (button) => button.className.includes("h-28") && button.className.includes("w-28"),
+      ) ?? null
     );
-    if (!voiceButton) return;
-    voiceButton.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function stopPreflightStream() {
+    preflightStreamRef.current?.getTracks().forEach((track) => track.stop());
+    preflightStreamRef.current = null;
+  }
+
+  function monitorSpeechAndAutoStop(stream: MediaStream, voiceButton: HTMLButtonElement) {
+    monitorCleanupRef.current?.();
+    const audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(stream);
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(analyser);
+    void audioContext.resume();
+
+    const samples = new Uint8Array(analyser.fftSize);
+    const startedAt = performance.now();
+    let lastSpeechAt = startedAt;
+    let speechDetected = false;
+    let frame = 0;
+    let finished = false;
+
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      cancelAnimationFrame(frame);
+      source.disconnect();
+      analyser.disconnect();
+      void audioContext.close();
+      stopPreflightStream();
+      if (monitorCleanupRef.current === cleanup) monitorCleanupRef.current = null;
+    };
+    monitorCleanupRef.current = cleanup;
+
+    const tick = () => {
+      analyser.getByteTimeDomainData(samples);
+      let energy = 0;
+      for (const sample of samples) {
+        const normalized = (sample - 128) / 128;
+        energy += normalized * normalized;
+      }
+      const rms = Math.sqrt(energy / samples.length);
+      const now = performance.now();
+      if (rms > 0.025) {
+        speechDetected = true;
+        lastSpeechAt = now;
+      }
+
+      const finishedSpeaking = speechDetected && now - lastSpeechAt > 1400 && now - startedAt > 1200;
+      const noSpeechTimeout = !speechDetected && now - startedAt > 7000;
+      const hardTimeout = now - startedAt > 20000;
+      if (finishedSpeaking || noSpeechTimeout || hardTimeout) {
+        if (!voiceButton.disabled) voiceButton.click();
+        cleanup();
+        return;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+
     window.setTimeout(() => {
+      if (!finished) frame = requestAnimationFrame(tick);
+    }, 350);
+  }
+
+  async function beginAssistantConversation() {
+    if (launcherBusyRef.current) return;
+    launcherBusyRef.current = true;
+    monitorCleanupRef.current?.();
+    stopPreflightStream();
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Tento prohlížeč nepodporuje hlasový vstup.");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      preflightStreamRef.current = stream;
+
+      if (pathname !== "/asistentka") await navigate({ to: "/asistentka" });
+
+      let voiceButton: HTMLButtonElement | null = null;
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 80));
+        voiceButton = findAssistantVoiceButton();
+        if (voiceButton) break;
+      }
+
+      if (!voiceButton) throw new Error("Hlasovou asistentku se nepodařilo otevřít.");
       voiceButton.focus({ preventScroll: true });
       voiceButton.click();
-    }, 250);
+      monitorSpeechAndAutoStop(stream, voiceButton);
+    } catch (error) {
+      monitorCleanupRef.current?.();
+      stopPreflightStream();
+      const message =
+        error instanceof DOMException && error.name === "NotAllowedError"
+          ? "Mikrofon je pro tuto stránku zakázaný. Povolte mikrofon v prohlížeči a zkuste to znovu."
+          : error instanceof Error
+            ? error.message
+            : "Mikrofon se nepodařilo spustit.";
+      window.alert(message);
+    } finally {
+      launcherBusyRef.current = false;
+    }
   }
 
   const assistantLauncherClass =
@@ -219,26 +334,15 @@ function AuthGate() {
       <QuickNavigation />
       <SpecialContinuityAssistantCard />
       <AfternoonReflectionPrompt />
-      {pathname === "/asistentka" ? (
-        <button
-          type="button"
-          onClick={activateAssistantVoice}
-          aria-label="Spustit obecnou AI asistentku"
-          className={assistantLauncherClass}
-        >
-          <Mic className="h-5 w-5" />
-          <span className="hidden sm:inline">Mluvit s asistentkou</span>
-        </button>
-      ) : (
-        <Link
-          to="/asistentka"
-          aria-label="Otevřít obecnou AI asistentku"
-          className={assistantLauncherClass}
-        >
-          <Mic className="h-5 w-5" />
-          <span className="hidden sm:inline">Mluvit s asistentkou</span>
-        </Link>
-      )}
+      <button
+        type="button"
+        onClick={() => void beginAssistantConversation()}
+        aria-label="Spustit hlasový rozhovor s AI asistentkou"
+        className={assistantLauncherClass}
+      >
+        <Mic className="h-5 w-5" />
+        <span className="hidden sm:inline">Mluvit s asistentkou</span>
+      </button>
     </>
   );
 }
