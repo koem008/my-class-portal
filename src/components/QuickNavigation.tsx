@@ -228,7 +228,9 @@ export function QuickNavigation() {
                 </section>
               )}
 
-              <section className={query.trim().length >= 2 ? "mt-4 border-t border-[#ece9e2] pt-3" : ""}>
+              <section
+                className={query.trim().length >= 2 ? "mt-4 border-t border-[#ece9e2] pt-3" : ""}
+              >
                 <div className="px-3 pb-2 pt-1 text-[10px] font-black uppercase tracking-[.15em] text-[#8a9893]">
                   Kam chceš jít?
                 </div>

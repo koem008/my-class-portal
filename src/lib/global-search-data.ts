@@ -115,11 +115,7 @@ export async function searchGlobalContent(query: string): Promise<GlobalSearchRe
       .order("lesson_date", { ascending: false })
       .limit(8),
     db.from("lesson_materials").select("id,title,kind,lesson_id").ilike("title", like).limit(10),
-    db
-      .from("curriculum_topics")
-      .select("id,code,name,description")
-      .ilike("name", like)
-      .limit(8),
+    db.from("curriculum_topics").select("id,code,name,description").ilike("name", like).limit(8),
     db
       .from("curriculum_topics")
       .select("id,code,name,description")
@@ -183,13 +179,15 @@ export async function searchGlobalContent(query: string): Promise<GlobalSearchRe
     path: `/hodina/${row.id}`,
   }));
 
-  const materialResults = ((materials.data ?? []) as MaterialRow[]).map<GlobalSearchResult>((row) => ({
-    key: `material:${row.id}`,
-    category: "material",
-    title: row.title,
-    subtitle: `Materiál · ${row.kind}`,
-    path: `/materialy/${row.id}`,
-  }));
+  const materialResults = ((materials.data ?? []) as MaterialRow[]).map<GlobalSearchResult>(
+    (row) => ({
+      key: `material:${row.id}`,
+      category: "material",
+      title: row.title,
+      subtitle: `Materiál · ${row.kind}`,
+      path: `/materialy/${row.id}`,
+    }),
+  );
 
   const curriculumTopics = [
     ...((curriculumTopicsByName.data ?? []) as CurriculumTopicRow[]),
@@ -222,15 +220,15 @@ export async function searchGlobalContent(query: string): Promise<GlobalSearchRe
     path: "/kalendar",
   }));
 
-  const systemCalendarResults = ((systemCalendar.data ?? []) as SystemCalendarRow[]).map<GlobalSearchResult>(
-    (row) => ({
-      key: `system-calendar:${row.id}`,
-      category: "calendar",
-      title: row.title,
-      subtitle: `Školní kalendář · ${dateLabel(row.starts_on)}`,
-      path: "/kalendar",
-    }),
-  );
+  const systemCalendarResults = (
+    (systemCalendar.data ?? []) as SystemCalendarRow[]
+  ).map<GlobalSearchResult>((row) => ({
+    key: `system-calendar:${row.id}`,
+    category: "calendar",
+    title: row.title,
+    subtitle: `Školní kalendář · ${dateLabel(row.starts_on)}`,
+    path: "/kalendar",
+  }));
 
   return unique([
     ...lessons,
