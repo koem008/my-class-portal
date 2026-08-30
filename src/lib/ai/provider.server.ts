@@ -14,7 +14,7 @@ import {
   type SpeechTranscriptionRequest,
   type SpeechTranscriptionResult,
 } from "./contracts";
-import { parseCompanionPayload } from "./companion-policy";
+import { COMPANION_NAVIGATION_TARGETS, parseCompanionPayload } from "./companion-policy";
 
 const DEFAULT_TIMEOUT_MS = 45_000;
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -322,7 +322,7 @@ export async function generateCompanionReply(
           "coordinatorSummary obsahuje výhradně agregované organizační údaje; nextMeetingAt je čas nejbližší porady AP. Nepokoušej se z nich odvozovat jména AP, identitu dítěte, diagnózu ani obsah poznámek. Pro detail naviguj na assistants.",
           "Vždy zvol přesně jeden režim: conversation, navigate, propose.",
           "conversation: běžná konverzace, dotaz, nejasný nebo nepodporovaný požadavek; bez navigation a proposal.",
-          "navigate: jen otevření existující obrazovky z pevného seznamu home, schedule, calendar, memory, art_studio, special_education, assistants, lesson. Pro lesson použij výhradně lessonId z availableLessons.",
+          `navigate: jen otevření existující obrazovky z pevného seznamu ${COMPANION_NAVIGATION_TARGETS.join(", ")}. Pro lesson použij výhradně lessonId z availableLessons.`,
           "propose: jen když AKTUÁLNÍ message sama explicitně žádá podporovanou změnu dat. SameDayContext smí pomoci pochopit odkaz, ale nikdy nesmí být sám zdrojem návrhu zápisu.",
           "Povolené proposal typy: save_preparation_note {lessonId,text}; mark_lesson_completed {lessonId,completedSummary?}; create_coordinator_item {kind,title,body?,dueOn?}. create_coordinator_item smíš navrhnout pouze když je coordinatorSummary přítomný; nesmí obsahovat diagnózu, zdravotní údaj ani identitu dítěte. Pro relativní termín použij localDate. Změnu nikdy sama neprovádíš.",
           "sameDayContext je dočasné shrnutí pouze dneška. Vrať volitelně sameDaySummary: stručné relevantní shrnutí pro další dnešní konverzaci, nikdy verbatim přepis a nikdy dlouhodobou osobní preferenci.",
