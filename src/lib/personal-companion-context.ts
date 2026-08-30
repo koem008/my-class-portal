@@ -123,7 +123,9 @@ export function buildPersonalDailyContext(
 
 export function personalContextLines(context: PersonalDailyContext): string[] {
   if (!context.enabled) return [];
-  const lines = [...context.preferences];
+  const lines = context.salutation
+    ? [`Preferované oslovení uživatelky je „${context.salutation}“.`, ...context.preferences]
+    : [...context.preferences];
   for (const commitment of context.commitments)
     lines.push(
       `Dnes ${commitment.startsAt}${commitment.endsAt ? `–${commitment.endsAt}` : ""}: ${commitment.label}`,

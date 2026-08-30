@@ -15,6 +15,7 @@ import {
   SunMedium,
   Sunset,
   MoonStar,
+  Palette,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -37,12 +38,55 @@ export const Route = createFileRoute("/")({ component: Index });
 type LoadState = "loading" | "ready" | "empty" | "error";
 
 const nav = [
-  { to: "/" as const, label: "Dnes", icon: CheckCircle2 },
-  { to: "/rozvrh" as const, label: "Rozvrh", icon: CalendarDays },
-  { to: "/kalendar" as const, label: "Kalendář", icon: Clock3 },
-  { to: "/trida" as const, label: "Třída", icon: Users },
-  { to: "/asistenti" as const, label: "Asistenti", icon: UsersRound },
-  { to: "/asistentka" as const, label: "Asistentka", icon: Sparkles },
+  {
+    to: "/" as const,
+    label: "Dnes",
+    mobileLabel: "Dnes",
+    icon: CheckCircle2,
+    iconClass: "text-[#188779]",
+  },
+  {
+    to: "/rozvrh" as const,
+    label: "Rozvrh",
+    mobileLabel: "Rozvrh",
+    icon: CalendarDays,
+    iconClass: "text-[#397ed1]",
+  },
+  {
+    to: "/kalendar" as const,
+    label: "Kalendář",
+    mobileLabel: "Kalendář",
+    icon: Clock3,
+    iconClass: "text-[#d08a20]",
+  },
+  {
+    to: "/trida" as const,
+    label: "Třída",
+    mobileLabel: "Třída",
+    icon: Users,
+    iconClass: "text-[#d46792]",
+  },
+  {
+    to: "/asistenti" as const,
+    label: "Asistenti",
+    mobileLabel: "Asistenti",
+    icon: UsersRound,
+    iconClass: "text-[#715ac3]",
+  },
+  {
+    to: "/asistentka" as const,
+    label: "Asistentka",
+    mobileLabel: "AI",
+    icon: Sparkles,
+    iconClass: "text-[#7c55c7]",
+  },
+  {
+    to: "/vytvarna-vychova" as const,
+    label: "Kreativní studio",
+    mobileLabel: "Studio",
+    icon: Palette,
+    iconClass: "text-[#d44f9a]",
+  },
 ];
 
 function Index() {
@@ -182,13 +226,13 @@ function Index() {
             </div>
           </div>
           <nav className="mt-7 space-y-1">
-            {nav.map(({ to, label, icon: Icon }) => (
+            {nav.map(({ to, label, icon: Icon, iconClass }) => (
               <Link
                 key={to}
                 to={to}
                 className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium ${to === "/" ? "bg-[#eaf4f1] text-[#245e5b]" : "text-[#6f7d83] hover:bg-[#f8faf8]"}`}
               >
-                <Icon className="h-[18px] w-[18px]" />
+                <Icon className={`h-[18px] w-[18px] ${iconClass}`} />
                 {label}
               </Link>
             ))}
@@ -407,15 +451,15 @@ function Index() {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#ece8df] bg-white/95 px-2 py-2 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-xl grid-cols-5">
-          {nav.map(({ to, label, icon: Icon }) => (
+        <div className="mx-auto grid max-w-2xl grid-cols-7">
+          {nav.map(({ to, label, mobileLabel, icon: Icon, iconClass }) => (
             <Link
               key={to}
               to={to}
               className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] ${to === "/" ? "text-[#276765]" : "text-[#9aa2a2]"}`}
             >
-              <Icon className="h-5 w-5" />
-              <span>{label}</span>
+              <Icon className={`h-5 w-5 ${iconClass}`} />
+              <span className="max-w-full truncate">{mobileLabel}</span>
             </Link>
           ))}
         </div>

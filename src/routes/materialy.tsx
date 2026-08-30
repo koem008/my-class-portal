@@ -334,7 +334,10 @@ function MaterialStudioPage() {
                 value={kind}
                 onChange={setKind}
                 label="Typ"
-                options={kinds.map((value) => ({ value, label: kindLabels[value as MaterialKind] ?? value }))}
+                options={kinds.map((value) => ({
+                  value,
+                  label: kindLabels[value as MaterialKind] ?? value,
+                }))}
               />
               <Select
                 value={grade}
@@ -522,7 +525,11 @@ function MaterialStudioPage() {
                   disabled={saving || !manualLessonId || !manualTitle.trim()}
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#276765] px-5 py-3 text-sm font-black text-white disabled:opacity-40"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
                   {saving ? "Ukládám…" : "Uložit materiál"}
                 </button>
               </div>

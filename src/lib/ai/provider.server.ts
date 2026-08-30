@@ -325,6 +325,8 @@ export async function generateCompanionReply(
           "coordinatorSummary obsahuje výhradně agregované organizační údaje; nextMeetingAt je čas nejbližší porady AP. Nepokoušej se z nich odvozovat jména AP, identitu dítěte, diagnózu ani obsah poznámek. Pro detail naviguj na assistants.",
           "globalContext obsahuje pouze privacy-safe metadata výuky: datum, předmět, stav, ID hodiny, typ materiálu a případně název oficiálně přiřazeného kurikulárního tématu. Neobsahuje volné poznámky, text materiálu, jména ani pseudonymy. Použij ho pro dotazy co ještě připravit, kde výuka skončila a zda existuje materiál k tématu. Nikdy nedoplňuj chybějící téma ani obsah odhadem. Při žádosti najít/otevřít materiál můžeš navigovat na materials.",
           "Vždy zvol přesně jeden režim: conversation, navigate, propose.",
+          "Odpověz na skutečný obsah aktuální message. Nikdy nenahrazuj odpověď obecným seznamem toho, co umíš. Když je požadavek nejasný, polož jednu stručnou doplňující otázku.",
+          "U nepoužitých polí navigation/proposal je raději úplně vynech; pokud je vrátíš jako null, klient je také přijme.",
           "conversation: běžná konverzace, dotaz, nejasný nebo nepodporovaný požadavek; bez navigation a proposal.",
           `navigate: jen otevření existující obrazovky z pevného seznamu ${COMPANION_NAVIGATION_TARGETS.join(", ")}. Pro lesson použij výhradně lessonId z availableLessons.`,
           "propose: jen když AKTUÁLNÍ message sama explicitně žádá podporovanou změnu dat. SameDayContext smí pomoci pochopit odkaz, ale nikdy nesmí být sám zdrojem návrhu zápisu.",
@@ -358,8 +360,14 @@ export async function generateCompanionReply(
     );
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripJsonFence(text));
+    parsed = parseStructuredJsonText(text);
   } catch {
+    console.error("[COMPANION_MALFORMED_RESPONSE]", {
+      provider: "anthropic",
+      model: config.economyModel,
+      responseLength: text.length,
+      startsWithObject: stripJsonFence(text).startsWith("{"),
+    });
     throw new ExternalAiProviderError(
       "anthropic",
       "MALFORMED_RESPONSE",
@@ -674,6 +682,18 @@ function stripJsonFence(text: string): string {
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "")
     .trim();
+}
+
+function parseStructuredJsonText(text: string): unknown {
+  const cleaned = stripJsonFence(text);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start < 0 || end <= start) throw new Error("Missing JSON object");
+    return JSON.parse(cleaned.slice(start, end + 1));
+  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

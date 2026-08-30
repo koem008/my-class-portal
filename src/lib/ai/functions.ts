@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertCoordinatorOrganizationalContent } from "@/lib/assistant-coordinator-content-policy";
+import { classifySpecializedCreationRequest } from "@/lib/ai/companion-policy";
 
 const lessonActionSchema = z.enum([
   "lesson_plan",
@@ -252,6 +253,14 @@ export const runCompanionAi = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(companionRequestSchema)
   .handler(async ({ data }) => {
+    const specializedRoute = classifySpecializedCreationRequest(data.message);
+    if (specializedRoute) {
+      return {
+        ...specializedRoute,
+        usage: { provider: "anthropic" as const, model: "deterministic-scope-router" },
+      };
+    }
+
     const { generateCompanionReply, readAnthropicTextProviderConfigFromEnv } =
       await import("./provider.server");
     const config = readAnthropicTextProviderConfigFromEnv();

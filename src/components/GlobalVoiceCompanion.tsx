@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { CheckCircle2, Loader2, Mic, MicOff, Play, Send, Volume2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { reportLovableError } from "@/lib/lovable-error-reporting";
 import {
   confirmCompanionPedagogicalAction,
   runCompanionAi,
@@ -181,10 +182,13 @@ export function GlobalVoiceCompanion() {
 
     const settings = await db
       .from("teacher_assistant_settings")
-      .select("memory_enabled")
+      .select("memory_enabled,preferred_salutation")
       .eq("user_id", userResult.data.user.id)
       .maybeSingle();
-    if (settings.error || !settings.data?.memory_enabled) return [];
+    if (settings.error) throw settings.error;
+    const salutation = String(settings.data?.preferred_salutation ?? "").trim();
+    const identityLine = salutation ? [`Preferované oslovení uživatelky je „${salutation}“.`] : [];
+    if (!settings.data?.memory_enabled) return identityLine;
 
     const memories = await db
       .from("teacher_personal_memory")
@@ -195,7 +199,10 @@ export function GlobalVoiceCompanion() {
       .order("updated_at", { ascending: false })
       .limit(20);
     if (memories.error) throw memories.error;
-    return ((memories.data ?? []) as MemoryRow[]).map((item) => item.content.trim()).filter(Boolean);
+    return [
+      ...identityLine,
+      ...((memories.data ?? []) as MemoryRow[]).map((item) => item.content.trim()).filter(Boolean),
+    ].slice(0, 20);
   }
 
   async function savePersonalMemory(content: string) {
@@ -214,10 +221,9 @@ export function GlobalVoiceCompanion() {
     }
     const userId = userResult.data.user.id;
 
-    const settings = await db.from("teacher_assistant_settings").upsert(
-      { user_id: userId, memory_enabled: true },
-      { onConflict: "user_id" },
-    );
+    const settings = await db
+      .from("teacher_assistant_settings")
+      .upsert({ user_id: userId, memory_enabled: true }, { onConflict: "user_id" });
     if (settings.error) throw settings.error;
 
     const existing = await db
@@ -292,13 +298,17 @@ export function GlobalVoiceCompanion() {
 
       if (result.mode === "propose" && result.proposal) {
         setPendingProposal(result.proposal);
-        await setAssistantReply(result.reply.trim() || "Mám připravený návrh změny. Potvrď ho prosím.", speak);
+        await setAssistantReply(
+          result.reply.trim() || "Mám připravený návrh změny. Potvrď ho prosím.",
+          speak,
+        );
         setNotice("Čekám na potvrzení.");
         return;
       }
 
       await setAssistantReply(result.reply.trim(), speak);
     } catch (error) {
+      reportLovableError(error, { feature: "global_companion", phase: "handle_input" });
       setState("error");
       setNotice(error instanceof Error ? error.message : "Požadavek se nepodařilo zpracovat.");
     }
@@ -429,7 +439,9 @@ export function GlobalVoiceCompanion() {
       setState("error");
       const message = error instanceof Error ? error.message : "Mikrofon se nepodařilo spustit.";
       setNotice(
-        message.includes("Permission") || message.includes("denied") || message.includes("NotAllowed")
+        message.includes("Permission") ||
+          message.includes("denied") ||
+          message.includes("NotAllowed")
           ? "Mikrofon je zablokovaný. Povol ho pro tento web a zkus to znovu."
           : message,
       );
@@ -467,7 +479,9 @@ export function GlobalVoiceCompanion() {
       await handleInput(text, true);
     } catch (error) {
       setState("error");
-      setNotice(error instanceof Error ? error.message : "Hlasový požadavek se nepodařilo zpracovat.");
+      setNotice(
+        error instanceof Error ? error.message : "Hlasový požadavek se nepodařilo zpracovat.",
+      );
     }
   }
 
@@ -493,9 +507,15 @@ export function GlobalVoiceCompanion() {
         <section className="fixed bottom-3 right-3 z-[70] max-h-[72dvh] w-[calc(100vw-24px)] max-w-[350px] overflow-hidden rounded-[20px] border border-[#e5e1d8] bg-[#fffefa] p-3 shadow-[0_18px_55px_rgba(32,48,44,.2)] sm:bottom-5 sm:right-5 sm:w-[350px] sm:p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[9px] font-bold uppercase tracking-[.16em] text-[#4e7772]">Moje asistentka</div>
+              <div className="text-[9px] font-bold uppercase tracking-[.16em] text-[#4e7772]">
+                Moje asistentka
+              </div>
               <div className="mt-0.5 truncate text-sm font-bold text-[#24343f]">
-                {state === "listening" ? "Poslouchám" : state === "processing" ? "Zpracovávám" : "Mluv nebo napiš"}
+                {state === "listening"
+                  ? "Poslouchám"
+                  : state === "processing"
+                    ? "Zpracovávám"
+                    : "Mluv nebo napiš"}
               </div>
             </div>
             <button
@@ -562,7 +582,9 @@ export function GlobalVoiceCompanion() {
           <div className="mt-3 max-h-[28dvh] space-y-2 overflow-y-auto pr-1">
             {transcript && (
               <div className="rounded-xl bg-[#f4f5f1] px-3 py-2">
-                <div className="text-[9px] font-bold uppercase tracking-[.12em] text-[#82908f]">Ty</div>
+                <div className="text-[9px] font-bold uppercase tracking-[.12em] text-[#82908f]">
+                  Ty
+                </div>
                 <p className="mt-0.5 text-xs leading-4 text-[#34484a]">{transcript}</p>
               </div>
             )}

@@ -382,6 +382,16 @@ function MemoryPage() {
               </button>
             </div>
             <div className="mt-5 space-y-2">
+              {settings.preferred_salutation?.trim() && (
+                <div className="rounded-2xl border border-[#d8e9e3] bg-[#eef9f5] p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-[#4e7772]">
+                    Oslovení · zdroj nastavení
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-[#4d6662]">
+                    Jak tě mám oslovovat: {settings.preferred_salutation.trim()}
+                  </p>
+                </div>
+              )}
               {regularMemories.map((m) => (
                 <div
                   key={m.id}
@@ -410,7 +420,7 @@ function MemoryPage() {
                   </button>
                 </div>
               ))}
-              {!regularMemories.length && (
+              {!regularMemories.length && !settings.preferred_salutation?.trim() && (
                 <div className="rounded-2xl border border-dashed border-[#ddd8cf] p-5 text-sm text-[#7c8988]">
                   Zatím tu nic osobního není. To je výchozí a bezpečný stav.
                 </div>

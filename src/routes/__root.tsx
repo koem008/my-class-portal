@@ -17,7 +17,6 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AfternoonReflectionPrompt } from "@/components/AfternoonReflectionPrompt";
 import { DelightLayer } from "@/components/DelightLayer";
 import { GlobalVoiceCompanion } from "@/components/GlobalVoiceCompanion";
-import { MobileCreativeShortcut } from "@/components/MobileCreativeShortcut";
 import { QuickNavigation } from "@/components/QuickNavigation";
 import { SeasonalAmbience } from "@/components/SeasonalAmbience";
 import { SpecialContinuityAssistantCard } from "@/components/special-education/SpecialContinuityAssistantCard";
@@ -201,7 +200,6 @@ function AuthGate() {
       <div key={pathname} className="app-polish app-screen-enter relative z-10">
         <Outlet />
       </div>
-      <MobileCreativeShortcut />
       <QuickNavigation />
       <SpecialContinuityAssistantCard />
       <AfternoonReflectionPrompt />

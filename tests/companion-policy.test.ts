@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { parseCompanionPayload } from "../src/lib/ai/companion-policy";
+import {
+  classifySpecializedCreationRequest,
+  navigationPath,
+  parseCompanionPayload,
+} from "../src/lib/ai/companion-policy";
 
 const lessonId = "11111111-1111-4111-8111-111111111111";
 
@@ -62,5 +66,40 @@ describe("companion proposal policy", () => {
         },
       }),
     ).toThrow("Konverzace nesmí spouštět akci.");
+  });
+});
+
+describe("specialized creation routing", () => {
+  test("routes Czech art creation requests to Creative Studio before AI", () => {
+    const result = classifySpecializedCreationRequest(
+      "Na páteční výtvarnou výchovu mi vymysli téma, konec prázdnin, omalovánky",
+    );
+    expect(result?.mode).toBe("navigate");
+    expect(result?.navigation?.target).toBe("art_studio");
+    expect(navigationPath("art_studio")).toBe("/vytvarna-vychova");
+  });
+
+  test("routes worksheet creation to Material Studio", () => {
+    const result = classifySpecializedCreationRequest(
+      "Vytvoř mi pracovní list na vyjmenovaná slova",
+    );
+    expect(result?.mode).toBe("navigate");
+    expect(result?.navigation?.target).toBe("materials");
+  });
+
+  test("does not hijack material lookup questions", () => {
+    expect(classifySpecializedCreationRequest("Mám už pracovní list na pátek?")).toBeNull();
+  });
+
+  test("accepts Claude-style null unused action fields", () => {
+    expect(
+      parseCompanionPayload({
+        mode: "conversation",
+        reply: "Rozumím. Co přesně potřebuješ vědět?",
+        navigation: null,
+        proposal: null,
+        sameDaySummary: null,
+      }).mode,
+    ).toBe("conversation");
   });
 });

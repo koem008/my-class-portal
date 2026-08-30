@@ -112,6 +112,6 @@ describe("personal daily context", () => {
       importantDates: [],
       preferences: [],
     });
-    expect(personalContextLines(context)).toEqual([]);
+    expect(personalContextLines(context)).toEqual(["Preferované oslovení uživatelky je „Káťo“."]);
   });
 });
