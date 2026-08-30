@@ -114,6 +114,27 @@ function parseProposal(value: unknown): CompanionPedagogicalProposal {
     };
   }
   if (typeof item.lessonId !== "string") throw new Error("AI návrh změny není platný.");
+  if (item.type === "substitute_lesson_activity") {
+    if (
+      typeof item.expectedSubject !== "string" ||
+      !item.expectedSubject.trim() ||
+      typeof item.expectedDate !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(item.expectedDate) ||
+      typeof item.replacementTitle !== "string" ||
+      !item.replacementTitle.trim() ||
+      typeof item.replacementSubject !== "string" ||
+      !item.replacementSubject.trim()
+    )
+      throw new Error("Návrh náhrady hodiny není platný.");
+    return {
+      type: item.type,
+      lessonId: item.lessonId,
+      expectedSubject: item.expectedSubject.trim(),
+      expectedDate: item.expectedDate,
+      replacementTitle: item.replacementTitle.trim(),
+      replacementSubject: item.replacementSubject.trim(),
+    };
+  }
   if (item.type === "save_preparation_note") {
     if (typeof item.text !== "string" || !item.text.trim())
       throw new Error("Návrh přípravy je prázdný.");

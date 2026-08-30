@@ -129,7 +129,7 @@ export async function deleteTimetableSlot(slotId: string) {
 export async function loadWeekLessons(
   classId: string,
   monday: string,
-): Promise<{ lessons: LessonInstance[]; created: number }> {
+): Promise<{ lessons: LessonInstance[]; movedLessons: LessonInstance[]; created: number }> {
   let created = 0;
   const materialize = await db.rpc("materialize_lessons_for_week", {
     _class_id: classId,
@@ -143,18 +143,34 @@ export async function loadWeekLessons(
   }
 
   const end = addDays(monday, 4);
-  const { data, error } = await db
-    .from("lesson_instances")
-    .select(
-      "id,school_id,class_id,academic_year_id,lesson_date,slot_order,starts_at,ends_at,subject_name,title,topic,status,curriculum_subject_id,curriculum_topic_id,teacher_note",
-    )
-    .eq("class_id", classId)
-    .gte("lesson_date", monday)
-    .lte("lesson_date", end)
-    .order("lesson_date")
-    .order("slot_order");
-  if (error) throw error;
-  return { lessons: (data ?? []) as LessonInstance[], created };
+  const lessonFields =
+    "id,school_id,class_id,academic_year_id,lesson_date,slot_order,starts_at,ends_at,subject_name,title,topic,status,curriculum_subject_id,curriculum_topic_id,teacher_note";
+  const [activeResult, movedResult] = await Promise.all([
+    db
+      .from("lesson_instances")
+      .select(lessonFields)
+      .eq("class_id", classId)
+      .gte("lesson_date", monday)
+      .lte("lesson_date", end)
+      .not("status", "in", "(moved,cancelled)")
+      .order("lesson_date")
+      .order("slot_order"),
+    db
+      .from("lesson_instances")
+      .select(lessonFields)
+      .eq("class_id", classId)
+      .eq("status", "moved")
+      .order("lesson_date")
+      .order("slot_order")
+      .limit(30),
+  ]);
+  if (activeResult.error) throw activeResult.error;
+  if (movedResult.error) throw movedResult.error;
+  return {
+    lessons: (activeResult.data ?? []) as LessonInstance[],
+    movedLessons: (movedResult.data ?? []) as LessonInstance[],
+    created,
+  };
 }
 
 export function mondayOf(date: Date): string {

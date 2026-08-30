@@ -25,6 +25,7 @@ import {
   type CurriculumSubjectChoice,
   type TimetableSlot,
 } from "@/lib/schedule-data";
+import { rescheduleMovedLesson } from "@/lib/calendar-data";
 import type { LessonInstance } from "@/lib/lesson-workspace-data";
 
 export const Route = createFileRoute("/rozvrh")({ component: SchedulePage });
@@ -35,6 +36,7 @@ function SchedulePage() {
   const [classId, setClassId] = useState("");
   const [monday, setMonday] = useState(() => mondayOf(new Date()));
   const [lessons, setLessons] = useState<LessonInstance[]>([]);
+  const [movedLessons, setMovedLessons] = useState<LessonInstance[]>([]);
   const [slots, setSlots] = useState<TimetableSlot[]>([]);
   const [subjectChoices, setSubjectChoices] = useState<CurriculumSubjectChoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +88,7 @@ function SchedulePage() {
         loadCurriculumSubjectChoices(selectedClass.grade),
       ]);
       setLessons(week.lessons);
+      setMovedLessons(week.movedLessons);
       setSlots(slotData);
       setSubjectChoices(choices);
       if (week.created > 0)
@@ -138,6 +141,22 @@ function SchedulePage() {
       setSaving(false);
     }
   }
+  async function rescheduleDeferred(lessonId: string, targetDay: string) {
+    setSaving(true);
+    setError("");
+    try {
+      await rescheduleMovedLesson(lessonId, targetDay);
+      await reload();
+      setNotice(
+        "Neprobraná hodina je znovu naplánovaná. Její příprava a materiály zůstaly zachované.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Hodinu se nepodařilo přesunout.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function remove(slotId: string) {
     setSaving(true);
     setError("");
@@ -318,6 +337,27 @@ function SchedulePage() {
               )}
             </section>
 
+            {movedLessons.length > 0 && (
+              <section className="mt-6 rounded-[28px] border border-[#ecd8c8] bg-[#fff8f1] p-5">
+                <div className="text-xs font-black uppercase tracking-[.12em] text-[#98644c]">
+                  Neprobrané hodiny čekající na přesun
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[#8a7468]">
+                  Nejsou označené jako odučené. Přípravy a materiály zůstávají u původní hodiny.
+                </p>
+                <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {movedLessons.map((lesson) => (
+                    <DeferredLessonCard
+                      key={lesson.id}
+                      lesson={lesson}
+                      saving={saving}
+                      onReschedule={rescheduleDeferred}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
             <div className="mt-6 flex items-center justify-between rounded-[22px] border border-[#e9e5dc] bg-white px-3 py-2.5">
               <button
                 onClick={() => setMonday(addDays(monday, -7))}
@@ -447,6 +487,60 @@ function SchedulePage() {
       </div>
     </main>
   );
+}
+
+function DeferredLessonCard({
+  lesson,
+  saving,
+  onReschedule,
+}: {
+  lesson: LessonInstance;
+  saving: boolean;
+  onReschedule: (lessonId: string, targetDay: string) => Promise<void>;
+}) {
+  const [targetDay, setTargetDay] = useState(() => nextSchoolDay(lesson.lesson_date));
+  return (
+    <div className="rounded-2xl border border-[#ead8cc] bg-white p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-sm font-black">{lesson.subject_name}</div>
+          <div className="mt-1 text-[11px] text-[#8c7a70]">
+            původně {formatShortDay(lesson.lesson_date)} · {lesson.slot_order}. hodina
+          </div>
+        </div>
+        <Link
+          to="/hodina/$lessonId"
+          params={{ lessonId: lesson.id }}
+          className="text-[10px] font-bold text-[#39706a]"
+        >
+          Otevřít
+        </Link>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <input
+          type="date"
+          value={targetDay}
+          onChange={(event) => setTargetDay(event.target.value)}
+          className="min-w-0 flex-1 rounded-xl border border-[#e3d8d0] px-2 py-1.5 text-xs"
+        />
+        <button
+          type="button"
+          disabled={saving || !targetDay}
+          onClick={() => void onReschedule(lesson.id, targetDay)}
+          className="rounded-xl bg-[#276765] px-3 py-1.5 text-[10px] font-black text-white disabled:opacity-40"
+        >
+          Přesunout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function nextSchoolDay(iso: string) {
+  const date = new Date(`${iso}T12:00:00`);
+  do date.setDate(date.getDate() + 1);
+  while (date.getDay() === 0 || date.getDay() === 6);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function DayColumn({

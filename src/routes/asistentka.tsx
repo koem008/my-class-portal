@@ -223,6 +223,8 @@ function AssistantPage() {
         if (nav.target === "home") await navigate({ to: "/" });
         else if (nav.target === "schedule") await navigate({ to: "/rozvrh" });
         else if (nav.target === "calendar") await navigate({ to: "/kalendar" });
+        else if (nav.target === "classroom") await navigate({ to: "/trida" });
+        else if (nav.target === "materials") await navigate({ to: "/materialy" });
         else if (nav.target === "memory") await navigate({ to: "/pamet" });
         else if (nav.target === "art_studio") await navigate({ to: "/vytvarna-vychova" });
         else if (nav.target === "special_education")
@@ -622,7 +624,9 @@ function AssistantPage() {
                         ? `Uložit jako poznámku k přípravě: ${pendingProposal.text}`
                         : pendingProposal.type === "mark_lesson_completed"
                           ? `Označit hodinu jako dokončenou${pendingProposal.completedSummary ? `: ${pendingProposal.completedSummary}` : "."}`
-                          : `${pendingProposal.kind === "follow_up" ? "Uložit follow-up" : pendingProposal.kind === "note" ? "Uložit organizační poznámku" : "Uložit úkol"}: ${pendingProposal.title}${pendingProposal.dueOn ? ` · termín ${new Date(`${pendingProposal.dueOn}T12:00:00`).toLocaleDateString("cs-CZ")}` : ""}`}
+                          : pendingProposal.type === "substitute_lesson_activity"
+                            ? `Dne ${new Date(`${pendingProposal.expectedDate}T12:00:00`).toLocaleDateString("cs-CZ")} nahradit ${pendingProposal.expectedSubject} aktivitou „${pendingProposal.replacementTitle}“. Původní hodina zůstane neprobraná a čeká na přesun.`
+                            : `${pendingProposal.kind === "follow_up" ? "Uložit follow-up" : pendingProposal.kind === "note" ? "Uložit organizační poznámku" : "Uložit úkol"}: ${pendingProposal.title}${pendingProposal.dueOn ? ` · termín ${new Date(`${pendingProposal.dueOn}T12:00:00`).toLocaleDateString("cs-CZ")}` : ""}`}
                     </p>
                     <p className="mt-2 text-xs text-amber-700">
                       Mluvený požadavek sám nic nezapisuje.

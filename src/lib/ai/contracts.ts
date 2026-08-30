@@ -154,6 +154,14 @@ export type CompanionPedagogicalProposal =
   | { type: "save_preparation_note"; lessonId: string; text: string }
   | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string | undefined }
   | {
+      type: "substitute_lesson_activity";
+      lessonId: string;
+      expectedSubject: string;
+      expectedDate: string;
+      replacementTitle: string;
+      replacementSubject: string;
+    }
+  | {
       type: "create_coordinator_item";
       kind: "note" | "task" | "follow_up";
       title: string;

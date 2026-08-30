@@ -150,6 +150,14 @@ const companionProposalSchema = z.discriminatedUnion("type", [
     completedSummary: z.string().trim().max(4_000).optional(),
   }),
   z.object({
+    type: z.literal("substitute_lesson_activity"),
+    lessonId: z.string().uuid(),
+    expectedSubject: z.string().trim().min(1).max(160),
+    expectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    replacementTitle: z.string().trim().min(1).max(300),
+    replacementSubject: z.string().trim().min(1).max(160),
+  }),
+  z.object({
     type: z.literal("create_coordinator_item"),
     kind: z.enum(["note", "task", "follow_up"]),
     title: z.string().trim().min(1).max(180),
@@ -299,12 +307,28 @@ export const confirmCompanionPedagogicalAction = createServerFn({ method: "POST"
 
     const lessonResult = await context.supabase
       .from("lesson_instances")
-      .select("id,school_id,class_id")
+      .select("id,school_id,class_id,lesson_date,subject_name,status")
       .eq("id", data.lessonId)
       .single();
     if (lessonResult.error || !lessonResult.data)
       throw lessonResult.error ?? new Error("Hodina není dostupná.");
     const lesson = lessonResult.data;
+    if (data.type === "substitute_lesson_activity") {
+      if (lesson.lesson_date !== data.expectedDate || lesson.subject_name !== data.expectedSubject)
+        throw new Error(
+          "Hodina se od vytvoření návrhu změnila. Nic nebylo provedeno; požadavek prosím zopakujte.",
+        );
+      const substituted = await context.supabase.rpc("substitute_lesson_with_activity", {
+        _lesson_id: lesson.id,
+        _replacement_title: data.replacementTitle,
+        _replacement_subject: data.replacementSubject,
+      });
+      if (substituted.error) throw substituted.error;
+      return {
+        ok: true,
+        message: `${data.expectedSubject} zůstala neprobraná a čeká na přesun. Ve slotu je po potvrzení naplánováno: ${data.replacementTitle}.`,
+      };
+    }
     if (data.type === "save_preparation_note") {
       const existing = await context.supabase
         .from("lesson_preparations")
