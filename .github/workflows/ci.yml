@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Companion policy tests
+        run: bun test tests/companion-policy.test.ts tests/personal-companion-context.test.ts
+
       - name: Lint
         shell: bash
         run: |
