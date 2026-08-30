@@ -3,12 +3,38 @@ import { supabase } from "@/integrations/supabase/client";
 import type { CoordinationItemKind } from "@/lib/assistant-coordinator-items";
 
 const db = supabase as unknown as SupabaseClient;
+const sourcePrefix = "assistant_coordinator:";
 
 const neutralTitles: Record<CoordinationItemKind, string> = {
   note: "Koordinace AP · poznámka",
   task: "Koordinace AP · úkol",
   follow_up: "Koordinace AP · follow-up",
 };
+
+export async function loadCoordinatorCalendarItemIds(schoolId: string, itemIds: string[]) {
+  if (itemIds.length === 0) return new Set<string>();
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!authData.user) throw new Error("Pro práci s kalendářem je nutné přihlášení.");
+
+  const sources = itemIds.map((itemId) => `${sourcePrefix}${itemId}`);
+  const { data, error } = await db
+    .from("calendar_events")
+    .select("source")
+    .eq("school_id", schoolId)
+    .eq("created_by", authData.user.id)
+    .eq("scope", "private")
+    .in("source", sources);
+  if (error) throw error;
+
+  return new Set(
+    (data ?? [])
+      .map((row) => (typeof row.source === "string" ? row.source : ""))
+      .filter((source) => source.startsWith(sourcePrefix))
+      .map((source) => source.slice(sourcePrefix.length)),
+  );
+}
 
 export async function ensureCoordinatorItemInCalendar(input: {
   schoolId: string;
@@ -32,7 +58,7 @@ export async function ensureCoordinatorItemInCalendar(input: {
   if (yearError) throw yearError;
   if (!year?.id) throw new Error("Aktivní školní rok nebyl nalezen.");
 
-  const source = `assistant_coordinator:${input.itemId}`;
+  const source = `${sourcePrefix}${input.itemId}`;
   const { data: existing, error: existingError } = await db
     .from("calendar_events")
     .select("id")
