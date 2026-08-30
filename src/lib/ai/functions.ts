@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertCoordinatorOrganizationalContent } from "@/lib/assistant-coordinator-content-policy";
 
 const lessonActionSchema = z.enum([
   "lesson_plan",
@@ -43,6 +44,10 @@ const companionRequestSchema = z.object({
   message: z.string().trim().min(1).max(4000),
   assistantName: z.string().trim().min(1).max(80),
   tone: z.enum(["friendly", "calm", "efficient", "custom"]),
+  localDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   todaySummary: z.string().trim().max(8000).optional(),
   continuitySummary: z.string().trim().max(5000).optional(),
   sameDayContext: z.string().trim().max(2000).optional(),
@@ -83,6 +88,16 @@ const companionProposalSchema = z.discriminatedUnion("type", [
     type: z.literal("mark_lesson_completed"),
     lessonId: z.string().uuid(),
     completedSummary: z.string().trim().max(4_000).optional(),
+  }),
+  z.object({
+    type: z.literal("create_coordinator_item"),
+    kind: z.enum(["note", "task", "follow_up"]),
+    title: z.string().trim().min(1).max(180),
+    body: z.string().trim().max(800).optional(),
+    dueOn: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
   }),
 ]);
 
@@ -132,6 +147,48 @@ export const confirmCompanionPedagogicalAction = createServerFn({ method: "POST"
   .middleware([requireSupabaseAuth])
   .validator(companionProposalSchema)
   .handler(async ({ data, context }) => {
+    if (data.type === "create_coordinator_item") {
+      const userResult = await context.supabase.auth.getUser();
+      if (userResult.error || !userResult.data.user)
+        throw userResult.error ?? new Error("Pro tuto akci je nutné přihlášení.");
+      const accessResult = await context.supabase
+        .from("assistant_coordinators")
+        .select("school_id")
+        .eq("user_id", userResult.data.user.id)
+        .eq("is_active", true)
+        .limit(2);
+      if (accessResult.error) throw accessResult.error;
+      if (!accessResult.data || accessResult.data.length !== 1)
+        throw new Error(
+          "Koordinátorský kontext není jednoznačně autorizovaný. Nic nebylo uloženo.",
+        );
+
+      const { title, body } = assertCoordinatorOrganizationalContent(data.title, data.body);
+      const schoolId = accessResult.data[0].school_id;
+      const inserted = await context.supabase
+        .from("assistant_coordination_items")
+        .insert({
+          school_id: schoolId,
+          kind: data.kind,
+          title,
+          body: body || null,
+          due_on: data.dueOn ?? null,
+          created_by: userResult.data.user.id,
+        })
+        .select("id")
+        .single();
+      if (inserted.error) throw inserted.error;
+      const audit = await context.supabase.from("assistant_coordination_audit_log").insert({
+        school_id: schoolId,
+        actor_user_id: userResult.data.user.id,
+        action: "coordination_item_created_via_companion",
+        entity_type: "assistant_coordination_item",
+        entity_id: inserted.data.id,
+      });
+      if (audit.error) throw audit.error;
+      return { ok: true, message: "Koordinační položka byla uložena až po vašem potvrzení." };
+    }
+
     const lessonResult = await context.supabase
       .from("lesson_instances")
       .select("id,school_id,class_id")

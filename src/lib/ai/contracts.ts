@@ -81,6 +81,7 @@ export type CompanionRequest = {
   message: string;
   assistantName: string;
   tone: CompanionTone;
+  localDate?: string | undefined;
   todaySummary?: string | undefined;
   continuitySummary?: string | undefined;
   /** Minimal continuity summary for the current local calendar day only. */
@@ -97,7 +98,14 @@ export type CompanionRequest = {
 
 export type CompanionPedagogicalProposal =
   | { type: "save_preparation_note"; lessonId: string; text: string }
-  | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string | undefined };
+  | { type: "mark_lesson_completed"; lessonId: string; completedSummary?: string | undefined }
+  | {
+      type: "create_coordinator_item";
+      kind: "note" | "task" | "follow_up";
+      title: string;
+      body?: string | undefined;
+      dueOn?: string | undefined;
+    };
 
 export type CompanionResult = {
   mode: "conversation" | "navigate" | "propose";

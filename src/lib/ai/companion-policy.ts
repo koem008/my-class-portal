@@ -41,8 +41,26 @@ function parseNavigation(value: unknown): CompanionResult["navigation"] {
 }
 function parseProposal(value: unknown): CompanionPedagogicalProposal {
   const item = record(value);
-  if (!item || typeof item.type !== "string" || typeof item.lessonId !== "string")
-    throw new Error("AI návrh změny není platný.");
+  if (!item || typeof item.type !== "string") throw new Error("AI návrh změny není platný.");
+  if (item.type === "create_coordinator_item") {
+    if (
+      !(["note", "task", "follow_up"] as const).includes(item.kind as "note" | "task" | "follow_up")
+    )
+      throw new Error("Koordinační návrh má neplatný typ.");
+    if (typeof item.title !== "string" || !item.title.trim())
+      throw new Error("Koordinační návrh je prázdný.");
+    const body = typeof item.body === "string" && item.body.trim() ? item.body.trim() : undefined;
+    const dueOn =
+      typeof item.dueOn === "string" && item.dueOn.trim() ? item.dueOn.trim() : undefined;
+    return {
+      type: item.type,
+      kind: item.kind as "note" | "task" | "follow_up",
+      title: item.title.trim(),
+      body,
+      dueOn,
+    };
+  }
+  if (typeof item.lessonId !== "string") throw new Error("AI návrh změny není platný.");
   if (item.type === "save_preparation_note") {
     if (typeof item.text !== "string" || !item.text.trim())
       throw new Error("Návrh přípravy je prázdný.");
@@ -59,6 +77,7 @@ function parseProposal(value: unknown): CompanionPedagogicalProposal {
     };
   throw new Error("AI navrhla nepovolený typ změny.");
 }
+
 export function parseCompanionPayload(value: unknown): Omit<CompanionResult, "usage"> {
   assertPrivacySafePayload(value);
   const item = record(value);

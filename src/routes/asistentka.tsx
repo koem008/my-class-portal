@@ -181,6 +181,7 @@ function AssistantPage() {
           tone:
             settings?.tone ||
             ({ Přátelská: "friendly", Klidná: "calm", Efektivní: "efficient" } as const)[tone],
+          localDate: todayIso,
           todaySummary,
           continuitySummary,
           sameDayContext: readSameDayCompanionMemory(todayIso),
@@ -610,7 +611,9 @@ function AssistantPage() {
                     <p className="mt-1 text-sm text-amber-900">
                       {pendingProposal.type === "save_preparation_note"
                         ? `Uložit jako poznámku k přípravě: ${pendingProposal.text}`
-                        : `Označit hodinu jako dokončenou${pendingProposal.completedSummary ? `: ${pendingProposal.completedSummary}` : "."}`}
+                        : pendingProposal.type === "mark_lesson_completed"
+                          ? `Označit hodinu jako dokončenou${pendingProposal.completedSummary ? `: ${pendingProposal.completedSummary}` : "."}`
+                          : `${pendingProposal.kind === "follow_up" ? "Uložit follow-up" : pendingProposal.kind === "note" ? "Uložit organizační poznámku" : "Uložit úkol"}: ${pendingProposal.title}${pendingProposal.dueOn ? ` · termín ${new Date(`${pendingProposal.dueOn}T12:00:00`).toLocaleDateString("cs-CZ")}` : ""}`}
                     </p>
                     <p className="mt-2 text-xs text-amber-700">
                       Mluvený požadavek sám nic nezapisuje.

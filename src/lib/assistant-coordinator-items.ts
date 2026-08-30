@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { CoordinatorClass, TeachingAssistant } from "@/lib/assistant-coordinator-data";
+import { assertCoordinatorOrganizationalContent } from "@/lib/assistant-coordinator-content-policy";
 
 const db = supabase as unknown as SupabaseClient;
 
@@ -25,23 +26,11 @@ export type AssistantCoordinationItem = {
 
 type ItemRow = Omit<AssistantCoordinationItem, "assistantName" | "className">;
 
-const forbiddenCoordinatorContent =
-  /\b(adhd|autis(?:mus|tický|tická|tické)?|pas|dyslex(?:ie|ii)|dysgraf(?:ie|ii)|dyskalk(?:ulie|ulii)|diagn[oó]z(?:a|y|u|ou)?|rodn[ée]\s*č[ií]slo|datum\s*narozen[ií])\b/i;
-
 async function authUserId() {
   const { data, error } = await supabase.auth.getUser();
   if (error) throw error;
   if (!data.user) throw new Error("Pro tuto akci je nutné přihlášení.");
   return data.user.id;
-}
-
-function assertOrganizationalContent(title: string, body?: string) {
-  const value = `${title} ${body ?? ""}`;
-  if (forbiddenCoordinatorContent.test(value)) {
-    throw new Error(
-      "Tahle poznámka patří do citlivějšího pracovního kontextu. V koordinaci AP ukládej jen organizační informace bez diagnóz a zdravotních údajů.",
-    );
-  }
 }
 
 async function writeAudit(schoolId: string, action: string, entityId: string) {
@@ -93,12 +82,7 @@ export async function createAssistantCoordinationItem(input: {
   dueOn?: string | null;
 }) {
   const createdBy = await authUserId();
-  const title = input.title.trim();
-  const body = input.body?.trim() || "";
-  if (!title) throw new Error("Napiš, co potřebuješ zachytit.");
-  if (title.length > 180) throw new Error("Nadpis je příliš dlouhý.");
-  if (body.length > 800) throw new Error("Poznámka je příliš dlouhá.");
-  assertOrganizationalContent(title, body);
+  const { title, body } = assertCoordinatorOrganizationalContent(input.title, input.body);
 
   const { data, error } = await db
     .from("assistant_coordination_items")
