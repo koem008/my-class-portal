@@ -1,0 +1,136 @@
+name: Verify Coordinator Companion Context
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-coordinator-companion-context.yml'
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Extend companion with privacy-safe coordinator context
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # contracts.ts — one navigation target list/type and minimal numeric summary.
+          p = Path('src/lib/ai/contracts.ts')
+          s = p.read_text()
+          s = s.replace(
+            '"home" | "schedule" | "calendar" | "memory" | "art_studio" | "special_education" | "lesson";',
+            '"home" | "schedule" | "calendar" | "memory" | "art_studio" | "special_education" | "assistants" | "lesson";',
+            1,
+          )
+          marker = 'export type CompanionConversationTurn = { role: "user" | "assistant"; text: string };\n'
+          addition = '''\nexport type CompanionCoordinatorSummary = {\n  activeAssistantCount: number;\n  todayWorkBlockCount: number;\n  todayAbsenceCount: number;\n  todayChangedCount: number;\n  overdueItemCount: number;\n  dueTodayItemCount: number;\n};\n'''
+          if 'export type CompanionCoordinatorSummary' not in s:
+            if marker not in s: raise SystemExit('conversation marker missing')
+            s = s.replace(marker, marker + addition, 1)
+          req_marker = '  recentConversation?: CompanionConversationTurn[] | undefined;\n'
+          req_add = '  coordinatorSummary?: CompanionCoordinatorSummary | undefined;\n'
+          if req_add not in s:
+            if req_marker not in s: raise SystemExit('request marker missing')
+            s = s.replace(req_marker, req_marker + req_add, 1)
+          p.write_text(s)
+
+          # functions.ts — server validation for numeric-only coordinator summary.
+          p = Path('src/lib/ai/functions.ts')
+          s = p.read_text()
+          marker = '  recentConversation: z\n    .array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().max(2000) }))\n    .max(8)\n    .optional(),\n'
+          addition = '''  coordinatorSummary: z\n    .object({\n      activeAssistantCount: z.number().int().min(0).max(500),\n      todayWorkBlockCount: z.number().int().min(0).max(2000),\n      todayAbsenceCount: z.number().int().min(0).max(500),\n      todayChangedCount: z.number().int().min(0).max(500),\n      overdueItemCount: z.number().int().min(0).max(2000),\n      dueTodayItemCount: z.number().int().min(0).max(2000),\n    })\n    .optional(),\n'''
+          if 'coordinatorSummary: z' not in s:
+            if marker not in s: raise SystemExit('functions request marker missing')
+            s = s.replace(marker, marker + addition, 1)
+          p.write_text(s)
+
+          # companion-policy.ts — same fixed allowlist, no second ad-hoc route list.
+          p = Path('src/lib/ai/companion-policy.ts')
+          s = p.read_text()
+          if '  "assistants",\n' not in s:
+            s = s.replace('  "special_education",\n  "lesson",', '  "special_education",\n  "assistants",\n  "lesson",', 1)
+          if 'assistants: "/asistenti",' not in s:
+            s = s.replace(
+              '    special_education: "/specialni-pedagogika",',
+              '    special_education: "/specialni-pedagogika",\n    assistants: "/asistenti",',
+              1,
+            )
+          p.write_text(s)
+
+          # provider.server.ts — economy model stays; add only fixed target and interpretation rule.
+          p = Path('src/lib/ai/provider.server.ts')
+          s = p.read_text()
+          s = s.replace(
+            'home, schedule, calendar, memory, art_studio, special_education, lesson.',
+            'home, schedule, calendar, memory, art_studio, special_education, assistants, lesson.',
+            1,
+          )
+          anchor = '          "Nikdy neodvozuj osobní fakta a nikdy nepožaduj skutečnou identitu dítěte.",\n'
+          rule = '          "coordinatorSummary obsahuje výhradně agregované organizační počty. Nepokoušej se z nich odvozovat jména AP, identitu dítěte, diagnózu ani obsah poznámek. Pro detail naviguj na assistants.",\n'
+          if rule not in s:
+            if anchor not in s: raise SystemExit('provider prompt anchor missing')
+            s = s.replace(anchor, anchor + rule, 1)
+          p.write_text(s)
+
+          # asistentka.tsx — load summary independently/fail-closed and wire fixed navigation.
+          p = Path('src/routes/asistentka.tsx')
+          s = p.read_text()
+          import_marker = 'import { loadAssistantMemory } from "@/lib/assistant-memory-data";\n'
+          import_add = 'import { loadCompanionCoordinatorSummary } from "@/lib/assistant-coordinator-companion";\n'
+          if import_add not in s:
+            if import_marker not in s: raise SystemExit('assistant memory import marker missing')
+            s = s.replace(import_marker, import_add + import_marker, 1)
+
+          call_marker = '      const result = await runCompanionAi({\n'
+          pre = '''      let coordinatorSummary;\n      try {\n        coordinatorSummary = await loadCompanionCoordinatorSummary(now);\n      } catch {\n        // Coordinator context is optional. Never broaden access or synthesize fallback data.\n        coordinatorSummary = undefined;\n      }\n'''
+          if 'loadCompanionCoordinatorSummary(now)' not in s:
+            if call_marker not in s: raise SystemExit('runCompanionAi marker missing')
+            s = s.replace(call_marker, pre + call_marker, 1)
+
+          request_marker = '          recentConversation:'
+          # There is currently no recentConversation property passed here. Insert before availableLessons.
+          available_marker = '          availableLessons: briefing?.lessons.map((l) => ({\n'
+          coord_line = '          coordinatorSummary,\n'
+          if coord_line not in s:
+            if available_marker not in s: raise SystemExit('available lessons marker missing')
+            s = s.replace(available_marker, coord_line + available_marker, 1)
+
+          nav_marker = '        else if (nav.target === "special_education")\n          await navigate({ to: "/specialni-pedagogika" });\n'
+          nav_add = '        else if (nav.target === "assistants") await navigate({ to: "/asistenti" });\n'
+          if nav_add not in s:
+            if nav_marker not in s: raise SystemExit('special education nav marker missing')
+            s = s.replace(nav_marker, nav_marker + nav_add, 1)
+          p.write_text(s)
+
+          # Hard privacy assertions over the dedicated summary helper and contract block.
+          helper = Path('src/lib/assistant-coordinator-companion.ts').read_text().lower()
+          forbidden = ['display_name', 'work_email', 'work_phone', 'student_alias', 'title', 'body', 'case_id', 'diagnosis', 'focus_summary']
+          for token in forbidden:
+            if token in helper:
+              raise SystemExit(f'coordinator companion helper contains forbidden content field: {token}')
+
+          contracts = Path('src/lib/ai/contracts.ts').read_text()
+          start = contracts.index('export type CompanionCoordinatorSummary')
+          end = contracts.index('};', start) + 2
+          block = contracts[start:end].lower()
+          for token in ['name', 'alias', 'note', 'body', 'case', 'diagnos', 'email', 'phone']:
+            if token in block:
+              raise SystemExit(f'coordinator summary contract contains forbidden field token: {token}')
+          PY
+      - run: bunx prettier --write src/lib/assistant-coordinator-companion.ts src/lib/ai/contracts.ts src/lib/ai/functions.ts src/lib/ai/companion-policy.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx
+      - run: bun run lint
+      - run: bun run build
+      - name: Commit verified coordinator companion context
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/assistant-coordinator-companion.ts src/lib/ai/contracts.ts src/lib/ai/functions.ts src/lib/ai/companion-policy.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/routeTree.gen.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: add privacy-safe coordinator companion context"
+            git push origin main
+          fi
