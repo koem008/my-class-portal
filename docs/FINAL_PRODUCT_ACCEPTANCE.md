@@ -22,3 +22,16 @@ Provider-neutral, server-only secrets, on-demand. Deterministické věci bez LLM
 
 ## Fail-closed
 Bez API key UI jasně říká, že AI/hlas nejsou připojené. Chyba provideru nesmí poškodit uložené přípravy ani změnit workflow status. Učitel vždy vidí návrh před aplikací změn.
+
+## Povinné ověření migrací v produkci
+
+U každé změny, která přidává nebo mění databázovou migraci, nestačí pro stav **VERIFIED** pouze lokální `supabase db reset`, lint ani production build. Lokální reset dokazuje syntaktickou a integrační platnost migrací od prázdné databáze, ale nedokazuje, že živá produkční Supabase je na stejném schématu.
+
+Migration-related změna smí být reportována jako **VERIFIED** až když jsou současně splněny všechny body:
+
+1. lokální migration reset od prázdné DB projde,
+2. všechny pending migrace jsou skutečně aplikované na produkční Supabase používanou publikovanou aplikací,
+3. přímý dotaz do produkčního schématu potvrdí nově očekávané tabulky/sloupce/funkce,
+4. produkční smoke test ověří dotčené živé routy bez schema-drift chyb (PostgREST 400/404, chybějící sloupce/tabulky apod.).
+
+Pokud není produkční schema sync nebo live smoke test ověřený, report musí použít **BLOCKER / NOT VERIFIED**, nikdy pouze předpokládat shodu z lokálního resetu.
