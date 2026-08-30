@@ -81,10 +81,9 @@ function AssistantCoordinatorPage() {
   const [selectedAlias, setSelectedAlias] = useState("");
   const [assignmentNote, setAssignmentNote] = useState("");
 
+  const [now] = useState(() => new Date());
   const [scheduleAssignment, setScheduleAssignment] = useState("");
-  const [scheduleWeekday, setScheduleWeekday] = useState(
-    String(coordinatorWeekday(new Date()) || 1),
-  );
+  const [scheduleWeekday, setScheduleWeekday] = useState(String(coordinatorWeekday(now) || 1));
   const [scheduleStart, setScheduleStart] = useState("08:00");
   const [scheduleEnd, setScheduleEnd] = useState("08:45");
   const [scheduleLocation, setScheduleLocation] = useState("");
@@ -170,7 +169,6 @@ function AssistantCoordinatorPage() {
     [assistants],
   );
 
-  const now = new Date();
   const todayIso = localIsoDate(now);
   const todayWeekday = coordinatorWeekday(now);
   const todaySlots = useMemo(
@@ -183,7 +181,7 @@ function AssistantCoordinatorPage() {
   );
   const nowCard = useMemo(
     () => buildCoordinatorNowCard(now, workSlots, exceptions),
-    [workSlots, exceptions],
+    [now, workSlots, exceptions],
   );
 
   async function activate() {
