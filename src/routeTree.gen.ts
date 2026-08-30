@@ -15,6 +15,7 @@ import { Route as AsistentkaRouteImport } from './routes/asistentka'
 import { Route as HlasRouteImport } from './routes/hlas'
 import { Route as KalendarRouteImport } from './routes/kalendar'
 import { Route as MaterialyRouteImport } from './routes/materialy'
+import { Route as NastaveniRouteImport } from './routes/nastaveni'
 import { Route as PametRouteImport } from './routes/pamet'
 import { Route as PrihlaseniRouteImport } from './routes/prihlaseni'
 import { Route as RozvrhRouteImport } from './routes/rozvrh'
@@ -55,6 +56,11 @@ const KalendarRoute = KalendarRouteImport.update({
 const MaterialyRoute = MaterialyRouteImport.update({
   id: '/materialy',
   path: '/materialy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NastaveniRoute = NastaveniRouteImport.update({
+  id: '/nastaveni',
+  path: '/nastaveni',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PametRoute = PametRouteImport.update({
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
   '/materialy': typeof MaterialyRouteWithChildren
+  '/nastaveni': typeof NastaveniRoute
   '/pamet': typeof PametRoute
   '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
   '/materialy': typeof MaterialyRouteWithChildren
+  '/nastaveni': typeof NastaveniRoute
   '/pamet': typeof PametRoute
   '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
   '/materialy': typeof MaterialyRouteWithChildren
+  '/nastaveni': typeof NastaveniRoute
   '/pamet': typeof PametRoute
   '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
@@ -182,6 +191,7 @@ export interface FileRouteTypes {
     | '/hlas'
     | '/kalendar'
     | '/materialy'
+    | '/nastaveni'
     | '/pamet'
     | '/prihlaseni'
     | '/rozvrh'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/hlas'
     | '/kalendar'
     | '/materialy'
+    | '/nastaveni'
     | '/pamet'
     | '/prihlaseni'
     | '/rozvrh'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/hlas'
     | '/kalendar'
     | '/materialy'
+    | '/nastaveni'
     | '/pamet'
     | '/prihlaseni'
     | '/rozvrh'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   HlasRoute: typeof HlasRoute
   KalendarRoute: typeof KalendarRoute
   MaterialyRoute: typeof MaterialyRouteWithChildren
+  NastaveniRoute: typeof NastaveniRoute
   PametRoute: typeof PametRoute
   PrihlaseniRoute: typeof PrihlaseniRoute
   RozvrhRoute: typeof RozvrhRoute
@@ -292,6 +305,13 @@ declare module '@tanstack/react-router' {
       path: '/materialy'
       fullPath: '/materialy'
       preLoaderRoute: typeof MaterialyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nastaveni': {
+      id: '/nastaveni'
+      path: '/nastaveni'
+      fullPath: '/nastaveni'
+      preLoaderRoute: typeof NastaveniRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pamet': {
@@ -418,6 +438,7 @@ const rootRouteChildren: RootRouteChildren = {
   HlasRoute: HlasRoute,
   KalendarRoute: KalendarRoute,
   MaterialyRoute: MaterialyRouteWithChildren,
+  NastaveniRoute: NastaveniRoute,
   PametRoute: PametRoute,
   PrihlaseniRoute: PrihlaseniRoute,
   RozvrhRoute: RozvrhRoute,

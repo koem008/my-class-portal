@@ -22,6 +22,16 @@ const categoryLabels: Record<GlobalSearchCategory, string> = {
   calendar: "Kalendář",
 };
 
+const NAVIGATION_ITEMS = [
+  ...COMPANION_NAVIGATION_ITEMS,
+  {
+    target: "settings-local",
+    label: "Nastavení",
+    path: "/nastaveni",
+    keywords: ["nastavení", "škola", "třída", "okres", "asistentka", "rozvrh"] as const,
+  },
+] as const;
+
 export function QuickNavigation() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -90,8 +100,8 @@ export function QuickNavigation() {
 
   const navigationResults = useMemo(() => {
     const needle = normalize(query);
-    if (!needle) return COMPANION_NAVIGATION_ITEMS;
-    return COMPANION_NAVIGATION_ITEMS.filter((item) =>
+    if (!needle) return NAVIGATION_ITEMS;
+    return NAVIGATION_ITEMS.filter((item) =>
       normalize([item.label, ...item.keywords].join(" ")).includes(needle),
     );
   }, [query]);

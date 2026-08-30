@@ -133,7 +133,10 @@ export async function loadWorkspaceSettings(): Promise<WorkspaceSettings | null>
 }
 
 export async function loadDistrictChoices(): Promise<string[]> {
-  const { data, error } = await db.from("spring_break_terms").select("districts").order("starts_on");
+  const { data, error } = await db
+    .from("spring_break_terms")
+    .select("districts")
+    .order("starts_on");
   if (error) throw error;
   return Array.from(
     new Set(
@@ -164,10 +167,9 @@ export async function saveWorkspaceSettings(input: WorkspaceSettings): Promise<v
     throw new Error("Konec školního roku musí být po jeho začátku.");
   if (!assistantName) throw new Error("Doplňte jméno AI asistentky.");
 
-  const profileResult = await db.from("teacher_profiles").upsert(
-    { user_id: input.userId, display_name: displayName },
-    { onConflict: "user_id" },
-  );
+  const profileResult = await db
+    .from("teacher_profiles")
+    .upsert({ user_id: input.userId, display_name: displayName }, { onConflict: "user_id" });
   if (profileResult.error) throw profileResult.error;
 
   const schoolResult = await db

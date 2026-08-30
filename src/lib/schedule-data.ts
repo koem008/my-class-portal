@@ -10,6 +10,7 @@ export type AccessibleClass = {
   grade: number;
   school_id: string;
   academic_year_id: string;
+  pseudonym_set_key?: string;
 };
 
 export type TimetableSlot = {
@@ -38,7 +39,7 @@ export type CurriculumSubjectChoice = {
 export async function loadAccessibleClasses(): Promise<AccessibleClass[]> {
   const { data, error } = await db
     .from("classes")
-    .select("id,name,grade,school_id,academic_year_id")
+    .select("id,name,grade,school_id,academic_year_id,pseudonym_set_key")
     .order("grade")
     .order("name");
   if (error) throw error;

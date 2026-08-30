@@ -26,7 +26,7 @@ export async function loadClassPseudonyms(classInfo: AccessibleClass) {
       .from("pseudonym_catalog")
       .select("id,set_key,code,display_name,emoji,sort_order")
       .eq("is_active", true)
-      .order("set_key")
+      .eq("set_key", classInfo.pseudonym_set_key ?? "animals")
       .order("sort_order"),
     db
       .from("student_aliases")
