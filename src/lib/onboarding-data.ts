@@ -30,7 +30,11 @@ export type OnboardingInput = {
   isAssistantCoordinator: boolean;
 };
 
-type ExistingClassRow = { id: string };
+type ExistingClassRow = {
+  id: string;
+  school_id: string;
+  academic_year_id: string;
+};
 
 export async function completeFirstRun(input: OnboardingInput) {
   const displayName = input.displayName.trim();
@@ -79,61 +83,104 @@ export async function completeFirstRun(input: OnboardingInput) {
   const user = authData.user;
   if (!user) throw new Error("Pro nastavení aplikace je potřeba být přihlášená.");
 
-  const existing = await db.from("classes").select("id").limit(1);
+  const existing = await db
+    .from("classes")
+    .select("id,school_id,academic_year_id")
+    .order("created_at")
+    .limit(1);
   if (existing.error) throw existing.error;
-  if (((existing.data ?? []) as ExistingClassRow[]).length > 0) {
-    throw new Error("První nastavení už bylo dokončeno. Další změny udělejte v Nastavení.");
+  const existingClass = ((existing.data ?? []) as ExistingClassRow[])[0];
+
+  let schoolId: string;
+  let academicYearId: string;
+  let classId: string;
+
+  if (existingClass) {
+    schoolId = String(existingClass.school_id);
+    academicYearId = String(existingClass.academic_year_id);
+    classId = String(existingClass.id);
+
+    const schoolUpdate = await db
+      .from("schools")
+      .update({ name: schoolName, district_name: districtName })
+      .eq("id", schoolId);
+    if (schoolUpdate.error) throw schoolUpdate.error;
+
+    const yearUpdate = await db
+      .from("academic_years")
+      .update({
+        label: academicYearLabel,
+        starts_on: input.academicYearStartsOn,
+        ends_on: input.academicYearEndsOn,
+      })
+      .eq("id", academicYearId)
+      .eq("school_id", schoolId);
+    if (yearUpdate.error) throw yearUpdate.error;
+
+    const classUpdate = await db
+      .from("classes")
+      .update({
+        name: className,
+        grade: input.grade,
+        pseudonym_set_key: input.pseudonymSetKey,
+      })
+      .eq("id", classId)
+      .eq("school_id", schoolId);
+    if (classUpdate.error) throw classUpdate.error;
+  } else {
+    const tenant = await db.rpc("create_school_tenant", {
+      _school_name: schoolName,
+      _academic_year_label: academicYearLabel,
+      _starts_on: input.academicYearStartsOn,
+      _ends_on: input.academicYearEndsOn,
+    });
+    if (tenant.error) throw tenant.error;
+    schoolId = String(tenant.data);
+
+    const schoolUpdate = await db
+      .from("schools")
+      .update({ district_name: districtName })
+      .eq("id", schoolId);
+    if (schoolUpdate.error) throw schoolUpdate.error;
+
+    const year = await db
+      .from("academic_years")
+      .select("id")
+      .eq("school_id", schoolId)
+      .eq("label", academicYearLabel)
+      .single();
+    if (year.error) throw year.error;
+    academicYearId = String(year.data.id);
+
+    const classInsert = await db
+      .from("classes")
+      .insert({
+        school_id: schoolId,
+        academic_year_id: academicYearId,
+        name: className,
+        grade: input.grade,
+        pseudonym_set_key: input.pseudonymSetKey,
+      })
+      .select("id")
+      .single();
+    if (classInsert.error) throw classInsert.error;
+    classId = String(classInsert.data.id);
   }
 
-  const tenant = await db.rpc("create_school_tenant", {
-    _school_name: schoolName,
-    _academic_year_label: academicYearLabel,
-    _starts_on: input.academicYearStartsOn,
-    _ends_on: input.academicYearEndsOn,
-  });
-  if (tenant.error) throw tenant.error;
-  const schoolId = String(tenant.data);
-
-  const schoolUpdate = await db
-    .from("schools")
-    .update({ district_name: districtName })
-    .eq("id", schoolId);
-  if (schoolUpdate.error) throw schoolUpdate.error;
-
-  const year = await db
-    .from("academic_years")
-    .select("id")
-    .eq("school_id", schoolId)
-    .eq("label", academicYearLabel)
-    .single();
-  if (year.error) throw year.error;
-
-  const classInsert = await db
-    .from("classes")
-    .insert({
-      school_id: schoolId,
-      academic_year_id: year.data.id,
-      name: className,
-      grade: input.grade,
-      pseudonym_set_key: input.pseudonymSetKey,
-    })
-    .select("id")
-    .single();
-  if (classInsert.error) throw classInsert.error;
-  const classId = String(classInsert.data.id);
-
-  const membership = await db.from("class_memberships").insert({
-    class_id: classId,
-    user_id: user.id,
-    role: "teacher",
-  });
+  const membership = await db.from("class_memberships").upsert(
+    {
+      class_id: classId,
+      user_id: user.id,
+      role: "teacher",
+    },
+    { onConflict: "class_id,user_id" },
+  );
   if (membership.error) throw membership.error;
 
   const profile = await db.from("teacher_profiles").upsert(
     {
       user_id: user.id,
       display_name: displayName,
-      onboarded_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
   );
@@ -152,11 +199,18 @@ export async function completeFirstRun(input: OnboardingInput) {
   );
   if (assistant.error) throw assistant.error;
 
+  const clearSlots = await db
+    .from("timetable_slots")
+    .delete()
+    .eq("class_id", classId)
+    .eq("academic_year_id", academicYearId);
+  if (clearSlots.error) throw clearSlots.error;
+
   const slots = await db.from("timetable_slots").insert(
     normalizedSlots.map((slot) => ({
       school_id: schoolId,
       class_id: classId,
-      academic_year_id: year.data.id,
+      academic_year_id: academicYearId,
       weekday: slot.weekday,
       slot_order: slot.slotOrder,
       starts_at: slot.startsAt,
@@ -202,7 +256,7 @@ export async function completeFirstRun(input: OnboardingInput) {
 
   return {
     schoolId,
-    academicYearId: String(year.data.id),
+    academicYearId,
     classId,
     artSubjectId,
     specialEducationEnabled: input.isSpecialEducator,
