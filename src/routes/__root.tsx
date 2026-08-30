@@ -8,13 +8,14 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { Loader2, Mic, ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AfternoonReflectionPrompt } from "@/components/AfternoonReflectionPrompt";
 import { DelightLayer } from "@/components/DelightLayer";
+import { GlobalVoiceCompanion } from "@/components/GlobalVoiceCompanion";
 import { QuickNavigation } from "@/components/QuickNavigation";
 import { SeasonalAmbience } from "@/components/SeasonalAmbience";
 import { SpecialContinuityAssistantCard } from "@/components/special-education/SpecialContinuityAssistantCard";
@@ -193,22 +194,6 @@ function AuthGate() {
   }
   if (pathname === "/prihlaseni") return <AuthLoading />;
 
-  function activateAssistantVoice() {
-    if (typeof document === "undefined") return;
-    const voiceButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
-      (button) => button.className.includes("h-28") && button.className.includes("w-28"),
-    );
-    if (!voiceButton) return;
-    voiceButton.scrollIntoView({ behavior: "smooth", block: "center" });
-    window.setTimeout(() => {
-      voiceButton.focus({ preventScroll: true });
-      voiceButton.click();
-    }, 250);
-  }
-
-  const assistantLauncherClass =
-    "fixed bottom-5 right-5 z-50 inline-flex min-h-14 items-center gap-2 rounded-full bg-[#276765] px-5 py-3 text-sm font-bold text-white shadow-[0_16px_40px_rgba(39,103,101,.28)] transition hover:-translate-y-0.5 hover:bg-[#215b59] focus:outline-none focus:ring-4 focus:ring-[#bfe0d7]";
-
   return (
     <>
       <SeasonalAmbience />
@@ -219,26 +204,7 @@ function AuthGate() {
       <QuickNavigation />
       <SpecialContinuityAssistantCard />
       <AfternoonReflectionPrompt />
-      {pathname === "/asistentka" ? (
-        <button
-          type="button"
-          onClick={activateAssistantVoice}
-          aria-label="Spustit obecnou AI asistentku"
-          className={assistantLauncherClass}
-        >
-          <Mic className="h-5 w-5" />
-          <span className="hidden sm:inline">Mluvit s asistentkou</span>
-        </button>
-      ) : (
-        <Link
-          to="/asistentka"
-          aria-label="Otevřít obecnou AI asistentku"
-          className={assistantLauncherClass}
-        >
-          <Mic className="h-5 w-5" />
-          <span className="hidden sm:inline">Mluvit s asistentkou</span>
-        </Link>
-      )}
+      <GlobalVoiceCompanion />
     </>
   );
 }
