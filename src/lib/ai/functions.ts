@@ -89,6 +89,43 @@ const companionRequestSchema = z.object({
       nextMeetingAt: z.string().datetime().nullable(),
     })
     .optional(),
+  globalContext: z
+    .object({
+      upcomingLessons: z
+        .array(
+          z.object({
+            lessonId: z.string().uuid(),
+            date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            subject: z.string().trim().min(1).max(160),
+            status: z.enum(["planned", "draft", "prepared", "completed", "moved"]),
+            curriculumTopic: z.string().trim().max(300).optional(),
+          }),
+        )
+        .max(60),
+      recentLessons: z
+        .array(
+          z.object({
+            lessonId: z.string().uuid(),
+            date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            subject: z.string().trim().min(1).max(160),
+            status: z.enum(["planned", "draft", "prepared", "completed", "moved"]),
+            curriculumTopic: z.string().trim().max(300).optional(),
+          }),
+        )
+        .max(60),
+      materials: z
+        .array(
+          z.object({
+            materialId: z.string().uuid(),
+            lessonId: z.string().uuid(),
+            kind: z.string().trim().min(1).max(80),
+            subject: z.string().trim().min(1).max(160),
+            curriculumTopic: z.string().trim().max(300).optional(),
+          }),
+        )
+        .max(160),
+    })
+    .optional(),
   availableLessons: z
     .array(
       z.object({

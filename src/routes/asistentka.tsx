@@ -27,6 +27,7 @@ import {
 import type { CompanionPedagogicalProposal } from "@/lib/ai/contracts";
 import { loadCompanionCoordinatorSummary } from "@/lib/assistant-coordinator-companion";
 import { loadAssistantMemory } from "@/lib/assistant-memory-data";
+import { loadGlobalCompanionContext } from "@/lib/global-assistant-context";
 import {
   buildMorningMessage,
   loadDailyBriefing,
@@ -174,6 +175,13 @@ function AssistantPage() {
         // Coordinator context is optional. Never broaden access or synthesize fallback data.
         coordinatorSummary = undefined;
       }
+      let globalContext;
+      try {
+        globalContext = await loadGlobalCompanionContext(todayIso);
+      } catch {
+        // Global context is optional. Fail closed instead of inventing teaching/material state.
+        globalContext = undefined;
+      }
       const result = await runCompanionAi({
         data: {
           message: transcribed.text,
@@ -189,6 +197,7 @@ function AssistantPage() {
             ? memories.map((m) => m.content)
             : undefined,
           coordinatorSummary,
+          globalContext,
           availableLessons: briefing?.lessons.map((l) => ({
             lessonId: l.id,
             subject: l.subject_name,

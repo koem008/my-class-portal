@@ -105,6 +105,30 @@ export type CompanionCoordinatorSummary = {
   nextMeetingAt: string | null;
 };
 
+export type CompanionGlobalContext = {
+  upcomingLessons: Array<{
+    lessonId: string;
+    date: string;
+    subject: string;
+    status: "planned" | "draft" | "prepared" | "completed" | "moved";
+    curriculumTopic?: string | undefined;
+  }>;
+  recentLessons: Array<{
+    lessonId: string;
+    date: string;
+    subject: string;
+    status: "planned" | "draft" | "prepared" | "completed" | "moved";
+    curriculumTopic?: string | undefined;
+  }>;
+  materials: Array<{
+    materialId: string;
+    lessonId: string;
+    kind: string;
+    subject: string;
+    curriculumTopic?: string | undefined;
+  }>;
+};
+
 /** Minimal, privacy-safe context for the general teacher companion. */
 export type CompanionRequest = {
   message: string;
@@ -118,6 +142,7 @@ export type CompanionRequest = {
   personalPreferences?: string[] | undefined;
   recentConversation?: CompanionConversationTurn[] | undefined;
   coordinatorSummary?: CompanionCoordinatorSummary | undefined;
+  globalContext?: CompanionGlobalContext | undefined;
   availableLessons?: Array<{
     lessonId: string;
     subject: string;

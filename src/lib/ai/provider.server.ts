@@ -323,6 +323,7 @@ export async function generateCompanionReply(
           "Používej pouze dodaný pracovní kontext a explicitně povolené osobní preference.",
           "Nikdy neodvozuj osobní fakta a nikdy nepožaduj skutečnou identitu dítěte.",
           "coordinatorSummary obsahuje výhradně agregované organizační údaje; nextMeetingAt je čas nejbližší porady AP. Nepokoušej se z nich odvozovat jména AP, identitu dítěte, diagnózu ani obsah poznámek. Pro detail naviguj na assistants.",
+          "globalContext obsahuje pouze privacy-safe metadata výuky: datum, předmět, stav, ID hodiny, typ materiálu a případně název oficiálně přiřazeného kurikulárního tématu. Neobsahuje volné poznámky, text materiálu, jména ani pseudonymy. Použij ho pro dotazy co ještě připravit, kde výuka skončila a zda existuje materiál k tématu. Nikdy nedoplňuj chybějící téma ani obsah odhadem. Při žádosti najít/otevřít materiál můžeš navigovat na materials.",
           "Vždy zvol přesně jeden režim: conversation, navigate, propose.",
           "conversation: běžná konverzace, dotaz, nejasný nebo nepodporovaný požadavek; bez navigation a proposal.",
           `navigate: jen otevření existující obrazovky z pevného seznamu ${COMPANION_NAVIGATION_TARGETS.join(", ")}. Pro lesson použij výhradně lessonId z availableLessons.`,
