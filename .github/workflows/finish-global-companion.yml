@@ -64,4 +64,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/global-assistant-context.ts src/lib/ai/contracts.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/routeTree.gen.ts
           git commit -m "feat: give companion privacy-safe global teaching context"
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
