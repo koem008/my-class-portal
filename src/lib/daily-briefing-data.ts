@@ -44,6 +44,8 @@ export type RecommendedAction = {
 };
 export type DailyBriefing = {
   date: string;
+  // Assistant-facing form of address. Intentionally sourced from teacher_assistant_settings.preferred_salutation,
+  // not teacher_profiles.display_name (which remains the account/profile display name).
   teacherDisplayName: string | null;
   classInfo: AccessibleClass;
   lessons: DailyLesson[];
@@ -90,7 +92,7 @@ export async function loadDailyBriefing(
     eventsResult,
     systemResult,
     recentLessonsResult,
-    profileResult,
+    salutationResult,
   ] = await Promise.all([
     lessonIds.length
       ? db.from("lesson_preparations").select("lesson_id").in("lesson_id", lessonIds)
@@ -120,7 +122,7 @@ export async function loadDailyBriefing(
       .order("lesson_date", { ascending: false })
       .order("slot_order", { ascending: false })
       .limit(20),
-    db.from("teacher_profiles").select("display_name").limit(1).maybeSingle(),
+    db.from("teacher_assistant_settings").select("preferred_salutation").limit(1).maybeSingle(),
   ]);
   for (const result of [
     prepResult,
@@ -128,7 +130,7 @@ export async function loadDailyBriefing(
     eventsResult,
     systemResult,
     recentLessonsResult,
-    profileResult,
+    salutationResult,
   ])
     if (result.error) throw result.error;
 
@@ -315,7 +317,7 @@ export async function loadDailyBriefing(
 
   return {
     date,
-    teacherDisplayName: profileResult.data?.display_name?.trim() || null,
+    teacherDisplayName: salutationResult.data?.preferred_salutation?.trim() || null,
     classInfo,
     lessons: dailyLessons,
     events,
