@@ -1,5 +1,6 @@
 name: Finish Workspace Settings
 
+# One-shot integration gate; remove after successful verification.
 on:
   push:
     paths:
