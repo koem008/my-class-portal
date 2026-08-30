@@ -1,0 +1,236 @@
+name: Verify Coordinator Meetings
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-coordinator-meetings.yml'
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Wire private meetings into one calendar and one priority flow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # 1) Deterministic single "Co dnes řeším?" priority includes meetings.
+          p = Path('src/lib/assistant-coordinator-data.ts')
+          s = p.read_text()
+          marker = '''export type CoordinatorNowCard = {\n  tone: "attention" | "now" | "next" | "done" | "quiet";\n  eyebrow: string;\n  title: string;\n  detail: string;\n};\n'''
+          addition = '''\nexport type CoordinatorMeetingPriority = {\n  starts_at: string;\n  ends_at: string;\n};\n'''
+          if 'export type CoordinatorMeetingPriority' not in s:
+            if marker not in s: raise SystemExit('now-card type marker missing')
+            s = s.replace(marker, marker + addition, 1)
+
+          old_sig = '''export function buildCoordinatorNowCard(\n  now: Date,\n  workSlots: AssistantWorkSlot[],\n  exceptions: AssistantPresenceException[],\n  items: CoordinatorPriorityItem[] = [],\n): CoordinatorNowCard {'''
+          new_sig = '''export function buildCoordinatorNowCard(\n  now: Date,\n  workSlots: AssistantWorkSlot[],\n  exceptions: AssistantPresenceException[],\n  items: CoordinatorPriorityItem[] = [],\n  meetings: CoordinatorMeetingPriority[] = [],\n): CoordinatorNowCard {'''
+          if old_sig in s:
+            s = s.replace(old_sig, new_sig, 1)
+          elif 'meetings: CoordinatorMeetingPriority[] = []' not in s:
+            raise SystemExit('buildCoordinatorNowCard signature marker missing')
+
+          changed_block = '''  const changed = todayExceptions.find((row) => row.kind === "changed");\n  if (changed) {\n    return {\n      tone: "attention",\n      eyebrow: "Co dnes řeším?",\n      title: `Dnes je změna u ${changed.assistantName}.`,\n      detail: changed.note?.trim() || "Mrkni na dnešní plán, ať sedí skutečné rozložení podpory.",\n    };\n  }\n\n  const current = todaySlots.find('''
+          meeting_block = '''  const changed = todayExceptions.find((row) => row.kind === "changed");\n  if (changed) {\n    return {\n      tone: "attention",\n      eyebrow: "Co dnes řeším?",\n      title: `Dnes je změna u ${changed.assistantName}.`,\n      detail: changed.note?.trim() || "Mrkni na dnešní plán, ať sedí skutečné rozložení podpory.",\n    };\n  }\n\n  const todayMeetings = meetings\n    .filter((meeting) => pragueDate(meeting.starts_at) === today)\n    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));\n  const currentMeeting = todayMeetings.find(\n    (meeting) => new Date(meeting.starts_at).getTime() <= now.getTime() && new Date(meeting.ends_at).getTime() > now.getTime(),\n  );\n  if (currentMeeting) {\n    return {\n      tone: "now",\n      eyebrow: "Právě teď",\n      title: "Porada AP",\n      detail: `${pragueTime(currentMeeting.starts_at)}–${pragueTime(currentMeeting.ends_at)} · podklady máš níže v koordinaci.`,\n    };\n  }\n\n  const current = todaySlots.find('''
+          if changed_block in s:
+            s = s.replace(changed_block, meeting_block, 1)
+          elif 'const currentMeeting = todayMeetings.find' not in s:
+            raise SystemExit('meeting current-priority marker missing')
+
+          next_block = '''  const next = todaySlots.find((slot) => minutesOf(slot.starts_at) > nowMinutes);\n  if (next) {\n    const diff = minutesOf(next.starts_at) - nowMinutes;\n    return {\n      tone: "next",\n      eyebrow: "Co dnes řeším?",\n      title:\n        diff <= 90\n          ? `Za ${diff} min ${next.assistantName} → ${next.className}`\n          : `Další podpora: ${next.assistantName} → ${next.className}`,\n      detail: `${next.starts_at.slice(0, 5)}–${next.ends_at.slice(0, 5)}${next.alias ? ` · ${next.alias}` : ""}`,\n    };\n  }\n\n  if (todaySlots.length > 0) {'''
+          next_replacement = '''  const next = todaySlots.find((slot) => minutesOf(slot.starts_at) > nowMinutes);\n  const nextMeeting = todayMeetings.find((meeting) => new Date(meeting.starts_at).getTime() > now.getTime());\n  const nextSlotAt = next ? minutesOf(next.starts_at) : Number.POSITIVE_INFINITY;\n  const nextMeetingAt = nextMeeting\n    ? new Date(nextMeeting.starts_at).getHours() * 60 + new Date(nextMeeting.starts_at).getMinutes()\n    : Number.POSITIVE_INFINITY;\n\n  if (nextMeeting && nextMeetingAt <= nextSlotAt) {\n    const diff = Math.max(0, Math.round((new Date(nextMeeting.starts_at).getTime() - now.getTime()) / 60000));\n    return {\n      tone: "next",\n      eyebrow: "Co dnes řeším?",\n      title: diff <= 90 ? `Za ${diff} min máš poradu AP.` : `Dnes tě čeká porada AP.`,\n      detail: `${pragueTime(nextMeeting.starts_at)}–${pragueTime(nextMeeting.ends_at)} · podklady jsou připravené v koordinaci.`,\n    };\n  }\n\n  if (next) {\n    const diff = minutesOf(next.starts_at) - nowMinutes;\n    return {\n      tone: "next",\n      eyebrow: "Co dnes řeším?",\n      title:\n        diff <= 90\n          ? `Za ${diff} min ${next.assistantName} → ${next.className}`\n          : `Další podpora: ${next.assistantName} → ${next.className}`,\n      detail: `${next.starts_at.slice(0, 5)}–${next.ends_at.slice(0, 5)}${next.alias ? ` · ${next.alias}` : ""}`,\n    };\n  }\n\n  if (todaySlots.length > 0 || todayMeetings.length > 0) {'''
+          if next_block in s:
+            s = s.replace(next_block, next_replacement, 1)
+          elif 'const nextMeeting = todayMeetings.find' not in s:
+            raise SystemExit('next meeting priority marker missing')
+
+          helper_marker = '''function minutesOf(time: string) {\n  const [hours, minutes] = time.slice(0, 5).split(":").map(Number);\n  return hours * 60 + minutes;\n}\n'''
+          helpers = '''function minutesOf(time: string) {\n  const [hours, minutes] = time.slice(0, 5).split(":").map(Number);\n  return hours * 60 + minutes;\n}\n\nfunction pragueDate(value: string) {\n  return new Intl.DateTimeFormat("en-CA", {\n    timeZone: "Europe/Prague",\n    year: "numeric",\n    month: "2-digit",\n    day: "2-digit",\n  }).format(new Date(value));\n}\n\nfunction pragueTime(value: string) {\n  return new Intl.DateTimeFormat("cs-CZ", {\n    timeZone: "Europe/Prague",\n    hour: "2-digit",\n    minute: "2-digit",\n  }).format(new Date(value));\n}\n'''
+          if 'function pragueDate(value: string)' not in s:
+            if helper_marker not in s: raise SystemExit('minutes helper marker missing')
+            s = s.replace(helper_marker, helpers, 1)
+          p.write_text(s)
+
+          # Correct timezone comparison for future meeting: use Prague clock rather than host UTC clock.
+          p = Path('src/lib/assistant-coordinator-data.ts')
+          s = p.read_text()
+          s = s.replace(
+            '''  const nextMeetingAt = nextMeeting\n    ? new Date(nextMeeting.starts_at).getHours() * 60 + new Date(nextMeeting.starts_at).getMinutes()\n    : Number.POSITIVE_INFINITY;''',
+            '''  const nextMeetingAt = nextMeeting ? minutesOf(pragueTime(nextMeeting.starts_at)) : Number.POSITIVE_INFINITY;''',
+            1,
+          )
+          p.write_text(s)
+
+          # 2) /asistenti loads and displays meetings from the same private calendar.
+          p = Path('src/routes/asistenti.tsx')
+          s = p.read_text()
+          import_marker = 'import { CoordinatorMeetingBriefCard } from "@/components/assistant-coordinator/CoordinatorMeetingBriefCard";\n'
+          import_add = 'import { CoordinatorMeetingsCard } from "@/components/assistant-coordinator/CoordinatorMeetingsCard";\n'
+          if import_add not in s:
+            if import_marker not in s: raise SystemExit('meeting brief import marker missing')
+            s = s.replace(import_marker, import_marker + import_add, 1)
+          lib_marker = 'import type { AssistantCoordinationItem } from "@/lib/assistant-coordinator-items";\n'
+          lib_add = '''import {\n  loadAssistantCoordinatorMeetings,\n  type AssistantCoordinatorMeeting,\n} from "@/lib/assistant-coordinator-meetings";\n'''
+          if lib_add not in s:
+            if lib_marker not in s: raise SystemExit('coordination item import marker missing')
+            s = s.replace(lib_marker, lib_marker + lib_add, 1)
+
+          state_marker = '  const [coordinationItems, setCoordinationItems] = useState<AssistantCoordinationItem[]>([]);\n'
+          state_add = '  const [meetings, setMeetings] = useState<AssistantCoordinatorMeeting[]>([]);\n'
+          if state_add not in s:
+            if state_marker not in s: raise SystemExit('route state marker missing')
+            s = s.replace(state_marker, state_marker + state_add, 1)
+
+          clear_marker = '        setExceptions([]);\n        setState("ready");\n'
+          if '        setMeetings([]);\n' not in s:
+            if clear_marker not in s: raise SystemExit('route clear marker missing')
+            s = s.replace(clear_marker, '        setExceptions([]);\n        setMeetings([]);\n        setState("ready");\n', 1)
+
+          old_load = '''      const [nextWorkSlots, nextExceptions] = await Promise.all([\n        loadAssistantWorkSlots(nextContext.access.schoolId, nextAssignments),\n        loadAssistantPresenceExceptions(\n          nextContext.access.schoolId,\n          nextAssistants,\n          localIsoDate(now),\n          localIsoDate(addDays(now, 7)),\n        ),\n      ]);'''
+          new_load = '''      const meetingFrom = new Date(now);\n      meetingFrom.setHours(0, 0, 0, 0);\n      const meetingTo = addDays(now, 60);\n      meetingTo.setHours(23, 59, 59, 999);\n      const [nextWorkSlots, nextExceptions, nextMeetings] = await Promise.all([\n        loadAssistantWorkSlots(nextContext.access.schoolId, nextAssignments),\n        loadAssistantPresenceExceptions(\n          nextContext.access.schoolId,\n          nextAssistants,\n          localIsoDate(now),\n          localIsoDate(addDays(now, 7)),\n        ),\n        loadAssistantCoordinatorMeetings(\n          nextContext.access.schoolId,\n          meetingFrom.toISOString(),\n          meetingTo.toISOString(),\n        ),\n      ]);'''
+          if old_load in s:
+            s = s.replace(old_load, new_load, 1)
+          elif 'nextMeetings' not in s:
+            raise SystemExit('route load marker missing')
+
+          set_marker = '      setExceptions(nextExceptions);\n      setState("ready");\n'
+          if '      setMeetings(nextMeetings);\n' not in s:
+            if set_marker not in s: raise SystemExit('meeting set marker missing')
+            s = s.replace(set_marker, '      setExceptions(nextExceptions);\n      setMeetings(nextMeetings);\n      setState("ready");\n', 1)
+
+          now_marker = '    () => buildCoordinatorNowCard(now, workSlots, exceptions, coordinationItems),\n    [now, workSlots, exceptions, coordinationItems],\n'
+          now_new = '    () => buildCoordinatorNowCard(now, workSlots, exceptions, coordinationItems, meetings),\n    [now, workSlots, exceptions, coordinationItems, meetings],\n'
+          if now_marker in s:
+            s = s.replace(now_marker, now_new, 1)
+          elif 'coordinationItems, meetings' not in s:
+            raise SystemExit('now-card route marker missing')
+
+          render_marker = '<CoordinatorMeetingBriefCard'
+          meeting_component = '''<CoordinatorMeetingsCard\n          schoolId={context.access.schoolId}\n          meetings={meetings}\n          onChanged={async () => {\n            const from = new Date();\n            from.setHours(0, 0, 0, 0);\n            const to = addDays(from, 60);\n            to.setHours(23, 59, 59, 999);\n            setMeetings(\n              await loadAssistantCoordinatorMeetings(\n                context.access.schoolId,\n                from.toISOString(),\n                to.toISOString(),\n              ),\n            );\n          }}\n        />\n\n        '''
+          if '<CoordinatorMeetingsCard' not in s:
+            idx = s.find(render_marker)
+            if idx < 0: raise SystemExit('meeting brief render marker missing')
+            s = s[:idx] + meeting_component + s[idx:]
+          p.write_text(s)
+
+          # 3) Companion summary may answer "Kdy mám poradu AP?" with time only, no content.
+          p = Path('src/lib/assistant-coordinator-companion.ts')
+          s = p.read_text()
+          import_marker = 'import { supabase } from "@/integrations/supabase/client";\n'
+          import_add = 'import { coordinatorMeetingSource } from "@/lib/assistant-coordinator-meetings";\n'
+          if import_add not in s:
+            s = s.replace(import_marker, import_marker + import_add, 1)
+          type_marker = '  dueTodayItemCount: number;\n};\n'
+          if '  todayMeetingCount: number;\n' not in s:
+            if type_marker not in s: raise SystemExit('companion summary type marker missing')
+            s = s.replace(type_marker, '  dueTodayItemCount: number;\n  todayMeetingCount: number;\n  nextMeetingAt: string | null;\n};\n', 1)
+
+          promise_old = '  const [assistants, slots, presence, items] = await Promise.all(['
+          if promise_old in s:
+            s = s.replace(promise_old, '  const [assistants, slots, presence, items, meetings] = await Promise.all([', 1)
+          elif 'presence, items, meetings' not in s:
+            raise SystemExit('companion promise marker missing')
+          end_marker = '''    db\n      .from("assistant_coordination_items")\n      .select("due_on")\n      .eq("school_id", schoolId)\n      .eq("status", "open")\n      .not("due_on", "is", null)\n      .lte("due_on", today),\n  ]);'''
+          end_new = '''    db\n      .from("assistant_coordination_items")\n      .select("due_on")\n      .eq("school_id", schoolId)\n      .eq("status", "open")\n      .not("due_on", "is", null)\n      .lte("due_on", today),\n    db\n      .from("calendar_events")\n      .select("starts_at,ends_at")\n      .eq("school_id", schoolId)\n      .eq("created_by", auth.user.id)\n      .eq("scope", "private")\n      .eq("source", coordinatorMeetingSource)\n      .gte("ends_at", now.toISOString())\n      .order("starts_at")\n      .limit(20),\n  ]);'''
+          if end_marker in s:
+            s = s.replace(end_marker, end_new, 1)
+          elif '.eq("source", coordinatorMeetingSource)' not in s:
+            raise SystemExit('companion meeting query marker missing')
+          s = s.replace('for (const result of [assistants, slots, presence, items])', 'for (const result of [assistants, slots, presence, items, meetings])', 1)
+          rows_marker = '  const itemRows = (items.data ?? []) as Array<{ due_on: string }>;\n'
+          rows_add = '''  const meetingRows = (meetings.data ?? []) as Array<{ starts_at: string; ends_at: string }>;\n  const todayMeetingCount = meetingRows.filter((row) => pragueIsoDate(row.starts_at) === today).length;\n'''
+          if 'const meetingRows =' not in s:
+            if rows_marker not in s: raise SystemExit('companion row marker missing')
+            s = s.replace(rows_marker, rows_marker + rows_add, 1)
+          return_marker = '    dueTodayItemCount: itemRows.filter((row) => row.due_on === today).length,\n'
+          return_add = '    todayMeetingCount,\n    nextMeetingAt: meetingRows[0]?.starts_at ?? null,\n'
+          if '    nextMeetingAt:' not in s:
+            if return_marker not in s: raise SystemExit('companion return marker missing')
+            s = s.replace(return_marker, return_marker + return_add, 1)
+          date_helper = '''\nfunction pragueIsoDate(value: string) {\n  return new Intl.DateTimeFormat("en-CA", {\n    timeZone: "Europe/Prague",\n    year: "numeric",\n    month: "2-digit",\n    day: "2-digit",\n  }).format(new Date(value));\n}\n'''
+          if 'function pragueIsoDate(value: string)' not in s:
+            s += date_helper
+          p.write_text(s)
+
+          # Contract + zod schema add only count/time fields.
+          p = Path('src/lib/ai/contracts.ts')
+          s = p.read_text()
+          marker = '  dueTodayItemCount: number;\n};\n'
+          if '  todayMeetingCount: number;\n' not in s:
+            if marker not in s: raise SystemExit('AI contract summary marker missing')
+            s = s.replace(marker, '  dueTodayItemCount: number;\n  todayMeetingCount: number;\n  nextMeetingAt: string | null;\n};\n', 1)
+          p.write_text(s)
+
+          p = Path('src/lib/ai/functions.ts')
+          s = p.read_text()
+          marker = '      dueTodayItemCount: z.number().int().min(0).max(2000),\n'
+          addition = '      todayMeetingCount: z.number().int().min(0).max(100),\n      nextMeetingAt: z.string().datetime().nullable(),\n'
+          if '      nextMeetingAt: z.string().datetime().nullable(),\n' not in s:
+            if marker not in s: raise SystemExit('zod coordinator summary marker missing')
+            s = s.replace(marker, marker + addition, 1)
+          p.write_text(s)
+
+          p = Path('src/lib/ai/provider.server.ts')
+          s = p.read_text()
+          anchor = '          "coordinatorSummary obsahuje výhradně agregované organizační počty. Nepokoušej se z nich odvozovat jména AP, identitu dítěte, diagnózu ani obsah poznámek. Pro detail naviguj na assistants.",\n'
+          replacement = '          "coordinatorSummary obsahuje výhradně agregované organizační údaje; nextMeetingAt je čas nejbližší porady AP. Nepokoušej se z nich odvozovat jména AP, identitu dítěte, diagnózu ani obsah poznámek. Pro detail naviguj na assistants.",\n'
+          if anchor in s:
+            s = s.replace(anchor, replacement, 1)
+          elif 'nextMeetingAt je čas nejbližší porady AP' not in s:
+            raise SystemExit('provider coordinator summary prompt marker missing')
+          p.write_text(s)
+
+          # 4) Extend adversarial test specifically for meeting event privacy.
+          p = Path('tests/sql/assistant_coordinator_rls_adversarial.sql')
+          s = p.read_text()
+          seed_marker = '-- Seed sensitive content to prove the coordinator cannot see it through the alias reference.\n'
+          seed = '''insert into public.calendar_events(\n  id,school_id,academic_year_id,created_by,scope,kind,title,starts_at,ends_at,all_day,source\n) values (\n  'aaaaaaaa-0000-0000-0000-0000000000b1','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',\n  'aaaaaaaa-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222',\n  'private','meeting','Porada AP','2026-09-09 14:00:00+02','2026-09-09 14:30:00+02',false,\n  'assistant_coordinator_meeting'\n);\n\n'''
+          if "'assistant_coordinator_meeting'" not in s:
+            if seed_marker not in s: raise SystemExit('RLS seed marker missing')
+            s = s.replace(seed_marker, seed + seed_marker, 1)
+          teacher_marker = "-- 2) Coordinator A sees own tenant only, never School B.\n"
+          teacher_assert = '''select pg_temp.assert_count(\n  (select count(*) from public.calendar_events where source='assistant_coordinator_meeting'),\n  0,\n  'ordinary teacher must not see coordinator meeting'\n);\n\n'''
+          if 'ordinary teacher must not see coordinator meeting' not in s:
+            if teacher_marker not in s: raise SystemExit('teacher meeting test marker missing')
+            s = s.replace(teacher_marker, teacher_assert + teacher_marker, 1)
+          coord_marker = '-- Completion outcome stays inside the same organizational-only boundary.\n'
+          coord_assert = '''select pg_temp.assert_count(\n  (select count(*) from public.calendar_events where source='assistant_coordinator_meeting'),\n  1,\n  'coordinator should see own private meeting'\n);\n\n'''
+          if 'coordinator should see own private meeting' not in s:
+            if coord_marker not in s: raise SystemExit('coordinator meeting test marker missing')
+            s = s.replace(coord_marker, coord_assert + coord_marker, 1)
+          p.write_text(s)
+
+          # Hard privacy assertions over meeting implementation.
+          helper = Path('src/lib/assistant-coordinator-meetings.ts').read_text().lower()
+          for token in ['student_alias_id: input', 'class_id: input', 'note: input', 'title: input']:
+            if token in helper:
+              raise SystemExit(f'meeting helper allows sensitive/free-text field: {token}')
+          for required in ['scope: "private"', 'title: "porada ap"', 'note: null', 'class_id: null', 'student_alias_id: null']:
+            if required not in helper:
+              raise SystemExit(f'meeting helper missing privacy invariant: {required}')
+
+          contracts = Path('src/lib/ai/contracts.ts').read_text()
+          start = contracts.index('export type CompanionCoordinatorSummary')
+          end = contracts.index('};', start) + 2
+          block = contracts[start:end].lower()
+          for token in ['name', 'alias', 'note', 'body', 'case', 'diagnos', 'email', 'phone', 'title']:
+            if token in block:
+              raise SystemExit(f'companion coordinator summary leaked content field: {token}')
+          PY
+      - run: bunx prettier --write src/lib/assistant-coordinator-meetings.ts src/components/assistant-coordinator/CoordinatorMeetingsCard.tsx src/lib/assistant-coordinator-data.ts src/routes/asistenti.tsx src/lib/assistant-coordinator-companion.ts src/lib/ai/contracts.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts
+      - run: bun run lint
+      - run: bun run build
+      - name: Commit verified coordinator meetings
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/assistant-coordinator-meetings.ts src/components/assistant-coordinator/CoordinatorMeetingsCard.tsx src/lib/assistant-coordinator-data.ts src/routes/asistenti.tsx src/lib/assistant-coordinator-companion.ts src/lib/ai/contracts.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts tests/sql/assistant_coordinator_rls_adversarial.sql src/routeTree.gen.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: add private coordinator meetings"
+            git push origin main
+          fi
