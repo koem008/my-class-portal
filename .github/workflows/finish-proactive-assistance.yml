@@ -1,0 +1,54 @@
+name: Finish Proactive Assistance
+
+on:
+  push:
+    paths:
+      - .github/workflows/finish-proactive-assistance.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply proactive assistance patch
+        run: python scripts/finish_proactive_assistance.py
+
+      - name: Format
+        run: bunx prettier --write src/lib/daily-briefing-data.ts
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build
+        run: bun run build
+
+      - name: Commit integration
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/daily-briefing-data.ts
+          git commit -m "feat: complete deterministic proactive assistance"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
