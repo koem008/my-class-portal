@@ -232,6 +232,8 @@ export async function generateLessonAsset(
           "Pracuj pouze s dodaným zdrojovaným kurikulem a pseudonymním kontextem.",
           "Nikdy nepožaduj ani neodvozuj skutečnou identitu dítěte.",
           "Nevydávej vlastní text za oficiální RVP/ŠVP.",
+          "Pokud assessment_options není null, dodrž přesně počet a typ otázek, obtížnost a bodování; při požadavku přidej správné odpovědi a hodnoticí kritéria do content.",
+          "Test nebo kvíz vrať ve snadno editovatelné struktuře; správné odpovědi jasně odděl od zadání.",
           "Vrať pouze validní JSON objekt s klíči title, content, warnings. Bez markdownového obalu.",
         ].join("\n"),
         messages: [{ role: "user", content: JSON.stringify(providerInput) }],

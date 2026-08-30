@@ -4,6 +4,7 @@ export type LessonAiAction =
   | "worksheet"
   | "answer_key"
   | "quiz"
+  | "test"
   | "presentation_outline"
   | "activity"
   | "differentiation"
@@ -13,6 +14,21 @@ export type PseudonymNeed = {
   aliasId: string;
   alias: string;
   need: string;
+};
+
+export type AssessmentQuestionType =
+  "mixed" | "open" | "multiple_choice" | "true_false" | "short_answer";
+
+export type AssessmentDifficulty = "easy" | "standard" | "advanced";
+
+export type LessonAssessmentOptions = {
+  questionCount: number;
+  questionType: AssessmentQuestionType;
+  difficulty: AssessmentDifficulty;
+  topic?: string | undefined;
+  pointsPerQuestion: number;
+  includeAnswerKey: boolean;
+  includeCriteria: boolean;
 };
 
 /**
@@ -29,6 +45,7 @@ export type LessonAiContext = {
   curriculumSummary?: string | undefined;
   previousLessonSummary?: string | undefined;
   teacherInstruction?: string | undefined;
+  assessmentOptions?: LessonAssessmentOptions | undefined;
   pseudonymNeeds?: PseudonymNeed[] | undefined;
 };
 
@@ -220,6 +237,7 @@ export function buildProviderInput(request: LessonAiRequest): Record<string, unk
     curriculum_summary: request.context.curriculumSummary ?? null,
     previous_lesson_summary: request.context.previousLessonSummary ?? null,
     teacher_instruction: request.context.teacherInstruction ?? null,
+    assessment_options: request.context.assessmentOptions ?? null,
     pseudonym_needs: request.context.pseudonymNeeds ?? [],
   };
 }

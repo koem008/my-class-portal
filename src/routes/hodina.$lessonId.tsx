@@ -18,7 +18,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { runLessonAi } from "@/lib/ai/functions";
-import type { LessonAiAction } from "@/lib/ai/contracts";
+import type {
+  AssessmentDifficulty,
+  AssessmentQuestionType,
+  LessonAiAction,
+} from "@/lib/ai/contracts";
 import {
   createLearningSignal,
   createMaterial,
@@ -73,6 +77,7 @@ const aiActionLabels: Record<LessonAiAction, string> = {
   worksheet: "Pracovní list",
   answer_key: "Klíč správných odpovědí",
   quiz: "Kvíz",
+  test: "Test",
   presentation_outline: "Osnova prezentace",
   activity: "Aktivita do hodiny",
   differentiation: "Diferenciace",
@@ -111,6 +116,15 @@ function LessonWorkspacePage() {
   const [signalNote, setSignalNote] = useState("");
   const [aiAction, setAiAction] = useState<LessonAiAction>("lesson_plan");
   const [aiInstruction, setAiInstruction] = useState("");
+  const [assessmentQuestionCount, setAssessmentQuestionCount] = useState(10);
+  const [assessmentQuestionType, setAssessmentQuestionType] =
+    useState<AssessmentQuestionType>("mixed");
+  const [assessmentDifficulty, setAssessmentDifficulty] =
+    useState<AssessmentDifficulty>("standard");
+  const [assessmentTopic, setAssessmentTopic] = useState("");
+  const [assessmentPointsPerQuestion, setAssessmentPointsPerQuestion] = useState(1);
+  const [assessmentIncludeAnswers, setAssessmentIncludeAnswers] = useState(true);
+  const [assessmentIncludeCriteria, setAssessmentIncludeCriteria] = useState(true);
   const [aiGenerating, setAiGenerating] = useState(false);
 
   const lessonDate = useMemo(
@@ -139,6 +153,7 @@ function LessonWorkspacePage() {
       setSignals(data.signals);
       setContinuity(data.continuity);
       setCurriculum(data.curriculum);
+      setAssessmentTopic((current) => current || data.lesson.topic || data.lesson.title || "");
       setObjective(data.preparation?.objective ?? "");
       setTeacherNotes(data.preparation?.teacher_notes ?? "");
       setBoardNotes(data.preparation?.board_notes ?? "");
@@ -291,6 +306,18 @@ function LessonWorkspacePage() {
             previousLessonSummary:
               continuity.map((item) => `${item.title}: ${item.detail}`).join("\n") || undefined,
             teacherInstruction: aiInstruction.trim() || undefined,
+            assessmentOptions:
+              aiAction === "quiz" || aiAction === "test"
+                ? {
+                    questionCount: Math.min(50, Math.max(1, assessmentQuestionCount)),
+                    questionType: assessmentQuestionType,
+                    difficulty: assessmentDifficulty,
+                    topic: assessmentTopic.trim() || lesson.topic || lesson.title || undefined,
+                    pointsPerQuestion: Math.min(100, Math.max(1, assessmentPointsPerQuestion)),
+                    includeAnswerKey: assessmentIncludeAnswers,
+                    includeCriteria: assessmentIncludeCriteria,
+                  }
+                : undefined,
           },
         },
       });
@@ -679,6 +706,102 @@ function LessonWorkspacePage() {
                     </option>
                   ))}
                 </select>
+                {(aiAction === "quiz" || aiAction === "test") && (
+                  <div className="mt-3 rounded-2xl border border-[#dbe7e2] bg-white/75 p-3">
+                    <div className="text-xs font-black uppercase tracking-[.12em] text-[#668079]">
+                      Parametry {aiAction === "test" ? "testu" : "kvízu"}
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs font-bold text-[#647775]">
+                        Počet otázek
+                        <input
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={assessmentQuestionCount}
+                          onChange={(event) =>
+                            setAssessmentQuestionCount(Number(event.target.value) || 1)
+                          }
+                          className="mt-1.5 h-10 w-full rounded-xl border border-[#dbe7e2] bg-white px-3 text-sm"
+                        />
+                      </label>
+                      <label className="text-xs font-bold text-[#647775]">
+                        Typ otázek
+                        <select
+                          value={assessmentQuestionType}
+                          onChange={(event) =>
+                            setAssessmentQuestionType(event.target.value as AssessmentQuestionType)
+                          }
+                          className="mt-1.5 h-10 w-full rounded-xl border border-[#dbe7e2] bg-white px-3 text-sm"
+                        >
+                          <option value="mixed">Kombinované</option>
+                          <option value="open">Otevřené</option>
+                          <option value="multiple_choice">Výběr z možností</option>
+                          <option value="true_false">Pravda / nepravda</option>
+                          <option value="short_answer">Krátká odpověď</option>
+                        </select>
+                      </label>
+                      <label className="text-xs font-bold text-[#647775]">
+                        Obtížnost
+                        <select
+                          value={assessmentDifficulty}
+                          onChange={(event) =>
+                            setAssessmentDifficulty(event.target.value as AssessmentDifficulty)
+                          }
+                          className="mt-1.5 h-10 w-full rounded-xl border border-[#dbe7e2] bg-white px-3 text-sm"
+                        >
+                          <option value="easy">Lehká</option>
+                          <option value="standard">Standardní</option>
+                          <option value="advanced">Pokročilá</option>
+                        </select>
+                      </label>
+                      <label className="text-xs font-bold text-[#647775]">
+                        Body za otázku
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={assessmentPointsPerQuestion}
+                          onChange={(event) =>
+                            setAssessmentPointsPerQuestion(Number(event.target.value) || 1)
+                          }
+                          className="mt-1.5 h-10 w-full rounded-xl border border-[#dbe7e2] bg-white px-3 text-sm"
+                        />
+                      </label>
+                    </div>
+                    <label className="mt-3 block text-xs font-bold text-[#647775]">
+                      Téma
+                      <input
+                        value={assessmentTopic}
+                        onChange={(event) => setAssessmentTopic(event.target.value)}
+                        placeholder="Téma testu nebo kvízu"
+                        className="mt-1.5 h-10 w-full rounded-xl border border-[#dbe7e2] bg-white px-3 text-sm"
+                      />
+                    </label>
+                    <div className="mt-3 flex flex-wrap gap-4 text-xs font-bold text-[#536c65]">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={assessmentIncludeAnswers}
+                          onChange={(event) => setAssessmentIncludeAnswers(event.target.checked)}
+                        />
+                        Správné odpovědi
+                      </label>
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={assessmentIncludeCriteria}
+                          onChange={(event) => setAssessmentIncludeCriteria(event.target.checked)}
+                        />
+                        Hodnoticí kritéria
+                      </label>
+                    </div>
+                    <p className="mt-3 text-[11px] leading-5 text-[#7c8a86]">
+                      Výsledek se vloží do editovatelného konceptu. Před uložením a tiskem ho můžete
+                      libovolně upravit.
+                    </p>
+                  </div>
+                )}
                 <textarea
                   value={aiInstruction}
                   onChange={(event) => setAiInstruction(event.target.value)}

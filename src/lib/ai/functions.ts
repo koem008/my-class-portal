@@ -9,6 +9,7 @@ const lessonActionSchema = z.enum([
   "worksheet",
   "answer_key",
   "quiz",
+  "test",
   "presentation_outline",
   "activity",
   "differentiation",
@@ -27,6 +28,17 @@ const lessonAiRequestSchema = z.object({
     curriculumSummary: z.string().trim().max(8_000).optional(),
     previousLessonSummary: z.string().trim().max(8_000).optional(),
     teacherInstruction: z.string().trim().max(8_000).optional(),
+    assessmentOptions: z
+      .object({
+        questionCount: z.number().int().min(1).max(50),
+        questionType: z.enum(["mixed", "open", "multiple_choice", "true_false", "short_answer"]),
+        difficulty: z.enum(["easy", "standard", "advanced"]),
+        topic: z.string().trim().max(500).optional(),
+        pointsPerQuestion: z.number().int().min(1).max(100),
+        includeAnswerKey: z.boolean(),
+        includeCriteria: z.boolean(),
+      })
+      .optional(),
     pseudonymNeeds: z
       .array(
         z.object({
