@@ -114,6 +114,11 @@ export type CoordinatorNowCard = {
   detail: string;
 };
 
+export type CoordinatorMeetingPriority = {
+  starts_at: string;
+  ends_at: string;
+};
+
 async function authUserId() {
   const { data, error } = await supabase.auth.getUser();
   if (error) throw error;
@@ -466,6 +471,23 @@ function minutesOf(time: string) {
   return hours * 60 + minutes;
 }
 
+function pragueDate(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Prague",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function pragueTime(value: string) {
+  return new Intl.DateTimeFormat("cs-CZ", {
+    timeZone: "Europe/Prague",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function exceptionTouchesSlot(exception: AssistantPresenceException, slot: AssistantWorkSlot) {
   if (exception.assistant_id !== slot.assistantId) return false;
   if (!exception.starts_at || !exception.ends_at) return true;
@@ -480,6 +502,7 @@ export function buildCoordinatorNowCard(
   workSlots: AssistantWorkSlot[],
   exceptions: AssistantPresenceException[],
   items: CoordinatorPriorityItem[] = [],
+  meetings: CoordinatorMeetingPriority[] = [],
 ): CoordinatorNowCard {
   const weekday = coordinatorWeekday(now);
   const today = localIsoDate(now);
@@ -550,6 +573,23 @@ export function buildCoordinatorNowCard(
     };
   }
 
+  const todayMeetings = meetings
+    .filter((meeting) => pragueDate(meeting.starts_at) === today)
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const currentMeeting = todayMeetings.find(
+    (meeting) =>
+      new Date(meeting.starts_at).getTime() <= now.getTime() &&
+      new Date(meeting.ends_at).getTime() > now.getTime(),
+  );
+  if (currentMeeting) {
+    return {
+      tone: "now",
+      eyebrow: "Právě teď",
+      title: "Porada AP",
+      detail: `${pragueTime(currentMeeting.starts_at)}–${pragueTime(currentMeeting.ends_at)} · podklady máš níže v koordinaci.`,
+    };
+  }
+
   const current = todaySlots.find(
     (slot) => minutesOf(slot.starts_at) <= nowMinutes && minutesOf(slot.ends_at) > nowMinutes,
   );
@@ -563,6 +603,27 @@ export function buildCoordinatorNowCard(
   }
 
   const next = todaySlots.find((slot) => minutesOf(slot.starts_at) > nowMinutes);
+  const nextMeeting = todayMeetings.find(
+    (meeting) => new Date(meeting.starts_at).getTime() > now.getTime(),
+  );
+  const nextSlotAt = next ? minutesOf(next.starts_at) : Number.POSITIVE_INFINITY;
+  const nextMeetingAt = nextMeeting
+    ? minutesOf(pragueTime(nextMeeting.starts_at))
+    : Number.POSITIVE_INFINITY;
+
+  if (nextMeeting && nextMeetingAt <= nextSlotAt) {
+    const diff = Math.max(
+      0,
+      Math.round((new Date(nextMeeting.starts_at).getTime() - now.getTime()) / 60000),
+    );
+    return {
+      tone: "next",
+      eyebrow: "Co dnes řeším?",
+      title: diff <= 90 ? `Za ${diff} min máš poradu AP.` : `Dnes tě čeká porada AP.`,
+      detail: `${pragueTime(nextMeeting.starts_at)}–${pragueTime(nextMeeting.ends_at)} · podklady jsou připravené v koordinaci.`,
+    };
+  }
+
   if (next) {
     const diff = minutesOf(next.starts_at) - nowMinutes;
     return {
@@ -576,7 +637,7 @@ export function buildCoordinatorNowCard(
     };
   }
 
-  if (todaySlots.length > 0) {
+  if (todaySlots.length > 0 || todayMeetings.length > 0) {
     return {
       tone: "done",
       eyebrow: "Co dnes řeším?",

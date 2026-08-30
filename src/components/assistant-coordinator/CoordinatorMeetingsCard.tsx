@@ -37,7 +37,8 @@ export function CoordinatorMeetingsCard({
   const [error, setError] = useState("");
 
   const upcoming = useMemo(
-    () => meetings.filter((meeting) => new Date(meeting.ends_at).getTime() >= Date.now()).slice(0, 5),
+    () =>
+      meetings.filter((meeting) => new Date(meeting.ends_at).getTime() >= Date.now()).slice(0, 5),
     [meetings],
   );
 
@@ -80,7 +81,8 @@ export function CoordinatorMeetingsCard({
             </div>
             <h2 className="mt-1 text-lg font-black">Porady AP</h2>
             <p className="mt-1 max-w-xl text-xs leading-5 text-[#7b8883]">
-              Porada se uloží jako tvoje soukromá událost „Porada AP“. Bez poznámek, jmen dětí nebo citlivého obsahu.
+              Porada se uloží jako tvoje soukromá událost „Porada AP“. Bez poznámek, jmen dětí nebo
+              citlivého obsahu.
             </p>
           </div>
         </div>
@@ -142,7 +144,9 @@ export function CoordinatorMeetingsCard({
             <div className="rounded-[24px] border border-dashed border-[#dce4e0] bg-white/55 px-5 py-7 text-center">
               <CalendarClock className="mx-auto h-6 w-6 text-[#86a097]" />
               <p className="mt-2 text-sm font-black">Žádná porada zatím není naplánovaná.</p>
-              <p className="mt-1 text-xs text-[#8a9591]">Až ji přidáš, objeví se i v hlavním kalendáři.</p>
+              <p className="mt-1 text-xs text-[#8a9591]">
+                Až ji přidáš, objeví se i v hlavním kalendáři.
+              </p>
             </div>
           ) : (
             <div className="space-y-2">

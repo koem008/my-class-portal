@@ -74,6 +74,8 @@ export type CompanionCoordinatorSummary = {
   todayChangedCount: number;
   overdueItemCount: number;
   dueTodayItemCount: number;
+  todayMeetingCount: number;
+  nextMeetingAt: string | null;
 };
 
 /** Minimal, privacy-safe context for the general teacher companion. */

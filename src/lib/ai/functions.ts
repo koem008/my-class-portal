@@ -64,6 +64,8 @@ const companionRequestSchema = z.object({
       todayChangedCount: z.number().int().min(0).max(500),
       overdueItemCount: z.number().int().min(0).max(2000),
       dueTodayItemCount: z.number().int().min(0).max(2000),
+      todayMeetingCount: z.number().int().min(0).max(100),
+      nextMeetingAt: z.string().datetime().nullable(),
     })
     .optional(),
   availableLessons: z

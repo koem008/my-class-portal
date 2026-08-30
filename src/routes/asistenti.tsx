@@ -15,8 +15,13 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CoordinatorItemsCard } from "@/components/assistant-coordinator/CoordinatorItemsCard";
 import { CoordinatorMeetingBriefCard } from "@/components/assistant-coordinator/CoordinatorMeetingBriefCard";
+import { CoordinatorMeetingsCard } from "@/components/assistant-coordinator/CoordinatorMeetingsCard";
 import { CoordinatorSpecialEducationBridge } from "@/components/assistant-coordinator/CoordinatorSpecialEducationBridge";
 import type { AssistantCoordinationItem } from "@/lib/assistant-coordinator-items";
+import {
+  loadAssistantCoordinatorMeetings,
+  type AssistantCoordinatorMeeting,
+} from "@/lib/assistant-coordinator-meetings";
 import {
   activateCoordinatorAccess,
   buildCoordinatorNowCard,
@@ -73,6 +78,7 @@ function AssistantCoordinatorPage() {
   const [exceptions, setExceptions] = useState<AssistantPresenceException[]>([]);
   const [aliases, setAliases] = useState<CoordinatorAliasOption[]>([]);
   const [coordinationItems, setCoordinationItems] = useState<AssistantCoordinationItem[]>([]);
+  const [meetings, setMeetings] = useState<AssistantCoordinatorMeeting[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -112,6 +118,7 @@ function AssistantCoordinatorPage() {
         setAssignments([]);
         setWorkSlots([]);
         setExceptions([]);
+        setMeetings([]);
         setState("ready");
         return;
       }
@@ -125,7 +132,11 @@ function AssistantCoordinatorPage() {
         nextClasses,
       );
       const now = new Date();
-      const [nextWorkSlots, nextExceptions] = await Promise.all([
+      const meetingFrom = new Date(now);
+      meetingFrom.setHours(0, 0, 0, 0);
+      const meetingTo = addDays(now, 60);
+      meetingTo.setHours(23, 59, 59, 999);
+      const [nextWorkSlots, nextExceptions, nextMeetings] = await Promise.all([
         loadAssistantWorkSlots(nextContext.access.schoolId, nextAssignments),
         loadAssistantPresenceExceptions(
           nextContext.access.schoolId,
@@ -133,12 +144,18 @@ function AssistantCoordinatorPage() {
           localIsoDate(now),
           localIsoDate(addDays(now, 7)),
         ),
+        loadAssistantCoordinatorMeetings(
+          nextContext.access.schoolId,
+          meetingFrom.toISOString(),
+          meetingTo.toISOString(),
+        ),
       ]);
       setAssistants(nextAssistants);
       setClasses(nextClasses);
       setAssignments(nextAssignments);
       setWorkSlots(nextWorkSlots);
       setExceptions(nextExceptions);
+      setMeetings(nextMeetings);
       setState("ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Koordinaci asistentů se nepodařilo načíst.");
@@ -185,8 +202,8 @@ function AssistantCoordinatorPage() {
     [exceptions, todayIso],
   );
   const nowCard = useMemo(
-    () => buildCoordinatorNowCard(now, workSlots, exceptions, coordinationItems),
-    [now, workSlots, exceptions, coordinationItems],
+    () => buildCoordinatorNowCard(now, workSlots, exceptions, coordinationItems, meetings),
+    [now, workSlots, exceptions, coordinationItems, meetings],
   );
 
   async function activate() {
@@ -540,6 +557,24 @@ function AssistantCoordinatorPage() {
           assistants={assistants}
           classes={classes}
           onOpenItemsChange={setCoordinationItems}
+        />
+
+        <CoordinatorMeetingsCard
+          schoolId={context.access.schoolId}
+          meetings={meetings}
+          onChanged={async () => {
+            const from = new Date();
+            from.setHours(0, 0, 0, 0);
+            const to = addDays(from, 60);
+            to.setHours(23, 59, 59, 999);
+            setMeetings(
+              await loadAssistantCoordinatorMeetings(
+                context.access.schoolId,
+                from.toISOString(),
+                to.toISOString(),
+              ),
+            );
+          }}
         />
 
         <CoordinatorMeetingBriefCard items={coordinationItems} exceptions={exceptions} />

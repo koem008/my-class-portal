@@ -82,6 +82,15 @@ insert into public.calendar_events(
   'assistant_coordinator:aaaaaaaa-0000-0000-0000-0000000000a0'
 );
 
+insert into public.calendar_events(
+  id,school_id,academic_year_id,created_by,scope,kind,title,starts_at,ends_at,all_day,source
+) values (
+  'aaaaaaaa-0000-0000-0000-0000000000b1','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'aaaaaaaa-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222',
+  'private','meeting','Porada AP','2026-09-09 14:00:00+02','2026-09-09 14:30:00+02',false,
+  'assistant_coordinator_meeting'
+);
+
 -- Seed sensitive content to prove the coordinator cannot see it through the alias reference.
 insert into public.special_education_cases(
   id,school_id,class_id,student_alias_id,status,focus_summary,created_by
@@ -157,6 +166,12 @@ select pg_temp.assert_count(
   'ordinary teacher must not see coordinator private calendar event'
 );
 
+select pg_temp.assert_count(
+  (select count(*) from public.calendar_events where source='assistant_coordinator_meeting'),
+  0,
+  'ordinary teacher must not see coordinator meeting'
+);
+
 -- 2) Coordinator A sees own tenant only, never School B.
 select set_config('request.jwt.claim.sub','22222222-2222-2222-2222-222222222222',true);
 select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',true);
@@ -211,6 +226,12 @@ select pg_temp.assert_count(
   (select count(*) from public.calendar_events where source like 'assistant_coordinator:%'),
   1,
   'coordinator should see own private calendar event'
+);
+
+select pg_temp.assert_count(
+  (select count(*) from public.calendar_events where source='assistant_coordinator_meeting'),
+  1,
+  'coordinator should see own private meeting'
 );
 
 -- Completion outcome stays inside the same organizational-only boundary.

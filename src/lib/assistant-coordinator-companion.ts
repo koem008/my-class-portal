@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { coordinatorMeetingSource } from "@/lib/assistant-coordinator-meetings";
 
 const db = supabase as unknown as SupabaseClient;
 
@@ -10,6 +11,8 @@ export type CompanionCoordinatorSummary = {
   todayChangedCount: number;
   overdueItemCount: number;
   dueTodayItemCount: number;
+  todayMeetingCount: number;
+  nextMeetingAt: string | null;
 };
 
 function localIsoDate(date: Date) {
@@ -41,7 +44,7 @@ export async function loadCompanionCoordinatorSummary(
   const today = localIsoDate(now);
   const weekday = coordinatorWeekday(now);
 
-  const [assistants, slots, presence, items] = await Promise.all([
+  const [assistants, slots, presence, items, meetings] = await Promise.all([
     db
       .from("teaching_assistants")
       .select("id", { count: "exact", head: true })
@@ -67,14 +70,28 @@ export async function loadCompanionCoordinatorSummary(
       .eq("status", "open")
       .not("due_on", "is", null)
       .lte("due_on", today),
+    db
+      .from("calendar_events")
+      .select("starts_at,ends_at")
+      .eq("school_id", schoolId)
+      .eq("created_by", auth.user.id)
+      .eq("scope", "private")
+      .eq("source", coordinatorMeetingSource)
+      .gte("ends_at", now.toISOString())
+      .order("starts_at")
+      .limit(20),
   ]);
 
-  for (const result of [assistants, slots, presence, items]) {
+  for (const result of [assistants, slots, presence, items, meetings]) {
     if (result.error) throw result.error;
   }
 
   const presenceRows = (presence.data ?? []) as Array<{ kind: "absent" | "changed" }>;
   const itemRows = (items.data ?? []) as Array<{ due_on: string }>;
+  const meetingRows = (meetings.data ?? []) as Array<{ starts_at: string; ends_at: string }>;
+  const todayMeetingCount = meetingRows.filter(
+    (row) => pragueIsoDate(row.starts_at) === today,
+  ).length;
 
   return {
     activeAssistantCount: assistants.count ?? 0,
@@ -83,5 +100,16 @@ export async function loadCompanionCoordinatorSummary(
     todayChangedCount: presenceRows.filter((row) => row.kind === "changed").length,
     overdueItemCount: itemRows.filter((row) => row.due_on < today).length,
     dueTodayItemCount: itemRows.filter((row) => row.due_on === today).length,
+    todayMeetingCount,
+    nextMeetingAt: meetingRows[0]?.starts_at ?? null,
   };
+}
+
+function pragueIsoDate(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Prague",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
 }

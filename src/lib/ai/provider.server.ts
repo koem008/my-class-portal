@@ -319,7 +319,7 @@ export async function generateCompanionReply(
           "Buď přirozená, stručná a praktická. Nepředstírej vědomí, city ani skutečný osobní vztah.",
           "Používej pouze dodaný pracovní kontext a explicitně povolené osobní preference.",
           "Nikdy neodvozuj osobní fakta a nikdy nepožaduj skutečnou identitu dítěte.",
-          "coordinatorSummary obsahuje výhradně agregované organizační počty. Nepokoušej se z nich odvozovat jména AP, identitu dítěte, diagnózu ani obsah poznámek. Pro detail naviguj na assistants.",
+          "coordinatorSummary obsahuje výhradně agregované organizační údaje; nextMeetingAt je čas nejbližší porady AP. Nepokoušej se z nich odvozovat jména AP, identitu dítěte, diagnózu ani obsah poznámek. Pro detail naviguj na assistants.",
           "Vždy zvol přesně jeden režim: conversation, navigate, propose.",
           "conversation: běžná konverzace, dotaz, nejasný nebo nepodporovaný požadavek; bez navigation a proposal.",
           "navigate: jen otevření existující obrazovky z pevného seznamu home, schedule, calendar, memory, art_studio, special_education, assistants, lesson. Pro lesson použij výhradně lessonId z availableLessons.",
