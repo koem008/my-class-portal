@@ -1661,6 +1661,54 @@ export type Database = {
           },
         ]
       }
+      special_education_external_documentation: {
+        Row: {
+          case_id: string
+          created_at: string
+          diagnosis_code: string
+          document_date: string
+          id: string
+          recorded_by: string
+          school_id: string
+          source_reference: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          diagnosis_code: string
+          document_date: string
+          id?: string
+          recorded_by: string
+          school_id: string
+          source_reference: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          diagnosis_code?: string
+          document_date?: string
+          id?: string
+          recorded_by?: string
+          school_id?: string
+          source_reference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_education_external_documentation_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "special_education_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_education_external_documentation_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       special_education_followups: {
         Row: {
           case_id: string
