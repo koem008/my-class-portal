@@ -218,7 +218,8 @@ export function GlobalVoiceCompanion() {
             await audio.play();
             setNotice("Hlas přehrávám.");
           } catch (error) {
-            const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            const message =
+              error instanceof Error ? `${error.name}: ${error.message}` : String(error);
             console.error("[AUDIO_PLAYBACK_ERROR]", error);
             setNotice(`Přehrání v prohlížeči selhalo: ${message}`);
           }
