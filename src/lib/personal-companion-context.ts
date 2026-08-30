@@ -18,7 +18,6 @@ export type PersonalDailyContext = {
 /**
  * Converts a Czech preferred first-name salutation to a natural vocative.
  * The stored preference stays untouched; only direct address is inflected.
- * Common indeclinable/foreign names can be entered already in vocative form.
  */
 export function czechVocative(name: string): string {
   const value = name.trim();
@@ -26,16 +25,6 @@ export function czechVocative(name: string): string {
 
   // If the user explicitly stored a vocative-looking form, do not inflect it again.
   if (/[oůie]$/iu.test(value) && !/[aá]$/iu.test(value)) return value;
-
-  // Czech feminine first names ending in -a/-á: Káťa → Káťo, Katka → Katko,
-  // Petra → Petro, Jana → Jano. This is the dominant pattern used in direct address.
-  if (/[aá]$/iu.test(value)) return `${value.slice(0, -1)}o`;
-
-  // Frequent masculine patterns. Keep this deliberately conservative; an explicitly
-  // configured preferred salutation always wins over guessing an uncommon name.
-  if (/ek$/iu.test(value)) return `${value.slice(0, -2)}ku`; // Marek → Marku
-  if (/el$/iu.test(value)) return `${value.slice(0, -2)}le`; // Pavel → Pavle
-  if (/r$/iu.test(value)) return `${value}e`; // Petr → Petře is irregular, handled below
 
   const irregular: Record<string, string> = {
     petr: "Petře",
@@ -48,7 +37,19 @@ export function czechVocative(name: string): string {
     ondřej: "Ondřeji",
     jiří: "Jiří",
   };
-  return irregular[value.toLocaleLowerCase("cs-CZ")] ?? value;
+  const irregularForm = irregular[value.toLocaleLowerCase("cs-CZ")];
+  if (irregularForm) return irregularForm;
+
+  // Czech feminine first names ending in -a/-á: Káťa → Káťo, Katka → Katko,
+  // Petra → Petro, Jana → Jano.
+  if (/[aá]$/iu.test(value)) return `${value.slice(0, -1)}o`;
+
+  // Frequent masculine patterns. Keep this conservative; an explicitly configured
+  // preferred salutation always wins over guessing an uncommon name.
+  if (/ek$/iu.test(value)) return `${value.slice(0, -2)}ku`; // Marek → Marku
+  if (/el$/iu.test(value)) return `${value.slice(0, -2)}le`; // Pavel → Pavle
+
+  return value;
 }
 
 export function buildPersonalDailyContext(
