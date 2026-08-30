@@ -1,26 +1,29 @@
 /* Premium visual system for Moje třída. Visual-only layer; no data behavior. */
 :root {
   --mt-ink: #18312f;
-  --mt-muted: #6f827d;
-  --mt-green: #1f6c64;
-  --mt-green-deep: #174f4a;
-  --mt-mint: #dff1ea;
-  --mt-cream: #fffaf0;
-  --mt-peach: #ffe7d6;
-  --mt-lilac: #ece7fb;
-  --mt-paper: rgba(255, 255, 255, 0.82);
-  --mt-line: rgba(67, 91, 83, 0.13);
-  --mt-shadow: 0 22px 70px rgba(50, 73, 66, 0.10);
-  --mt-shadow-soft: 0 12px 34px rgba(50, 73, 66, 0.07);
+  --mt-muted: #5f736f;
+  --mt-green: #19766d;
+  --mt-green-deep: #145c56;
+  --mt-mint: #bcefd9;
+  --mt-sky: #b9e7ff;
+  --mt-lilac: #d9c8ff;
+  --mt-pink: #ffc7df;
+  --mt-peach: #ffd1b8;
+  --mt-yellow: #ffe89b;
+  --mt-paper: rgba(255, 255, 255, 0.90);
+  --mt-line: rgba(61, 79, 76, 0.15);
+  --mt-shadow: 0 24px 68px rgba(69, 75, 92, 0.14);
+  --mt-shadow-soft: 0 14px 36px rgba(69, 75, 92, 0.10);
 }
 
 @media screen {
   body {
     background:
-      radial-gradient(circle at 8% 8%, rgba(255, 225, 196, .52), transparent 28rem),
-      radial-gradient(circle at 92% 13%, rgba(220, 238, 231, .78), transparent 30rem),
-      radial-gradient(circle at 80% 86%, rgba(231, 224, 250, .56), transparent 28rem),
-      linear-gradient(135deg, #fbfaf5 0%, #f7fbf8 48%, #fbf8f5 100%);
+      radial-gradient(circle at 4% 7%, rgba(255, 199, 223, .86), transparent 25rem),
+      radial-gradient(circle at 95% 8%, rgba(185, 231, 255, .92), transparent 28rem),
+      radial-gradient(circle at 8% 78%, rgba(255, 232, 155, .72), transparent 26rem),
+      radial-gradient(circle at 92% 84%, rgba(217, 200, 255, .88), transparent 27rem),
+      linear-gradient(135deg, #fff7fb 0%, #f3fff9 36%, #f7fbff 67%, #fff8ef 100%);
     color: var(--mt-ink);
     min-height: 100vh;
   }
@@ -37,24 +40,24 @@
     z-index: -1;
     pointer-events: none;
     border-radius: 999px;
-    filter: blur(12px);
-    opacity: .6;
+    filter: blur(10px);
+    opacity: .82;
   }
 
   .app-polish::before {
-    width: 24rem;
-    height: 24rem;
-    top: 12vh;
-    right: -9rem;
-    background: radial-gradient(circle, rgba(205, 234, 222, .8), rgba(205, 234, 222, 0));
+    width: 23rem;
+    height: 23rem;
+    top: 13vh;
+    right: -8rem;
+    background: radial-gradient(circle, rgba(145, 226, 189, .88), rgba(145, 226, 189, 0));
   }
 
   .app-polish::after {
     width: 22rem;
     height: 22rem;
-    bottom: 3vh;
-    left: -10rem;
-    background: radial-gradient(circle, rgba(255, 221, 198, .65), rgba(255, 221, 198, 0));
+    bottom: 5vh;
+    left: -9rem;
+    background: radial-gradient(circle, rgba(255, 177, 201, .78), rgba(255, 177, 201, 0));
   }
 
   .app-polish main {
@@ -69,174 +72,149 @@
     text-wrap: balance;
   }
 
-  .app-polish h1 {
-    letter-spacing: -0.045em !important;
-  }
-
-  .app-polish p {
-    text-wrap: pretty;
-  }
+  .app-polish h1 { letter-spacing: -0.045em !important; }
+  .app-polish p { text-wrap: pretty; }
 
   .app-polish :is(section, article, aside)[class*="bg-white"],
-  .app-polish :is(section, article, aside)[class*="bg-[#fff"],
-  .app-polish :is(section, article, aside)[class*="bg-[linear-gradient"] {
-    border-color: var(--mt-line) !important;
+  .app-polish :is(section, article, aside)[class*="bg-[#fff"] {
+    border-color: rgba(71, 82, 92, .13) !important;
     box-shadow: var(--mt-shadow-soft);
-    backdrop-filter: blur(18px) saturate(1.08);
+    backdrop-filter: blur(16px) saturate(1.18);
   }
 
-  .app-polish :is(section, article)[class*="rounded-[3"] {
-    box-shadow: var(--mt-shadow);
+  /* Make repeated content cards visibly pastel instead of washed-out white. */
+  .app-polish :is(section, article)[class*="bg-white"]:nth-of-type(4n + 1) {
+    background: linear-gradient(140deg, rgba(188,239,217,.94), rgba(238,255,247,.96)) !important;
   }
+  .app-polish :is(section, article)[class*="bg-white"]:nth-of-type(4n + 2) {
+    background: linear-gradient(140deg, rgba(217,200,255,.92), rgba(248,242,255,.97)) !important;
+  }
+  .app-polish :is(section, article)[class*="bg-white"]:nth-of-type(4n + 3) {
+    background: linear-gradient(140deg, rgba(255,209,184,.92), rgba(255,245,232,.97)) !important;
+  }
+  .app-polish :is(section, article)[class*="bg-white"]:nth-of-type(4n) {
+    background: linear-gradient(140deg, rgba(185,231,255,.94), rgba(240,250,255,.97)) !important;
+  }
+
+  .app-polish :is(section, article)[class*="rounded-[3"] { box-shadow: var(--mt-shadow); }
 
   .app-polish header[class*="sticky"] {
-    border-color: rgba(54, 80, 72, .11) !important;
-    background: rgba(255, 253, 248, .78) !important;
-    box-shadow: 0 8px 26px rgba(56, 76, 70, .045);
-    backdrop-filter: blur(22px) saturate(1.14);
+    border-color: rgba(61, 79, 76, .12) !important;
+    background: rgba(255, 250, 253, .88) !important;
+    box-shadow: 0 9px 28px rgba(78, 78, 105, .08);
+    backdrop-filter: blur(22px) saturate(1.22);
   }
 
   .app-polish aside[class*="sticky"] {
-    border-color: rgba(54, 80, 72, .1) !important;
-    background: rgba(255, 255, 255, .72) !important;
-    box-shadow: 12px 0 40px rgba(51, 74, 67, .035);
-    backdrop-filter: blur(22px) saturate(1.1);
+    border-color: rgba(61, 79, 76, .11) !important;
+    background: linear-gradient(180deg, rgba(242,255,249,.94), rgba(248,243,255,.92)) !important;
+    box-shadow: 12px 0 40px rgba(71, 76, 98, .06);
+    backdrop-filter: blur(22px) saturate(1.18);
   }
 
   .app-polish input,
   .app-polish textarea,
   .app-polish select {
-    border-color: rgba(54, 80, 72, .16) !important;
-    background: rgba(255, 255, 255, .86) !important;
+    border-color: rgba(63, 85, 82, .20) !important;
+    background: rgba(255,255,255,.93) !important;
     color: var(--mt-ink);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 5px 16px rgba(56, 76, 70, .035);
-    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease, transform 160ms ease;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.82), 0 5px 16px rgba(66, 75, 96, .05);
   }
 
   .app-polish input:focus,
   .app-polish textarea:focus,
   .app-polish select:focus {
     outline: none;
-    border-color: rgba(31, 108, 100, .48) !important;
+    border-color: rgba(91, 76, 180, .48) !important;
     background: #fff !important;
-    box-shadow: 0 0 0 4px rgba(64, 137, 125, .11), 0 8px 24px rgba(45, 83, 73, .08);
+    box-shadow: 0 0 0 4px rgba(202,184,255,.30), 0 8px 24px rgba(69, 67, 107, .10);
   }
 
   .app-polish button[class*="bg-[#276765]"],
   .app-polish a[class*="bg-[#276765]"] {
-    background: linear-gradient(135deg, var(--mt-green) 0%, var(--mt-green-deep) 100%) !important;
-    border: 1px solid rgba(255,255,255,.13);
-    box-shadow: 0 10px 24px rgba(31, 108, 100, .20), inset 0 1px 0 rgba(255,255,255,.14);
+    background: linear-gradient(135deg, #168476 0%, #246c91 55%, #6b5db5 100%) !important;
+    border: 1px solid rgba(255,255,255,.28);
+    box-shadow: 0 11px 26px rgba(55, 88, 124, .24), inset 0 1px 0 rgba(255,255,255,.26);
   }
 
   .app-polish button[class*="bg-slate-900"],
   .app-polish a[class*="bg-slate-900"] {
-    background: linear-gradient(135deg, #234642 0%, #183632 100%) !important;
-    box-shadow: 0 10px 25px rgba(27, 55, 51, .18);
-  }
-
-  .app-polish :is(button, a)[class*="rounded-2xl"],
-  .app-polish :is(button, a)[class*="rounded-xl"] {
-    font-weight: 750;
-  }
-
-  @media (hover:hover) and (pointer:fine) {
-    .app-polish :is(section, article, aside)[class*="bg-white"]:hover {
-      border-color: rgba(31, 108, 100, .20) !important;
-    }
-
-    .app-polish :is(button, a):not(:disabled):hover {
-      filter: saturate(1.03);
-    }
+    background: linear-gradient(135deg, #36577d 0%, #6959a9 100%) !important;
+    box-shadow: 0 10px 25px rgba(70, 65, 119, .21);
   }
 
   .app-polish [class*="bg-violet-50"],
   .app-polish [class*="bg-[#eee8f8]"],
   .app-polish [class*="bg-[#f3eff9]"] {
-    background-color: rgba(238, 232, 250, .78) !important;
+    background-color: rgba(217, 200, 255, .88) !important;
   }
 
   .app-polish [class*="bg-orange-50"],
   .app-polish [class*="bg-[#fff4ea]"] {
-    background-color: rgba(255, 239, 224, .82) !important;
+    background-color: rgba(255, 209, 184, .90) !important;
   }
 
   .app-polish [class*="bg-[#eaf4f1]"],
   .app-polish [class*="bg-[#eef7f3]"],
   .app-polish [class*="bg-emerald-50"] {
-    background-color: rgba(226, 242, 235, .84) !important;
+    background-color: rgba(188, 239, 217, .90) !important;
   }
 
-  .premium-page-shell {
-    position: relative;
-    overflow: hidden;
+  .app-polish [class*="bg-yellow-50"],
+  .app-polish [class*="bg-amber-50"] {
+    background-color: rgba(255, 232, 155, .92) !important;
   }
 
-  .premium-page-shell::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: radial-gradient(circle at 20% 15%, rgba(255,255,255,.8) 0 1px, transparent 1.5px);
-    background-size: 22px 22px;
-    mask-image: linear-gradient(to bottom, rgba(0,0,0,.22), transparent 46%);
+  .app-polish [class*="bg-pink-50"],
+  .app-polish [class*="bg-rose-50"] {
+    background-color: rgba(255, 199, 223, .90) !important;
   }
+
+  .premium-page-shell { position: relative; overflow: hidden; }
 
   .premium-hero {
     position: relative;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,.78);
-    background:
-      linear-gradient(128deg, rgba(255,255,255,.91) 0%, rgba(255,250,239,.90) 44%, rgba(237,246,242,.90) 74%, rgba(241,236,250,.88) 100%);
-    box-shadow: 0 30px 90px rgba(62, 76, 71, .11);
-    backdrop-filter: blur(22px) saturate(1.12);
-  }
-
-  .premium-hero::after {
-    content: "";
-    position: absolute;
-    width: 18rem;
-    height: 18rem;
-    right: -5rem;
-    top: -7rem;
-    border-radius: 999px;
-    background: conic-gradient(from 210deg, rgba(255,206,169,.52), rgba(203,231,220,.62), rgba(220,210,248,.52), rgba(255,206,169,.52));
-    filter: blur(18px);
-    opacity: .72;
+    border: 1px solid rgba(255,255,255,.88);
+    background: linear-gradient(125deg, rgba(255,199,223,.92), rgba(255,232,155,.90) 34%, rgba(188,239,217,.92) 66%, rgba(217,200,255,.92)) !important;
+    box-shadow: 0 30px 90px rgba(77, 70, 105, .16);
+    backdrop-filter: blur(18px) saturate(1.2);
   }
 
   .premium-tile {
     position: relative;
     overflow: hidden;
-    border: 1px solid rgba(65, 88, 80, .11);
-    background: rgba(255,255,255,.82);
-    box-shadow: 0 18px 55px rgba(51, 74, 67, .08);
-    backdrop-filter: blur(20px) saturate(1.08);
-  }
-
-  .premium-tile::after {
-    content: "";
-    position: absolute;
-    inset: auto -30% -55% 35%;
-    height: 9rem;
-    border-radius: 999px;
-    background: radial-gradient(circle, rgba(220,239,231,.74), transparent 70%);
-    pointer-events: none;
+    border: 1px solid rgba(67, 78, 89, .13);
+    background: linear-gradient(145deg, rgba(255,255,255,.93), rgba(239,249,255,.91));
+    box-shadow: 0 18px 55px rgba(66, 73, 96, .11);
+    backdrop-filter: blur(18px) saturate(1.18);
   }
 
   .premium-kicker {
     display: inline-flex;
     align-items: center;
     gap: .5rem;
-    border: 1px solid rgba(31,108,100,.1);
+    border: 1px solid rgba(93,76,165,.16);
     border-radius: 999px;
-    background: rgba(255,255,255,.68);
+    background: linear-gradient(135deg, rgba(255,255,255,.84), rgba(236,226,255,.86));
     padding: .45rem .75rem;
-    color: #526f69;
+    color: #5c4d86;
     font-size: .68rem;
     font-weight: 850;
     letter-spacing: .14em;
     text-transform: uppercase;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.85);
   }
+
+  .mobile-creative-shortcut {
+    animation: creativePulse 3.6s ease-in-out infinite;
+  }
+
+  @keyframes creativePulse {
+    0%,100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-3px); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-creative-shortcut { animation: none; }
 }
