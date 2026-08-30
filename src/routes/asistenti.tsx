@@ -82,7 +82,9 @@ function AssistantCoordinatorPage() {
   const [assignmentNote, setAssignmentNote] = useState("");
 
   const [scheduleAssignment, setScheduleAssignment] = useState("");
-  const [scheduleWeekday, setScheduleWeekday] = useState(String(coordinatorWeekday(new Date()) || 1));
+  const [scheduleWeekday, setScheduleWeekday] = useState(
+    String(coordinatorWeekday(new Date()) || 1),
+  );
   const [scheduleStart, setScheduleStart] = useState("08:00");
   const [scheduleEnd, setScheduleEnd] = useState("08:45");
   const [scheduleLocation, setScheduleLocation] = useState("");
@@ -461,7 +463,9 @@ function AssistantCoordinatorPage() {
           ) : (
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               {todaySlots.map((slot) => {
-                const exception = todayExceptions.find((row) => row.assistant_id === slot.assistantId);
+                const exception = todayExceptions.find(
+                  (row) => row.assistant_id === slot.assistantId,
+                );
                 return (
                   <article
                     key={slot.id}
@@ -554,7 +558,12 @@ function AssistantCoordinatorPage() {
                   </option>
                 ))}
               </Select>
-              <Input value={scheduleStart} onChange={setScheduleStart} placeholder="Od" type="time" />
+              <Input
+                value={scheduleStart}
+                onChange={setScheduleStart}
+                placeholder="Od"
+                type="time"
+              />
               <Input value={scheduleEnd} onChange={setScheduleEnd} placeholder="Do" type="time" />
             </div>
             <div className="mt-3">
@@ -586,11 +595,7 @@ function AssistantCoordinatorPage() {
               </div>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <Select
-                value={exceptionAssistant}
-                onChange={setExceptionAssistant}
-                label="Vyber AP"
-              >
+              <Select value={exceptionAssistant} onChange={setExceptionAssistant} label="Vyber AP">
                 {assistants.map((assistant) => (
                   <option key={assistant.id} value={assistant.id}>
                     {assistant.display_name}
@@ -662,7 +667,10 @@ function AssistantCoordinatorPage() {
           ) : (
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {workSlots.map((slot) => (
-                <article key={slot.id} className="rounded-[22px] border border-[#ebe5dc] bg-[#fffefa] p-4">
+                <article
+                  key={slot.id}
+                  className="rounded-[22px] border border-[#ebe5dc] bg-[#fffefa] p-4"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="text-[11px] font-black uppercase tracking-[.12em] text-[#7e8c87]">

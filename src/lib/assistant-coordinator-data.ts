@@ -419,7 +419,12 @@ export async function createAssistantPresenceException(input: {
     .select("id")
     .single();
   if (error) throw error;
-  await writeAudit(input.schoolId, "presence_exception_created", "assistant_presence_exception", data.id);
+  await writeAudit(
+    input.schoolId,
+    "presence_exception_created",
+    "assistant_presence_exception",
+    data.id,
+  );
   return data.id as string;
 }
 
@@ -455,8 +460,10 @@ function minutesOf(time: string) {
 function exceptionTouchesSlot(exception: AssistantPresenceException, slot: AssistantWorkSlot) {
   if (exception.assistant_id !== slot.assistantId) return false;
   if (!exception.starts_at || !exception.ends_at) return true;
-  return minutesOf(exception.starts_at) < minutesOf(slot.ends_at) &&
-    minutesOf(exception.ends_at) > minutesOf(slot.starts_at);
+  return (
+    minutesOf(exception.starts_at) < minutesOf(slot.ends_at) &&
+    minutesOf(exception.ends_at) > minutesOf(slot.starts_at)
+  );
 }
 
 export function buildCoordinatorNowCard(
