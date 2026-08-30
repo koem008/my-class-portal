@@ -57,7 +57,9 @@ export function GlobalVoiceCompanion() {
 
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-        throw new Error("Tento prohlížeč nepodporuje hlasový vstup. Zkuste aktuální Chrome nebo Edge.");
+        throw new Error(
+          "Tento prohlížeč nepodporuje hlasový vstup. Zkuste aktuální Chrome nebo Edge.",
+        );
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -66,8 +68,8 @@ export function GlobalVoiceCompanion() {
       streamRef.current = stream;
       chunksRef.current = [];
 
-      const supportedMime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) =>
-        MediaRecorder.isTypeSupported(type),
+      const supportedMime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(
+        (type) => MediaRecorder.isTypeSupported(type),
       );
       const recorder = supportedMime
         ? new MediaRecorder(stream, { mimeType: supportedMime })
@@ -83,7 +85,8 @@ export function GlobalVoiceCompanion() {
         void processRecording(mimeType);
       };
 
-      const AudioContextCtor = window.AudioContext ||
+      const AudioContextCtor =
+        window.AudioContext ||
         (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextCtor) throw new Error("Prohlížeč neumí rozpoznat konec řeči.");
       const audioContext = new AudioContextCtor();
@@ -118,8 +121,10 @@ export function GlobalVoiceCompanion() {
           lastSpeechAtRef.current = now;
         }
 
-        const noSpeechTooLong = !heardSpeechRef.current && now - startedAtRef.current >= NO_SPEECH_TIMEOUT_MS;
-        const speechEnded = heardSpeechRef.current && now - lastSpeechAtRef.current >= SILENCE_MS;
+        const noSpeechTooLong =
+          !heardSpeechRef.current && now - startedAtRef.current >= NO_SPEECH_TIMEOUT_MS;
+        const speechEnded =
+          heardSpeechRef.current && now - lastSpeechAtRef.current >= SILENCE_MS;
         const maxReached = now - startedAtRef.current >= MAX_RECORDING_MS;
 
         if (noSpeechTooLong) {
@@ -141,7 +146,9 @@ export function GlobalVoiceCompanion() {
       setState("error");
       const message = error instanceof Error ? error.message : "Mikrofon se nepodařilo spustit.";
       setNotice(
-        message.includes("Permission") || message.includes("denied") || message.includes("NotAllowed")
+        message.includes("Permission") ||
+          message.includes("denied") ||
+          message.includes("NotAllowed")
           ? "Mikrofon je v prohlížeči zablokovaný. Povol ho pro tento web a zkus to znovu."
           : message,
       );
@@ -190,7 +197,9 @@ export function GlobalVoiceCompanion() {
 
       if (result.reply.trim()) {
         try {
-          const speech = await synthesizeAssistantVoice({ data: { text: result.reply.slice(0, 2500) } });
+          const speech = await synthesizeAssistantVoice({
+            data: { text: result.reply.slice(0, 2500) },
+          });
           const audio = new Audio(`data:${speech.mimeType};base64,${speech.audioBase64}`);
           await audio.play();
           setNotice("Můžeš pokračovat dalším dotazem.");
@@ -200,7 +209,9 @@ export function GlobalVoiceCompanion() {
       }
     } catch (error) {
       setState("error");
-      setNotice(error instanceof Error ? error.message : "Hlasový požadavek se nepodařilo zpracovat.");
+      setNotice(
+        error instanceof Error ? error.message : "Hlasový požadavek se nepodařilo zpracovat.",
+      );
     }
   }
 
@@ -212,8 +223,16 @@ export function GlobalVoiceCompanion() {
         aria-label="Mluvit s asistentkou"
         className="fixed bottom-5 right-5 z-[70] inline-flex min-h-14 items-center gap-2 rounded-full bg-[#276765] px-5 py-3 text-sm font-bold text-white shadow-[0_16px_40px_rgba(39,103,101,.28)] transition hover:-translate-y-0.5 hover:bg-[#215b59] focus:outline-none focus:ring-4 focus:ring-[#bfe0d7]"
       >
-        {state === "processing" ? <Loader2 className="h-5 w-5 animate-spin" /> : state === "listening" ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-        <span className="hidden sm:inline">{state === "listening" ? "Poslouchám…" : "Mluvit s asistentkou"}</span>
+        {state === "processing" ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : state === "listening" ? (
+          <MicOff className="h-5 w-5" />
+        ) : (
+          <Mic className="h-5 w-5" />
+        )}
+        <span className="hidden sm:inline">
+          {state === "listening" ? "Poslouchám…" : "Mluvit s asistentkou"}
+        </span>
       </button>
 
       {open && (
@@ -221,9 +240,15 @@ export function GlobalVoiceCompanion() {
           <section className="w-full max-w-xl rounded-[30px] border border-white/70 bg-[#fffefa] p-5 shadow-[0_28px_90px_rgba(32,48,44,.24)] sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-bold uppercase tracking-[.16em] text-[#4e7772]">Moje asistentka</div>
+                <div className="text-xs font-bold uppercase tracking-[.16em] text-[#4e7772]">
+                  Moje asistentka
+                </div>
                 <h2 className="mt-1 text-xl font-bold text-[#24343f]">
-                  {state === "listening" ? "Poslouchám tě" : state === "processing" ? "Zpracovávám" : "Můžeme mluvit"}
+                  {state === "listening"
+                    ? "Poslouchám tě"
+                    : state === "processing"
+                      ? "Zpracovávám"
+                      : "Můžeme mluvit"}
                 </h2>
               </div>
               <button
@@ -246,13 +271,23 @@ export function GlobalVoiceCompanion() {
               disabled={state === "processing"}
               className={`mx-auto mt-7 grid h-28 w-28 place-items-center rounded-full text-white shadow-[0_18px_45px_rgba(39,103,101,.25)] transition disabled:opacity-60 ${state === "listening" ? "animate-pulse bg-[#b85f61]" : "bg-[#276765] hover:scale-105"}`}
             >
-              {state === "processing" ? <Loader2 className="h-10 w-10 animate-spin" /> : state === "listening" ? <MicOff className="h-10 w-10" /> : <Mic className="h-10 w-10" />}
+              {state === "processing" ? (
+                <Loader2 className="h-10 w-10 animate-spin" />
+              ) : state === "listening" ? (
+                <MicOff className="h-10 w-10" />
+              ) : (
+                <Mic className="h-10 w-10" />
+              )}
             </button>
-            <p className="mt-4 text-center text-sm font-semibold text-[#53696a]">{notice || "Klepni a mluv přirozeně."}</p>
+            <p className="mt-4 text-center text-sm font-semibold text-[#53696a]">
+              {notice || "Klepni a mluv přirozeně."}
+            </p>
 
             {transcript && (
               <div className="mt-5 rounded-2xl bg-[#f4f5f1] p-4">
-                <div className="text-[11px] font-bold uppercase tracking-[.12em] text-[#82908f]">Ty</div>
+                <div className="text-[11px] font-bold uppercase tracking-[.12em] text-[#82908f]">
+                  Ty
+                </div>
                 <p className="mt-1 text-sm leading-6 text-[#34484a]">{transcript}</p>
               </div>
             )}
