@@ -348,13 +348,22 @@ function MaterialCard({ item }: { item: MaterialStudioItem }) {
           </span>
           {item.difficulty && <span>{difficultyLabels[item.difficulty] ?? item.difficulty}</span>}
         </div>
-        <Link
-          to="/hodina/$lessonId"
-          params={{ lessonId: item.lessonId }}
-          className="text-xs font-black text-[#4e786f] transition group-hover:text-[#276765]"
-        >
-          Otevřít v hodině →
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/materialy/$materialId"
+            params={{ materialId: item.id }}
+            className="text-xs font-black text-[#4e786f] transition group-hover:text-[#276765]"
+          >
+            Tisk / PDF
+          </Link>
+          <Link
+            to="/hodina/$lessonId"
+            params={{ lessonId: item.lessonId }}
+            className="text-xs font-black text-[#4e786f] transition group-hover:text-[#276765]"
+          >
+            Otevřít v hodině →
+          </Link>
+        </div>
       </div>
     </article>
   );

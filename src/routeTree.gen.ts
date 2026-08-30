@@ -23,6 +23,7 @@ import { Route as TridaRouteImport } from './routes/trida'
 import { Route as VytvarnaVychovaRouteImport } from './routes/vytvarna-vychova'
 import { Route as ZacatekRouteImport } from './routes/zacatek'
 import { Route as HodinaLessonIdRouteImport } from './routes/hodina.$lessonId'
+import { Route as MaterialyMaterialIdRouteImport } from './routes/materialy.$materialId'
 import { Route as SpecialniPedagogikaCaseIdRouteImport } from './routes/specialni-pedagogika.$caseId'
 import { Route as SpecialniPedagogikaCaseIdSouhrnRouteImport } from './routes/specialni-pedagogika.$caseId.souhrn'
 
@@ -96,6 +97,11 @@ const HodinaLessonIdRoute = HodinaLessonIdRouteImport.update({
   path: '/hodina/$lessonId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MaterialyMaterialIdRoute = MaterialyMaterialIdRouteImport.update({
+  id: '/$materialId',
+  path: '/$materialId',
+  getParentRoute: () => MaterialyRoute,
+} as any)
 const SpecialniPedagogikaCaseIdRoute =
   SpecialniPedagogikaCaseIdRouteImport.update({
     id: '/$caseId',
@@ -115,7 +121,7 @@ export interface FileRoutesByFullPath {
   '/asistentka': typeof AsistentkaRoute
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
-  '/materialy': typeof MaterialyRoute
+  '/materialy': typeof MaterialyRouteWithChildren
   '/pamet': typeof PametRoute
   '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/vytvarna-vychova': typeof VytvarnaVychovaRoute
   '/zacatek': typeof ZacatekRoute
   '/hodina/$lessonId': typeof HodinaLessonIdRoute
+  '/materialy/$materialId': typeof MaterialyMaterialIdRoute
   '/specialni-pedagogika/$caseId': typeof SpecialniPedagogikaCaseIdRouteWithChildren
   '/specialni-pedagogika/$caseId/souhrn': typeof SpecialniPedagogikaCaseIdSouhrnRoute
 }
@@ -133,7 +140,7 @@ export interface FileRoutesByTo {
   '/asistentka': typeof AsistentkaRoute
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
-  '/materialy': typeof MaterialyRoute
+  '/materialy': typeof MaterialyRouteWithChildren
   '/pamet': typeof PametRoute
   '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/vytvarna-vychova': typeof VytvarnaVychovaRoute
   '/zacatek': typeof ZacatekRoute
   '/hodina/$lessonId': typeof HodinaLessonIdRoute
+  '/materialy/$materialId': typeof MaterialyMaterialIdRoute
   '/specialni-pedagogika/$caseId': typeof SpecialniPedagogikaCaseIdRouteWithChildren
   '/specialni-pedagogika/$caseId/souhrn': typeof SpecialniPedagogikaCaseIdSouhrnRoute
 }
@@ -152,7 +160,7 @@ export interface FileRoutesById {
   '/asistentka': typeof AsistentkaRoute
   '/hlas': typeof HlasRoute
   '/kalendar': typeof KalendarRoute
-  '/materialy': typeof MaterialyRoute
+  '/materialy': typeof MaterialyRouteWithChildren
   '/pamet': typeof PametRoute
   '/prihlaseni': typeof PrihlaseniRoute
   '/rozvrh': typeof RozvrhRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/vytvarna-vychova': typeof VytvarnaVychovaRoute
   '/zacatek': typeof ZacatekRoute
   '/hodina/$lessonId': typeof HodinaLessonIdRoute
+  '/materialy/$materialId': typeof MaterialyMaterialIdRoute
   '/specialni-pedagogika/$caseId': typeof SpecialniPedagogikaCaseIdRouteWithChildren
   '/specialni-pedagogika/$caseId/souhrn': typeof SpecialniPedagogikaCaseIdSouhrnRoute
 }
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/vytvarna-vychova'
     | '/zacatek'
     | '/hodina/$lessonId'
+    | '/materialy/$materialId'
     | '/specialni-pedagogika/$caseId'
     | '/specialni-pedagogika/$caseId/souhrn'
   fileRoutesByTo: FileRoutesByTo
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/vytvarna-vychova'
     | '/zacatek'
     | '/hodina/$lessonId'
+    | '/materialy/$materialId'
     | '/specialni-pedagogika/$caseId'
     | '/specialni-pedagogika/$caseId/souhrn'
   id:
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/vytvarna-vychova'
     | '/zacatek'
     | '/hodina/$lessonId'
+    | '/materialy/$materialId'
     | '/specialni-pedagogika/$caseId'
     | '/specialni-pedagogika/$caseId/souhrn'
   fileRoutesById: FileRoutesById
@@ -227,7 +239,7 @@ export interface RootRouteChildren {
   AsistentkaRoute: typeof AsistentkaRoute
   HlasRoute: typeof HlasRoute
   KalendarRoute: typeof KalendarRoute
-  MaterialyRoute: typeof MaterialyRoute
+  MaterialyRoute: typeof MaterialyRouteWithChildren
   PametRoute: typeof PametRoute
   PrihlaseniRoute: typeof PrihlaseniRoute
   RozvrhRoute: typeof RozvrhRoute
@@ -338,6 +350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HodinaLessonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/materialy/$materialId': {
+      id: '/materialy/$materialId'
+      path: '/$materialId'
+      fullPath: '/materialy/$materialId'
+      preLoaderRoute: typeof MaterialyMaterialIdRouteImport
+      parentRoute: typeof MaterialyRoute
+    }
     '/specialni-pedagogika/$caseId': {
       id: '/specialni-pedagogika/$caseId'
       path: '/$caseId'
@@ -354,6 +373,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface MaterialyRouteChildren {
+  MaterialyMaterialIdRoute: typeof MaterialyMaterialIdRoute
+}
+
+const MaterialyRouteChildren: MaterialyRouteChildren = {
+  MaterialyMaterialIdRoute: MaterialyMaterialIdRoute,
+}
+
+const MaterialyRouteWithChildren = MaterialyRoute._addFileChildren(
+  MaterialyRouteChildren,
+)
 
 interface SpecialniPedagogikaCaseIdRouteChildren {
   SpecialniPedagogikaCaseIdSouhrnRoute: typeof SpecialniPedagogikaCaseIdSouhrnRoute
@@ -386,7 +417,7 @@ const rootRouteChildren: RootRouteChildren = {
   AsistentkaRoute: AsistentkaRoute,
   HlasRoute: HlasRoute,
   KalendarRoute: KalendarRoute,
-  MaterialyRoute: MaterialyRoute,
+  MaterialyRoute: MaterialyRouteWithChildren,
   PametRoute: PametRoute,
   PrihlaseniRoute: PrihlaseniRoute,
   RozvrhRoute: RozvrhRoute,

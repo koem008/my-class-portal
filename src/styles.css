@@ -180,7 +180,8 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .app-polish :is(section, article, div)[class*="rounded-"][class*="border"][class*="bg-white"]:hover {
+  .app-polish
+    :is(section, article, div)[class*="rounded-"][class*="border"][class*="bg-white"]:hover {
     border-color: rgb(213 226 220);
     box-shadow: 0 18px 44px rgb(55 70 65 / 0.08);
   }
@@ -297,5 +298,61 @@
   .app-polish [class*="bg-[#eef8f3]"],
   .app-polish [class*="bg-[#f1f9f5]"] {
     animation: none !important;
+  }
+}
+
+/* Printable material document: browser print / Save as PDF, no external service. */
+@page {
+  size: A4;
+  margin: 0;
+}
+
+.material-print-sheet {
+  min-height: 297mm;
+}
+
+@media print {
+  html,
+  body {
+    background: white !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .material-print-screen,
+  .material-print-screen * {
+    visibility: visible;
+  }
+
+  .material-print-screen {
+    position: absolute;
+    inset: 0;
+    min-height: auto !important;
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  .material-print-toolbar {
+    display: none !important;
+  }
+
+  .material-print-sheet {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .material-print-content {
+    overflow-wrap: anywhere;
+  }
+
+  .material-print-footer {
+    break-inside: avoid;
   }
 }
