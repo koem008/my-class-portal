@@ -15,6 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AfternoonReflectionPrompt } from "@/components/AfternoonReflectionPrompt";
 import { DelightLayer } from "@/components/DelightLayer";
+import { QuickNavigation } from "@/components/QuickNavigation";
 import { SeasonalAmbience } from "@/components/SeasonalAmbience";
 import { SpecialContinuityAssistantCard } from "@/components/special-education/SpecialContinuityAssistantCard";
 import { supabase } from "@/integrations/supabase/client";
@@ -199,6 +200,7 @@ function AuthGate() {
       <div key={pathname} className="app-polish app-screen-enter relative z-10">
         <Outlet />
       </div>
+      <QuickNavigation />
       <SpecialContinuityAssistantCard />
       <AfternoonReflectionPrompt />
       <Link
