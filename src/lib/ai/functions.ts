@@ -39,6 +39,14 @@ const lessonAiRequestSchema = z.object({
         includeCriteria: z.boolean(),
       })
       .optional(),
+    worksheetOptions: z
+      .object({
+        difficulty: z.enum(["easy", "standard", "advanced"]),
+        topic: z.string().trim().max(500).optional(),
+        includeAnswerKey: z.boolean(),
+        writingSpaceLines: z.number().int().min(0).max(20),
+      })
+      .optional(),
     pseudonymNeeds: z
       .array(
         z.object({

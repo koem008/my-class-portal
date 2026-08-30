@@ -111,6 +111,9 @@ function LessonWorkspacePage() {
   const [materialKind, setMaterialKind] = useState<MaterialKind>("worksheet");
   const [materialTitle, setMaterialTitle] = useState("");
   const [materialText, setMaterialText] = useState("");
+  const [materialDifficulty, setMaterialDifficulty] = useState<
+    "easy" | "standard" | "advanced" | "individual" | ""
+  >("");
   const [signalAliasId, setSignalAliasId] = useState("");
   const [signalKind, setSignalKind] = useState<LearningSignalKind>("needs_practice");
   const [signalNote, setSignalNote] = useState("");
@@ -125,6 +128,10 @@ function LessonWorkspacePage() {
   const [assessmentPointsPerQuestion, setAssessmentPointsPerQuestion] = useState(1);
   const [assessmentIncludeAnswers, setAssessmentIncludeAnswers] = useState(true);
   const [assessmentIncludeCriteria, setAssessmentIncludeCriteria] = useState(true);
+  const [worksheetDifficulty, setWorksheetDifficulty] = useState<AssessmentDifficulty>("standard");
+  const [worksheetTopic, setWorksheetTopic] = useState("");
+  const [worksheetIncludeAnswers, setWorksheetIncludeAnswers] = useState(true);
+  const [worksheetWritingSpaceLines, setWorksheetWritingSpaceLines] = useState(4);
   const [aiGenerating, setAiGenerating] = useState(false);
 
   const lessonDate = useMemo(
@@ -154,6 +161,7 @@ function LessonWorkspacePage() {
       setContinuity(data.continuity);
       setCurriculum(data.curriculum);
       setAssessmentTopic((current) => current || data.lesson.topic || data.lesson.title || "");
+      setWorksheetTopic((current) => current || data.lesson.topic || data.lesson.title || "");
       setObjective(data.preparation?.objective ?? "");
       setTeacherNotes(data.preparation?.teacher_notes ?? "");
       setBoardNotes(data.preparation?.board_notes ?? "");
@@ -209,6 +217,7 @@ function LessonWorkspacePage() {
         kind: materialKind,
         title: materialTitle.trim(),
         text: materialText,
+        difficulty: materialDifficulty || undefined,
       });
       setMaterialTitle("");
       setMaterialText("");
@@ -318,11 +327,27 @@ function LessonWorkspacePage() {
                     includeCriteria: assessmentIncludeCriteria,
                   }
                 : undefined,
+            worksheetOptions:
+              aiAction === "worksheet"
+                ? {
+                    difficulty: worksheetDifficulty,
+                    topic: worksheetTopic.trim() || lesson.topic || lesson.title || undefined,
+                    includeAnswerKey: worksheetIncludeAnswers,
+                    writingSpaceLines: Math.min(20, Math.max(0, worksheetWritingSpaceLines)),
+                  }
+                : undefined,
           },
         },
       });
       setMaterialKind(
         (aiAction === "presentation_outline" ? "presentation" : aiAction) as MaterialKind,
+      );
+      setMaterialDifficulty(
+        aiAction === "worksheet"
+          ? worksheetDifficulty
+          : aiAction === "quiz" || aiAction === "test"
+            ? assessmentDifficulty
+            : "",
       );
       setMaterialTitle(result.title);
       setMaterialText(JSON.stringify(result.content, null, 2));
@@ -552,6 +577,22 @@ function LessonWorkspacePage() {
                     placeholder="Název materiálu"
                     className="rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm"
                   />
+                  <select
+                    value={materialDifficulty}
+                    onChange={(e) =>
+                      setMaterialDifficulty(
+                        e.target.value as "easy" | "standard" | "advanced" | "individual" | "",
+                      )
+                    }
+                    className="rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm md:col-span-2"
+                    aria-label="Obtížnost materiálu"
+                  >
+                    <option value="">Bez určené obtížnosti</option>
+                    <option value="easy">Lehká</option>
+                    <option value="standard">Standardní</option>
+                    <option value="advanced">Pokročilá</option>
+                    <option value="individual">Individuální</option>
+                  </select>
                 </div>
                 <textarea
                   value={materialText}
@@ -706,6 +747,63 @@ function LessonWorkspacePage() {
                     </option>
                   ))}
                 </select>
+                {aiAction === "worksheet" && (
+                  <div className="mt-3 rounded-2xl border border-[#dbe7e2] bg-white/75 p-3">
+                    <div className="text-xs font-black uppercase tracking-[.12em] text-[#668079]">
+                      Parametry pracovního listu
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs font-bold text-[#647775]">
+                        Varianta
+                        <select
+                          value={worksheetDifficulty}
+                          onChange={(event) =>
+                            setWorksheetDifficulty(event.target.value as AssessmentDifficulty)
+                          }
+                          className="mt-1.5 h-10 w-full rounded-xl border border-[#dbe7e2] bg-white px-3 text-sm"
+                        >
+                          <option value="easy">Lehká</option>
+                          <option value="standard">Standardní</option>
+                          <option value="advanced">Pokročilá</option>
+                        </select>
+                      </label>
+                      <label className="text-xs font-bold text-[#647775]">
+                        Řádků pro psaní
+                        <input
+                          type="number"
+                          min={0}
+                          max={20}
+                          value={worksheetWritingSpaceLines}
+                          onChange={(event) =>
+                            setWorksheetWritingSpaceLines(Number(event.target.value) || 0)
+                          }
+                          className="mt-1.5 h-10 w-full rounded-xl border border-[#dbe7e2] bg-white px-3 text-sm"
+                        />
+                      </label>
+                    </div>
+                    <label className="mt-3 block text-xs font-bold text-[#647775]">
+                      Téma
+                      <input
+                        value={worksheetTopic}
+                        onChange={(event) => setWorksheetTopic(event.target.value)}
+                        placeholder="Téma pracovního listu"
+                        className="mt-1.5 h-10 w-full rounded-xl border border-[#dbe7e2] bg-white px-3 text-sm"
+                      />
+                    </label>
+                    <label className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-[#536c65]">
+                      <input
+                        type="checkbox"
+                        checked={worksheetIncludeAnswers}
+                        onChange={(event) => setWorksheetIncludeAnswers(event.target.checked)}
+                      />
+                      Přidat oddělené správné odpovědi
+                    </label>
+                    <p className="mt-3 text-[11px] leading-5 text-[#7c8a86]">
+                      Zadání, odpovědi i prostor pro psaní zůstávají před uložením plně
+                      editovatelné.
+                    </p>
+                  </div>
+                )}
                 {(aiAction === "quiz" || aiAction === "test") && (
                   <div className="mt-3 rounded-2xl border border-[#dbe7e2] bg-white/75 p-3">
                     <div className="text-xs font-black uppercase tracking-[.12em] text-[#668079]">

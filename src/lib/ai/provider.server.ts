@@ -234,6 +234,7 @@ export async function generateLessonAsset(
           "Nevydávej vlastní text za oficiální RVP/ŠVP.",
           "Pokud assessment_options není null, dodrž přesně počet a typ otázek, obtížnost a bodování; při požadavku přidej správné odpovědi a hodnoticí kritéria do content.",
           "Test nebo kvíz vrať ve snadno editovatelné struktuře; správné odpovědi jasně odděl od zadání.",
+          "Pokud worksheet_options není null, vytvoř pracovní list v požadované obtížnosti; content musí jasně obsahovat zadání a podle volby také oddělené odpovědi. writingSpaceLines vyjádři jako dostatek místa pro ruční psaní v tiskové podobě.",
           "Vrať pouze validní JSON objekt s klíči title, content, warnings. Bez markdownového obalu.",
         ].join("\n"),
         messages: [{ role: "user", content: JSON.stringify(providerInput) }],

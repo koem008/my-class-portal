@@ -31,6 +31,13 @@ export type LessonAssessmentOptions = {
   includeCriteria: boolean;
 };
 
+export type LessonWorksheetOptions = {
+  difficulty: AssessmentDifficulty;
+  topic?: string | undefined;
+  includeAnswerKey: boolean;
+  writingSpaceLines: number;
+};
+
 /**
  * Privacy-minimized context allowed to leave our server for an external AI provider.
  * Never add real pupil identity, email, date of birth, address or an offline mapping here.
@@ -46,6 +53,7 @@ export type LessonAiContext = {
   previousLessonSummary?: string | undefined;
   teacherInstruction?: string | undefined;
   assessmentOptions?: LessonAssessmentOptions | undefined;
+  worksheetOptions?: LessonWorksheetOptions | undefined;
   pseudonymNeeds?: PseudonymNeed[] | undefined;
 };
 
@@ -238,6 +246,7 @@ export function buildProviderInput(request: LessonAiRequest): Record<string, unk
     previous_lesson_summary: request.context.previousLessonSummary ?? null,
     teacher_instruction: request.context.teacherInstruction ?? null,
     assessment_options: request.context.assessmentOptions ?? null,
+    worksheet_options: request.context.worksheetOptions ?? null,
     pseudonym_needs: request.context.pseudonymNeeds ?? [],
   };
 }
