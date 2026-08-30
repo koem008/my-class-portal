@@ -27,6 +27,7 @@ export type OnboardingInput = {
   timetableSlots: OnboardingTimetableSlot[];
   teachesArt: boolean;
   isSpecialEducator: boolean;
+  isAssistantCoordinator: boolean;
 };
 
 type ExistingClassRow = { id: string };
@@ -50,6 +51,8 @@ export async function completeFirstRun(input: OnboardingInput) {
     throw new Error("Konec školního roku musí být po jeho začátku.");
   if (!districtName) throw new Error("Vyberte okres školy.");
   if (!assistantName) throw new Error("Doplňte jméno AI asistentky.");
+  if (input.timetableSlots.length === 0)
+    throw new Error("Přidejte alespoň jednu hodinu do rozvrhu.");
 
   const normalizedSlots = input.timetableSlots.map((slot, index) => {
     const subjectName = slot.subjectName.trim();
@@ -149,30 +152,37 @@ export async function completeFirstRun(input: OnboardingInput) {
   );
   if (assistant.error) throw assistant.error;
 
-  if (normalizedSlots.length > 0) {
-    const slots = await db.from("timetable_slots").insert(
-      normalizedSlots.map((slot) => ({
-        school_id: schoolId,
-        class_id: classId,
-        academic_year_id: year.data.id,
-        weekday: slot.weekday,
-        slot_order: slot.slotOrder,
-        starts_at: slot.startsAt,
-        ends_at: slot.endsAt,
-        subject_name: slot.subjectName,
-        valid_from: input.academicYearStartsOn,
-        valid_to: input.academicYearEndsOn,
-        is_active: true,
-      })),
-    );
-    if (slots.error) throw slots.error;
-  }
+  const slots = await db.from("timetable_slots").insert(
+    normalizedSlots.map((slot) => ({
+      school_id: schoolId,
+      class_id: classId,
+      academic_year_id: year.data.id,
+      weekday: slot.weekday,
+      slot_order: slot.slotOrder,
+      starts_at: slot.startsAt,
+      ends_at: slot.endsAt,
+      subject_name: slot.subjectName,
+      valid_from: input.academicYearStartsOn,
+      valid_to: input.academicYearEndsOn,
+      is_active: true,
+    })),
+  );
+  if (slots.error) throw slots.error;
 
   if (input.isSpecialEducator) {
     const grant = await db.rpc("grant_special_education_access", {
       p_school_id: schoolId,
       p_user_id: user.id,
       p_role: "special_educator",
+    });
+    if (grant.error) throw grant.error;
+  }
+
+  if (input.isAssistantCoordinator) {
+    const grant = await db.rpc("grant_assistant_coordinator_access", {
+      p_school_id: schoolId,
+      p_user_id: user.id,
+      p_role: "coordinator",
     });
     if (grant.error) throw grant.error;
   }
@@ -196,5 +206,6 @@ export async function completeFirstRun(input: OnboardingInput) {
     classId,
     artSubjectId,
     specialEducationEnabled: input.isSpecialEducator,
+    assistantCoordinatorEnabled: input.isAssistantCoordinator,
   };
 }
