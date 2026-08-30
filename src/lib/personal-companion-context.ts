@@ -57,8 +57,19 @@ export function buildPersonalDailyContext(
   memories: TeacherMemory[],
   isoDate: string,
 ): PersonalDailyContext {
+  const preferredSalutation = settings?.preferred_salutation?.trim();
+  const salutation = preferredSalutation ? czechVocative(preferredSalutation) : undefined;
+
+  // A preferred form of address is UI identity, not personal-memory content.
+  // It must therefore remain available even when optional personal memory is disabled.
   if (!settings?.memory_enabled) {
-    return { enabled: false, commitments: [], importantDates: [], preferences: [] };
+    return {
+      enabled: Boolean(salutation),
+      salutation,
+      commitments: [],
+      importantDates: [],
+      preferences: [],
+    };
   }
 
   const date = new Date(`${isoDate}T12:00:00`);
@@ -101,10 +112,9 @@ export function buildPersonalDailyContext(
     .map((memory) => memory.content)
     .slice(0, 12);
 
-  const preferredSalutation = settings.preferred_salutation?.trim();
   return {
     enabled: true,
-    salutation: preferredSalutation ? czechVocative(preferredSalutation) : undefined,
+    salutation,
     commitments,
     importantDates,
     preferences,
