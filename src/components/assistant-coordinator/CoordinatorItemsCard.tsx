@@ -57,6 +57,7 @@ export function CoordinatorItemsCard({
   const [dueOn, setDueOn] = useState("");
   const [calendarSavingId, setCalendarSavingId] = useState<string | null>(null);
   const [calendarAddedIds, setCalendarAddedIds] = useState<Set<string>>(() => new Set());
+  const [outcomeDrafts, setOutcomeDrafts] = useState<Record<string, string>>({});
 
   const todayIso = localIsoDate();
 
@@ -138,11 +139,20 @@ export function CoordinatorItemsCard({
     }
   }
 
-  async function complete(itemId: string) {
+  async function complete(item: AssistantCoordinationItem) {
     setSaving(true);
     setError("");
     try {
-      await completeAssistantCoordinationItem(schoolId, itemId);
+      await completeAssistantCoordinationItem(
+        schoolId,
+        item.id,
+        item.kind === "follow_up" ? outcomeDrafts[item.id] : undefined,
+      );
+      setOutcomeDrafts((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Úkol se nepodařilo dokončit.");
@@ -231,6 +241,24 @@ export function CoordinatorItemsCard({
                         {item.body && (
                           <p className="mt-2 text-sm leading-5 text-[#77837f]">{item.body}</p>
                         )}
+                        {item.kind === "follow_up" && (
+                          <label className="mt-3 block text-[11px] font-bold text-[#718079]">
+                            Výsledek jednání (volitelné, uloží se až při dokončení)
+                            <textarea
+                              value={outcomeDrafts[item.id] ?? ""}
+                              onChange={(event) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: event.target.value,
+                                }))
+                              }
+                              maxLength={800}
+                              rows={2}
+                              placeholder="Např. domluvena změna organizace od příštího týdne"
+                              className="mt-1 w-full resize-none rounded-xl border border-[#ddd8cf] bg-white px-3 py-2 text-xs font-medium text-[#55645f] outline-none focus:border-[#7aa096]"
+                            />
+                          </label>
+                        )}
                       </div>
                       <div className="flex shrink-0 gap-1">
                         {item.due_on && (
@@ -259,7 +287,7 @@ export function CoordinatorItemsCard({
                         )}
                         <button
                           disabled={saving}
-                          onClick={() => void complete(item.id)}
+                          onClick={() => void complete(item)}
                           className="rounded-xl p-2 text-[#4f7b70] transition hover:bg-[#eaf4ef] disabled:opacity-40"
                           aria-label="Označit jako hotové"
                         >
@@ -293,7 +321,14 @@ export function CoordinatorItemsCard({
                     className="flex items-center gap-2 rounded-2xl bg-[#f5f6f2] px-3 py-2.5 text-xs text-[#78847f]"
                   >
                     <CheckCircle2 className="h-4 w-4 text-[#78998b]" />
-                    <span className="line-through decoration-[#abb8b2]">{item.title}</span>
+                    <div className="min-w-0">
+                      <span className="line-through decoration-[#abb8b2]">{item.title}</span>
+                      {item.outcome && (
+                        <p className="mt-1 text-[11px] leading-4 text-[#6f7d77]">
+                          Výsledek: {item.outcome}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

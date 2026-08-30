@@ -213,6 +213,31 @@ select pg_temp.assert_count(
   'coordinator should see own private calendar event'
 );
 
+-- Completion outcome stays inside the same organizational-only boundary.
+update public.assistant_coordination_items
+set outcome='Domluvena organizační změna od příštího týdne'
+where id='aaaaaaaa-0000-0000-0000-0000000000a0';
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_coordination_items
+    where id='aaaaaaaa-0000-0000-0000-0000000000a0'
+      and outcome='Domluvena organizační změna od příštího týdne'),
+  1,
+  'coordinator should be able to record a safe organizational outcome'
+);
+
+do $$
+begin
+  begin
+    update public.assistant_coordination_items
+    set outcome='Potvrzeno ADHD, pokračovat dál'
+    where id='aaaaaaaa-0000-0000-0000-0000000000a0';
+    raise exception 'ASSERTION FAILED: diagnostic language in outcome unexpectedly succeeded';
+  exception
+    when check_violation then null;
+  end;
+end;
+$$;
+
 -- Cross-tenant writes must fail closed at RLS, not merely disappear from reads.
 do $$
 begin

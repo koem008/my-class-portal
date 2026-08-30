@@ -19,6 +19,7 @@ export type AssistantCoordinationItem = {
   due_on: string | null;
   status: CoordinationItemStatus;
   completed_at: string | null;
+  outcome: string | null;
   created_at: string;
   assistantName: string | null;
   className: string | null;
@@ -53,7 +54,7 @@ export async function loadAssistantCoordinationItems(
   const { data, error } = await db
     .from("assistant_coordination_items")
     .select(
-      "id,school_id,kind,title,body,assistant_id,class_id,due_on,status,completed_at,created_at",
+      "id,school_id,kind,title,body,assistant_id,class_id,due_on,status,completed_at,outcome,created_at",
     )
     .eq("school_id", schoolId)
     .order("status", { ascending: false })
@@ -103,14 +104,22 @@ export async function createAssistantCoordinationItem(input: {
   return data.id as string;
 }
 
-export async function completeAssistantCoordinationItem(schoolId: string, itemId: string) {
+export async function completeAssistantCoordinationItem(
+  schoolId: string,
+  itemId: string,
+  outcome?: string,
+) {
   const userId = await authUserId();
+  const normalizedOutcome = outcome?.trim() || "";
+  if (normalizedOutcome)
+    assertCoordinatorOrganizationalContent("Výsledek pracovního jednání", normalizedOutcome);
   const { error } = await db
     .from("assistant_coordination_items")
     .update({
       status: "done",
       completed_by: userId,
       completed_at: new Date().toISOString(),
+      outcome: normalizedOutcome || null,
     })
     .eq("school_id", schoolId)
     .eq("id", itemId)
