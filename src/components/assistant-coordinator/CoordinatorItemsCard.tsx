@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CoordinatorClass, TeachingAssistant } from "@/lib/assistant-coordinator-data";
-import { ensureCoordinatorItemInCalendar } from "@/lib/assistant-coordinator-calendar";
+import {
+  ensureCoordinatorItemInCalendar,
+  loadCoordinatorCalendarItemIds,
+} from "@/lib/assistant-coordinator-calendar";
 import {
   completeAssistantCoordinationItem,
   coordinationItemDueLabel,
@@ -62,8 +65,14 @@ export function CoordinatorItemsCard({
     setError("");
     try {
       const rows = await loadAssistantCoordinationItems(schoolId, assistants, classes);
+      const openRows = rows.filter((item) => item.status === "open");
+      const linkedIds = await loadCoordinatorCalendarItemIds(
+        schoolId,
+        openRows.filter((item) => item.due_on).map((item) => item.id),
+      );
       setItems(rows);
-      onOpenItemsChange?.(rows.filter((item) => item.status === "open"));
+      setCalendarAddedIds(linkedIds);
+      onOpenItemsChange?.(openRows);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Úkoly a poznámky se nepodařilo načíst.");
     } finally {
