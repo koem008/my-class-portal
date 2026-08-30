@@ -38,9 +38,7 @@ export function CoordinatorMeetingsCard({
 
   const upcoming = useMemo(
     () =>
-      meetings
-        .filter((meeting) => new Date(meeting.ends_at).getTime() >= Date.now())
-        .slice(0, 5),
+      meetings.filter((meeting) => new Date(meeting.ends_at).getTime() >= Date.now()).slice(0, 5),
     [meetings],
   );
 
