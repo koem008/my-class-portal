@@ -1,0 +1,223 @@
+name: Apply four live bug fixes
+
+on:
+  push:
+    branches:
+      - fix/four-live-bugs
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/four-live-bugs
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Apply targeted fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected snippet not found in {path}: {old[:120]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          # BUG 1: deterministic specialized-creation routing before any provider/model call.
+          replace(
+              "src/lib/ai/functions.ts",
+              'import { assertCoordinatorOrganizationalContent } from "@/lib/assistant-coordinator-content-policy";\n',
+              'import { assertCoordinatorOrganizationalContent } from "@/lib/assistant-coordinator-content-policy";\nimport { classifySpecializedCreationRequest } from "@/lib/ai/companion-policy";\n',
+          )
+          replace(
+              "src/lib/ai/functions.ts",
+              '  .handler(async ({ data }) => {\n    const { generateCompanionReply, readAnthropicTextProviderConfigFromEnv } =\n      await import("./provider.server");',
+              '  .handler(async ({ data }) => {\n    const specializedRoute = classifySpecializedCreationRequest(data.message);\n    if (specializedRoute) {\n      return {\n        ...specializedRoute,\n        usage: { provider: "anthropic" as const, model: "deterministic-scope-router" },\n      };\n    }\n\n    const { generateCompanionReply, readAnthropicTextProviderConfigFromEnv } =\n      await import("./provider.server");',
+          )
+
+          # BUG 3: seasonal badge is decorative, never interactive, and never overlays sidebar/nav.
+          replace(
+              "src/components/SeasonalAmbience.tsx",
+              '<div className="fixed left-4 top-4 z-40 hidden sm:block">',
+              '<div className="pointer-events-none fixed right-24 top-5 z-10 hidden xl:block">',
+          )
+
+          # BUG 4: remove special floating creative shortcut from global shell.
+          replace(
+              "src/routes/__root.tsx",
+              'import { MobileCreativeShortcut } from "@/components/MobileCreativeShortcut";\n',
+              '',
+          )
+          replace(
+              "src/routes/__root.tsx",
+              '      <MobileCreativeShortcut />\n',
+              '',
+          )
+          Path("src/components/MobileCreativeShortcut.tsx").unlink(missing_ok=True)
+
+          # BUG 4: Creative Studio is a normal main nav item on desktop and mobile.
+          replace(
+              "src/routes/index.tsx",
+              '  MoonStar,\n  Users,',
+              '  MoonStar,\n  Palette,\n  Users,',
+          )
+          old_nav = '''const nav = [
+  { to: "/" as const, label: "Dnes", icon: CheckCircle2 },
+  { to: "/rozvrh" as const, label: "Rozvrh", icon: CalendarDays },
+  { to: "/kalendar" as const, label: "Kalendář", icon: Clock3 },
+  { to: "/trida" as const, label: "Třída", icon: Users },
+  { to: "/asistenti" as const, label: "Asistenti", icon: UsersRound },
+  { to: "/asistentka" as const, label: "Asistentka", icon: Sparkles },
+];'''
+          new_nav = '''const nav = [
+  { to: "/" as const, label: "Dnes", mobileLabel: "Dnes", icon: CheckCircle2, iconClass: "text-[#188779]" },
+  { to: "/rozvrh" as const, label: "Rozvrh", mobileLabel: "Rozvrh", icon: CalendarDays, iconClass: "text-[#397ed1]" },
+  { to: "/kalendar" as const, label: "Kalendář", mobileLabel: "Kalendář", icon: Clock3, iconClass: "text-[#d08a20]" },
+  { to: "/trida" as const, label: "Třída", mobileLabel: "Třída", icon: Users, iconClass: "text-[#d46792]" },
+  { to: "/asistenti" as const, label: "Asistenti", mobileLabel: "Asistenti", icon: UsersRound, iconClass: "text-[#715ac3]" },
+  { to: "/asistentka" as const, label: "Asistentka", mobileLabel: "AI", icon: Sparkles, iconClass: "text-[#7c55c7]" },
+  { to: "/vytvarna-vychova" as const, label: "Kreativní studio", mobileLabel: "Studio", icon: Palette, iconClass: "text-[#d44f9a]" },
+];'''
+          replace("src/routes/index.tsx", old_nav, new_nav)
+          replace(
+              "src/routes/index.tsx",
+              '{nav.map(({ to, label, icon: Icon }) => (',
+              '{nav.map(({ to, label, icon: Icon, iconClass }) => (',
+          )
+          replace(
+              "src/routes/index.tsx",
+              '<Icon className="h-[18px] w-[18px]" />\n                {label}',
+              '<Icon className={`h-[18px] w-[18px] ${iconClass}`} />\n                {label}',
+          )
+          replace(
+              "src/routes/index.tsx",
+              '<div className="mx-auto grid max-w-xl grid-cols-5">\n          {nav.map(({ to, label, icon: Icon }) => (',
+              '<div className="mx-auto grid max-w-2xl grid-cols-7">\n          {nav.map(({ to, label, mobileLabel, icon: Icon, iconClass }) => (',
+          )
+          replace(
+              "src/routes/index.tsx",
+              '<Icon className="h-5 w-5" />\n              <span>{label}</span>',
+              '<Icon className={`h-5 w-5 ${iconClass}`} />\n              <span className="max-w-full truncate">{mobileLabel}</span>',
+          )
+
+          # Focused policy tests.
+          test = Path("tests/companion-policy.test.ts")
+          text = test.read_text()
+          text = text.replace(
+              'import { parseCompanionPayload } from "../src/lib/ai/companion-policy";',
+              'import { classifySpecializedCreationRequest, navigationPath, parseCompanionPayload } from "../src/lib/ai/companion-policy";',
+          )
+          text += '''\n\ndescribe("specialized creation routing", () => {\n  test("routes Czech art creation requests to Creative Studio before AI", () => {\n    const result = classifySpecializedCreationRequest(\n      "Na páteční výtvarnou výchovu mi vymysli téma, konec prázdnin, omalovánky",\n    );\n    expect(result?.mode).toBe("navigate");\n    expect(result?.navigation?.target).toBe("art_studio");\n    expect(navigationPath("art_studio")).toBe("/vytvarna-vychova");\n  });\n\n  test("routes worksheet creation to Material Studio", () => {\n    const result = classifySpecializedCreationRequest("Vytvoř mi pracovní list na vyjmenovaná slova");\n    expect(result?.mode).toBe("navigate");\n    expect(result?.navigation?.target).toBe("materials");\n  });\n\n  test("does not hijack material lookup questions", () => {\n    expect(classifySpecializedCreationRequest("Mám už pracovní list na pátek?")).toBeNull();\n  });\n});\n'''
+          test.write_text(text)
+
+          # BUG 2: canonical preferred_salutation remains teacher_assistant_settings;
+          # teacher_personal_memory gets a system-managed projection kept in sync by DB triggers.
+          migration = Path("supabase/migrations/20260830231500_sync_preferred_salutation_memory.sql")
+          migration.write_text(r'''alter table public.teacher_personal_memory
+            add column if not exists source_key text;
+
+          create unique index if not exists teacher_personal_memory_user_source_key_uidx
+            on public.teacher_personal_memory(user_id, source_key)
+            where source_key is not null;
+
+          create or replace function public.sync_preferred_salutation_memory()
+          returns trigger
+          language plpgsql
+          security definer
+          set search_path = public
+          as $$
+          begin
+            if new.preferred_salutation is null or btrim(new.preferred_salutation) = '' then
+              delete from public.teacher_personal_memory
+              where user_id = new.user_id and source_key = 'preferred_salutation';
+            else
+              insert into public.teacher_personal_memory (
+                user_id, kind, content, is_active, explicitly_confirmed, source_key, updated_at
+              ) values (
+                new.user_id,
+                'communication_preference',
+                'Preferované oslovení uživatelky je „' || btrim(new.preferred_salutation) || '“.',
+                true,
+                true,
+                'preferred_salutation',
+                now()
+              )
+              on conflict (user_id, source_key) where source_key is not null
+              do update set
+                kind = excluded.kind,
+                content = excluded.content,
+                is_active = true,
+                explicitly_confirmed = true,
+                updated_at = now();
+            end if;
+            return new;
+          end;
+          $$;
+
+          drop trigger if exists sync_preferred_salutation_memory_trg
+            on public.teacher_assistant_settings;
+          create trigger sync_preferred_salutation_memory_trg
+            after insert or update of preferred_salutation
+            on public.teacher_assistant_settings
+            for each row execute function public.sync_preferred_salutation_memory();
+
+          create or replace function public.clear_preferred_salutation_from_memory_delete()
+          returns trigger
+          language plpgsql
+          security definer
+          set search_path = public
+          as $$
+          begin
+            if old.source_key = 'preferred_salutation' then
+              update public.teacher_assistant_settings
+              set preferred_salutation = null
+              where user_id = old.user_id and preferred_salutation is not null;
+            end if;
+            return old;
+          end;
+          $$;
+
+          drop trigger if exists clear_preferred_salutation_from_memory_delete_trg
+            on public.teacher_personal_memory;
+          create trigger clear_preferred_salutation_from_memory_delete_trg
+            after delete on public.teacher_personal_memory
+            for each row execute function public.clear_preferred_salutation_from_memory_delete();
+
+          -- Backfill existing accounts immediately through the same canonical sync path.
+          update public.teacher_assistant_settings
+          set preferred_salutation = preferred_salutation
+          where preferred_salutation is not null and btrim(preferred_salutation) <> '';
+          ''')
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Focused tests
+        run: bun test tests/companion-policy.test.ts tests/personal-companion-context.test.ts
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build
+        run: bun run build
+
+      - name: Commit verified fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix four live companion memory and navigation bugs"
+          git push origin HEAD:fix/four-live-bugs
