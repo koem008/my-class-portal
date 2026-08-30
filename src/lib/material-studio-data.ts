@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { MaterialKind } from "@/lib/lesson-workspace-data";
 
-const db = supabase as unknown as SupabaseClient<any>;
+const db = supabase as unknown as SupabaseClient;
 
 export type MaterialStudioDifficulty = "easy" | "standard" | "advanced" | "individual" | null;
 
