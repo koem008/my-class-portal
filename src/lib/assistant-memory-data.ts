@@ -18,6 +18,7 @@ export type AssistantSettings = {
   morning_briefing_enabled: boolean;
   afternoon_reflection_enabled: boolean;
   custom_style: string | null;
+  preferred_salutation: string | null;
 };
 export type TeacherMemory = {
   id: string;
@@ -28,6 +29,9 @@ export type TeacherMemory = {
   date_day: number | null;
   date_month: number | null;
   date_year: number | null;
+  recurring_weekday: number | null;
+  recurring_starts_at: string | null;
+  recurring_ends_at: string | null;
 };
 
 export type ImportantDateInput = {
@@ -46,7 +50,7 @@ export async function loadAssistantMemory() {
   const settingsResult = await db
     .from("teacher_assistant_settings")
     .select(
-      "user_id,assistant_name,tone,memory_enabled,morning_briefing_enabled,afternoon_reflection_enabled,custom_style",
+      "user_id,assistant_name,tone,memory_enabled,morning_briefing_enabled,afternoon_reflection_enabled,custom_style,preferred_salutation",
     )
     .eq("user_id", uid)
     .maybeSingle();
@@ -57,7 +61,7 @@ export async function loadAssistantMemory() {
       .from("teacher_assistant_settings")
       .insert({ user_id: uid })
       .select(
-        "user_id,assistant_name,tone,memory_enabled,morning_briefing_enabled,afternoon_reflection_enabled,custom_style",
+        "user_id,assistant_name,tone,memory_enabled,morning_briefing_enabled,afternoon_reflection_enabled,custom_style,preferred_salutation",
       )
       .single();
     if (insert.error) throw insert.error;
@@ -65,7 +69,9 @@ export async function loadAssistantMemory() {
   }
   const memoriesResult = await db
     .from("teacher_personal_memory")
-    .select("id,kind,content,is_active,created_at,date_day,date_month,date_year")
+    .select(
+      "id,kind,content,is_active,created_at,date_day,date_month,date_year,recurring_weekday,recurring_starts_at,recurring_ends_at",
+    )
     .eq("user_id", uid)
     .eq("is_active", true)
     .order("created_at", { ascending: false });
@@ -83,12 +89,30 @@ export async function saveAssistantSettings(values: Omit<AssistantSettings, "use
   if (error) throw error;
 }
 
+export type RecurringCommitmentInput = {
+  weekday: number;
+  startsAt: string;
+  endsAt?: string | null;
+};
+
 export async function addTeacherMemory(
   kind: Exclude<TeacherMemoryKind, "important_date">,
   content: string,
+  recurring?: RecurringCommitmentInput,
 ) {
   const text = content.trim();
   if (!text) throw new Error("Napište, co si má asistentka pamatovat.");
+  if (kind === "recurring_commitment") {
+    if (!recurring) throw new Error("U pravidelného závazku vyberte den a čas.");
+    if (!Number.isInteger(recurring.weekday) || recurring.weekday < 1 || recurring.weekday > 7)
+      throw new Error("Vyberte platný den týdne.");
+    if (!/^\d{2}:\d{2}$/.test(recurring.startsAt)) throw new Error("Vyberte platný čas začátku.");
+    if (
+      recurring.endsAt &&
+      (!/^\d{2}:\d{2}$/.test(recurring.endsAt) || recurring.endsAt <= recurring.startsAt)
+    )
+      throw new Error("Konec závazku musí být později než začátek.");
+  }
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   if (!authData.user) throw new Error("Je potřeba být přihlášená.");
@@ -98,6 +122,9 @@ export async function addTeacherMemory(
     content: text,
     is_active: true,
     explicitly_confirmed: true,
+    recurring_weekday: kind === "recurring_commitment" ? recurring!.weekday : null,
+    recurring_starts_at: kind === "recurring_commitment" ? recurring!.startsAt : null,
+    recurring_ends_at: kind === "recurring_commitment" ? recurring?.endsAt || null : null,
   });
   if (error) throw error;
 }
@@ -154,7 +181,8 @@ export function importantDatesForToday(memories: TeacherMemory[], now: Date): Te
       memory.kind === "important_date" &&
       memory.is_active &&
       memory.date_day === day &&
-      memory.date_month === month,
+      memory.date_month === month &&
+      (memory.date_year == null || memory.date_year === now.getFullYear()),
   );
 }
 

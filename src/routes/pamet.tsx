@@ -64,6 +64,9 @@ function MemoryPage() {
   const [error, setError] = useState("");
   const [kind, setKind] = useState<RegularMemoryKind>("communication_preference");
   const [content, setContent] = useState("");
+  const [recurringWeekday, setRecurringWeekday] = useState(1);
+  const [recurringStartsAt, setRecurringStartsAt] = useState("16:00");
+  const [recurringEndsAt, setRecurringEndsAt] = useState("");
   const [dateLabel, setDateLabel] = useState("");
   const [dateDay, setDateDay] = useState<number | "">("");
   const [dateMonth, setDateMonth] = useState<number | "">("");
@@ -122,7 +125,17 @@ function MemoryPage() {
     setSaving(true);
     setError("");
     try {
-      await addTeacherMemory(kind, content);
+      await addTeacherMemory(
+        kind,
+        content,
+        kind === "recurring_commitment"
+          ? {
+              weekday: recurringWeekday,
+              startsAt: recurringStartsAt,
+              endsAt: recurringEndsAt || null,
+            }
+          : undefined,
+      );
       setContent("");
       await reload();
     } catch (e) {
@@ -228,6 +241,20 @@ function MemoryPage() {
             </p>
             <div className="mt-5 space-y-4">
               <label className="block text-xs font-bold">
+                Jak tě mám oslovovat
+                <input
+                  value={settings.preferred_salutation ?? ""}
+                  onChange={(e) =>
+                    setSettings({ ...settings, preferred_salutation: e.target.value || null })
+                  }
+                  placeholder="Např. Káťo"
+                  className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] px-3 py-2.5 text-sm font-normal"
+                />
+                <span className="mt-1 block text-[10px] font-normal text-[#8c9795]">
+                  Použije se jen při zapnuté osobní paměti.
+                </span>
+              </label>
+              <label className="block text-xs font-bold">
                 Jméno asistentky
                 <input
                   value={settings.assistant_name}
@@ -301,6 +328,44 @@ function MemoryPage() {
                   </option>
                 ))}
               </select>
+              {kind === "recurring_commitment" && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <label className="text-xs font-bold">
+                    Den
+                    <select
+                      value={recurringWeekday}
+                      onChange={(e) => setRecurringWeekday(Number(e.target.value))}
+                      className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
+                    >
+                      {["Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek", "Sobota", "Neděle"].map(
+                        (day, index) => (
+                          <option key={day} value={index + 1}>
+                            {day}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold">
+                    Od
+                    <input
+                      type="time"
+                      value={recurringStartsAt}
+                      onChange={(e) => setRecurringStartsAt(e.target.value)}
+                      className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
+                    />
+                  </label>
+                  <label className="text-xs font-bold">
+                    Do <span className="font-normal text-[#929c9a]">(volitelně)</span>
+                    <input
+                      type="time"
+                      value={recurringEndsAt}
+                      onChange={(e) => setRecurringEndsAt(e.target.value)}
+                      className="mt-1.5 w-full rounded-2xl border border-[#e2ded6] bg-white px-3 py-2.5 text-sm font-normal"
+                    />
+                  </label>
+                </div>
+              )}
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
@@ -327,6 +392,13 @@ function MemoryPage() {
                       {kindLabels[m.kind as RegularMemoryKind]}
                     </div>
                     <p className="mt-1 text-sm leading-6 text-[#5f706f]">{m.content}</p>
+                    {m.kind === "recurring_commitment" &&
+                      m.recurring_weekday &&
+                      m.recurring_starts_at && (
+                        <div className="mt-1 text-[11px] font-semibold text-[#6b7f7b]">
+                          {formatRecurringCommitment(m)}
+                        </div>
+                      )}
                   </div>
                   <button
                     disabled={saving}
@@ -475,6 +547,14 @@ function MemoryPage() {
       </div>
     </main>
   );
+}
+
+function formatRecurringCommitment(memory: TeacherMemory) {
+  const days = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+  const day = memory.recurring_weekday ? days[memory.recurring_weekday - 1] : "—";
+  const start = memory.recurring_starts_at?.slice(0, 5) ?? "—";
+  const end = memory.recurring_ends_at?.slice(0, 5);
+  return `${day} · ${start}${end ? `–${end}` : ""}`;
 }
 
 function formatImportantDate(memory: TeacherMemory) {

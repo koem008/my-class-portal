@@ -26,7 +26,16 @@ import {
 } from "@/lib/ai/functions";
 import type { CompanionPedagogicalProposal } from "@/lib/ai/contracts";
 import { loadCompanionCoordinatorSummary } from "@/lib/assistant-coordinator-companion";
-import { loadAssistantMemory } from "@/lib/assistant-memory-data";
+import {
+  loadAssistantMemory,
+  type AssistantSettings,
+  type TeacherMemory,
+} from "@/lib/assistant-memory-data";
+import {
+  buildPersonalDailyContext,
+  personalContextLines,
+  type PersonalDailyContext,
+} from "@/lib/personal-companion-context";
 import { loadGlobalCompanionContext } from "@/lib/global-assistant-context";
 import {
   buildMorningMessage,
@@ -55,6 +64,8 @@ function AssistantPage() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [specialAttention, setSpecialAttention] = useState<SpecialAttentionItem[]>([]);
+  const [assistantSettings, setAssistantSettings] = useState<AssistantSettings | null>(null);
+  const [personalMemories, setPersonalMemories] = useState<TeacherMemory[]>([]);
   const [error, setError] = useState("");
   const now = useMemo(() => new Date(), []);
   const todayIso = useMemo(
@@ -75,21 +86,28 @@ function AssistantPage() {
     setError("");
     try {
       const specialPromise = loadSpecialAttention().catch(() => [] as SpecialAttentionItem[]);
+      const memoryPromise = loadAssistantMemory().catch(() => null);
       const classes = await loadAccessibleClasses();
       if (!classes.length) {
-        setSpecialAttention(await specialPromise);
+        const [special, memory] = await Promise.all([specialPromise, memoryPromise]);
+        setSpecialAttention(special);
+        setAssistantSettings(memory?.settings ?? null);
+        setPersonalMemories(memory?.memories ?? []);
         setLoadState("empty");
         setBriefing(null);
         return;
       }
       const selectedClass = classes[0];
       await loadWeekLessons(selectedClass.id, mondayOf(now));
-      const [data, special] = await Promise.all([
+      const [data, special, memory] = await Promise.all([
         loadDailyBriefing(selectedClass, todayIso),
         specialPromise,
+        memoryPromise,
       ]);
       setBriefing(data);
       setSpecialAttention(special);
+      setAssistantSettings(memory?.settings ?? null);
+      setPersonalMemories(memory?.memories ?? []);
       setLoadState("ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ranní přehled se nepodařilo načíst.");
@@ -100,7 +118,15 @@ function AssistantPage() {
     void reload();
   }, []);
 
-  const message = briefing ? buildMorningMessage(briefing) : "Dobré ráno.";
+  const personalContext = useMemo(
+    () => buildPersonalDailyContext(assistantSettings, personalMemories, todayIso),
+    [assistantSettings, personalMemories, todayIso],
+  );
+  const message = briefing
+    ? buildPersonalizedMorningMessage(briefing, personalContext)
+    : personalContext.enabled && personalContext.salutation
+      ? `Dobré ráno, ${personalContext.salutation}.`
+      : "Dobré ráno.";
 
   async function startGeneralVoice() {
     if (listening) {
@@ -144,15 +170,7 @@ function AssistantPage() {
       const transcribed = await transcribeVoice({ data: form });
       setVoiceTranscript(transcribed.text);
       setVoiceNotice("Přemýšlím nad požadavkem…");
-      let settings: any = null;
-      let memories: any[] = [];
-      try {
-        const loaded = await loadAssistantMemory();
-        settings = loaded.settings;
-        memories = loaded.memories;
-      } catch {
-        /* companion works without personal memory */
-      }
+      const settings = assistantSettings;
       const todaySummary = briefing
         ? [
             `${briefing.classInfo.name}: ${briefing.lessons.length} hodin, ${briefing.readyCount} připravených.`,
@@ -194,7 +212,7 @@ function AssistantPage() {
           continuitySummary,
           sameDayContext: readSameDayCompanionMemory(todayIso),
           personalPreferences: settings?.memory_enabled
-            ? memories.map((m) => m.content)
+            ? personalContextLines(personalContext)
             : undefined,
           coordinatorSummary,
           globalContext,
@@ -685,6 +703,46 @@ function AssistantPage() {
       </div>
     </main>
   );
+}
+
+function buildPersonalizedMorningMessage(briefing: DailyBriefing, personal: PersonalDailyContext) {
+  if (!personal.enabled) return buildMorningMessage(briefing);
+
+  const parts = [personal.salutation ? `Dobré ráno, ${personal.salutation}.` : "Dobré ráno."];
+  if (briefing.blocked) parts.push("Dnešní běžnou výuku ovlivňuje blokující událost v kalendáři.");
+  else if (briefing.lessons.length)
+    parts.push(
+      `Ve škole tě dnes čeká ${briefing.lessons.length} ${briefing.lessons.length === 1 ? "hodina" : briefing.lessons.length < 5 ? "hodiny" : "hodin"}.`,
+    );
+  else parts.push("Dnes nemáš naplánovanou běžnou výuku.");
+
+  const timedEvent = briefing.events.find((event) => !event.all_day && event.starts_at);
+  if (timedEvent?.starts_at) {
+    const time = new Intl.DateTimeFormat("cs-CZ", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Prague",
+    }).format(new Date(timedEvent.starts_at));
+    parts.push(`V ${time} máš ${timedEvent.title}.`);
+  }
+
+  for (const commitment of personal.commitments.slice(0, 2))
+    parts.push(`V ${commitment.startsAt} máš ${commitment.label}.`);
+  if (personal.importantDates[0]) parts.push(`Dnes si připomínáš: ${personal.importantDates[0]}.`);
+
+  const missingWorksheet = briefing.lessons.find(
+    (lesson) => lesson.prepared && !lesson.hasWorksheet,
+  );
+  if (missingWorksheet)
+    parts.push(
+      `K ${missingWorksheet.subject_name} ještě chybí pracovní list. Chceš, ať ho připravím?`,
+    );
+  else if (briefing.missingPreparationCount > 0)
+    parts.push(
+      `${briefing.missingPreparationCount} ${briefing.missingPreparationCount === 1 ? "hodina ještě nemá" : "hodiny ještě nemají"} přípravu.`,
+    );
+
+  return parts.join(" ");
 }
 
 const SAME_DAY_MEMORY_KEY = "my-class-portal:companion-same-day";

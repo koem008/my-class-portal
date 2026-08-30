@@ -15,7 +15,11 @@ export type DailyEvent = {
   blocks_lessons: boolean;
   source: "calendar" | "system";
 };
-export type DailyLesson = LessonInstance & { prepared: boolean; materialCount: number };
+export type DailyLesson = LessonInstance & {
+  prepared: boolean;
+  materialCount: number;
+  hasWorksheet: boolean;
+};
 export type DailyCarryOver = {
   lessonId: string;
   subject: string;
@@ -92,7 +96,7 @@ export async function loadDailyBriefing(
       ? db.from("lesson_preparations").select("lesson_id").in("lesson_id", lessonIds)
       : Promise.resolve({ data: [], error: null }),
     lessonIds.length
-      ? db.from("lesson_materials").select("lesson_id").in("lesson_id", lessonIds)
+      ? db.from("lesson_materials").select("lesson_id,kind").in("lesson_id", lessonIds)
       : Promise.resolve({ data: [], error: null }),
     db
       .from("calendar_events")
@@ -130,15 +134,19 @@ export async function loadDailyBriefing(
 
   const preparedIds = new Set((prepResult.data ?? []).map((x: any) => x.lesson_id as string));
   const materialCounts = new Map<string, number>();
-  for (const row of materialsResult.data ?? [])
+  const worksheetIds = new Set<string>();
+  for (const row of materialsResult.data ?? []) {
     materialCounts.set(
       (row as any).lesson_id,
       (materialCounts.get((row as any).lesson_id) ?? 0) + 1,
     );
+    if ((row as any).kind === "worksheet") worksheetIds.add((row as any).lesson_id);
+  }
   const dailyLessons: DailyLesson[] = lessons.map((lesson) => ({
     ...lesson,
     prepared: preparedIds.has(lesson.id),
     materialCount: materialCounts.get(lesson.id) ?? 0,
+    hasWorksheet: worksheetIds.has(lesson.id),
   }));
 
   const recentIds = (recentLessonsResult.data ?? []).map((x: any) => x.id as string);
