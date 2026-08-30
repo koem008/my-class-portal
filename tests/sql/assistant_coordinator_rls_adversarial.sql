@@ -52,7 +52,20 @@ insert into public.teaching_assistants(id,school_id,display_name,created_by) val
 insert into public.teaching_assistant_assignments(
   id,school_id,assistant_id,class_id,student_alias_id,created_by
 ) values
-  ('aaaaaaaa-0000-0000-0000-000000000040','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','aaaaaaaa-0000-0000-0000-000000000030','aaaaaaaa-0000-0000-0000-000000000010','aaaaaaaa-0000-0000-0000-000000000020','11111111-1111-1111-1111-111111111111');
+  ('aaaaaaaa-0000-0000-0000-000000000040','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','aaaaaaaa-0000-0000-0000-000000000030','aaaaaaaa-0000-0000-0000-000000000010','aaaaaaaa-0000-0000-0000-000000000020','11111111-1111-1111-1111-111111111111'),
+  ('bbbbbbbb-0000-0000-0000-000000000040','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','bbbbbbbb-0000-0000-0000-000000000030','bbbbbbbb-0000-0000-0000-000000000010','bbbbbbbb-0000-0000-0000-000000000020','44444444-4444-4444-4444-444444444444');
+
+insert into public.assistant_work_slots(
+  id,school_id,assignment_id,weekday,starts_at,ends_at,location_note,created_by
+) values
+  ('aaaaaaaa-0000-0000-0000-000000000080','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','aaaaaaaa-0000-0000-0000-000000000040',1,'08:00','08:45','Učebna A','11111111-1111-1111-1111-111111111111'),
+  ('bbbbbbbb-0000-0000-0000-000000000080','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','bbbbbbbb-0000-0000-0000-000000000040',1,'09:00','09:45','Učebna B','44444444-4444-4444-4444-444444444444');
+
+insert into public.assistant_presence_exceptions(
+  id,school_id,assistant_id,exception_date,kind,note,created_by
+) values
+  ('aaaaaaaa-0000-0000-0000-000000000090','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','aaaaaaaa-0000-0000-0000-000000000030','2026-09-07','absent','Organizačně nepřítomen','11111111-1111-1111-1111-111111111111'),
+  ('bbbbbbbb-0000-0000-0000-000000000090','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','bbbbbbbb-0000-0000-0000-000000000030','2026-09-07','changed','Jiný blok','44444444-4444-4444-4444-444444444444');
 
 -- Seed sensitive content to prove the coordinator cannot see it through the alias reference.
 insert into public.special_education_cases(
@@ -106,6 +119,16 @@ select pg_temp.assert_count(
   0,
   'ordinary teacher must not see assistant assignments'
 );
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_work_slots),
+  0,
+  'ordinary teacher must not see assistant work slots'
+);
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_presence_exceptions),
+  0,
+  'ordinary teacher must not see assistant presence exceptions'
+);
 
 -- 2) Coordinator A sees own tenant only, never School B.
 select set_config('request.jwt.claim.sub','22222222-2222-2222-2222-222222222222',true);
@@ -125,6 +148,62 @@ select pg_temp.assert_count(
   1,
   'coordinator A should see own assignment'
 );
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_work_slots where school_id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  1,
+  'coordinator A should see own work slot'
+);
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_work_slots where school_id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+  0,
+  'coordinator A must not see School B work slot'
+);
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_presence_exceptions where school_id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  1,
+  'coordinator A should see own presence exception'
+);
+select pg_temp.assert_count(
+  (select count(*) from public.assistant_presence_exceptions where school_id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+  0,
+  'coordinator A must not see School B presence exception'
+);
+
+-- Cross-tenant writes must fail closed at RLS, not merely disappear from reads.
+do $$
+begin
+  begin
+    insert into public.assistant_work_slots(
+      school_id,assignment_id,weekday,starts_at,ends_at,created_by
+    ) values (
+      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      'bbbbbbbb-0000-0000-0000-000000000040',
+      2,'10:00','10:45','22222222-2222-2222-2222-222222222222'
+    );
+    raise exception 'ASSERTION FAILED: coordinator A inserted School B work slot';
+  exception
+    when others then
+      if sqlerrm like 'ASSERTION FAILED:%' then raise; end if;
+  end;
+end $$;
+
+do $$
+begin
+  begin
+    insert into public.assistant_presence_exceptions(
+      school_id,assistant_id,exception_date,kind,note,created_by
+    ) values (
+      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      'bbbbbbbb-0000-0000-0000-000000000030',
+      '2026-09-08','changed','Unauthorized fixture',
+      '22222222-2222-2222-2222-222222222222'
+    );
+    raise exception 'ASSERTION FAILED: coordinator A inserted School B presence exception';
+  exception
+    when others then
+      if sqlerrm like 'ASSERTION FAILED:%' then raise; end if;
+  end;
+end $$;
 
 -- 3) Alias access is intentionally narrow: no direct student_aliases visibility,
 --    but the fixed RPC exposes exactly the allowed alias-safe option for own school/class.
