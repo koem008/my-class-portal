@@ -1,0 +1,103 @@
+name: Finish Material Studio
+
+on:
+  push:
+    paths:
+      - .github/workflows/finish-material-studio.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Integrate Material Studio
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/lib/lesson-workspace-data.ts')
+          text = path.read_text()
+          old = '  | "homework"\n  | "other";'
+          new = '  | "homework"\n  | "flashcards"\n  | "game"\n  | "project"\n  | "other";'
+          if old not in text and '  | "flashcards"' not in text:
+              raise SystemExit('MaterialKind marker missing')
+          path.write_text(text.replace(old, new))
+
+          path = Path('src/routes/hodina.$lessonId.tsx')
+          text = path.read_text()
+          old = '  homework: "Domácí úkol",\n  other: "Jiný materiál",'
+          new = '  homework: "Domácí úkol",\n  flashcards: "Kartičky",\n  game: "Hra",\n  project: "Projekt",\n  other: "Jiný materiál",'
+          if old not in text and 'flashcards: "Kartičky"' not in text:
+              raise SystemExit('Lesson material labels marker missing')
+          path.write_text(text.replace(old, new))
+
+          path = Path('src/lib/ai/contracts.ts')
+          text = path.read_text()
+          old = '  | "calendar"\n  | "classroom"\n  | "memory"'
+          new = '  | "calendar"\n  | "classroom"\n  | "materials"\n  | "memory"'
+          if old not in text and '  | "materials"' not in text:
+              raise SystemExit('Companion target marker missing')
+          path.write_text(text.replace(old, new))
+
+          path = Path('src/lib/ai/companion-policy.ts')
+          text = path.read_text()
+          marker = '''  {
+    target: "classroom",
+    label: "Třída",
+    path: "/trida",
+    keywords: ["třída", "pseudonymy", "žáci"],
+  },
+'''
+          addition = marker + '''  {
+    target: "materials",
+    label: "Materiálové studio",
+    path: "/materialy",
+    keywords: ["materiály", "pracovní listy", "testy", "kvízy", "kartičky", "projekty"],
+  },
+'''
+          if marker not in text and 'target: "materials"' not in text:
+              raise SystemExit('Navigation item marker missing')
+          if 'target: "materials"' not in text:
+              text = text.replace(marker, addition)
+          path.write_text(text)
+
+      - name: Format
+        run: bunx prettier --write src/lib/lesson-workspace-data.ts 'src/routes/hodina.$lessonId.tsx' src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/companion-policy.test.ts src/lib/material-studio-data.ts src/routes/materialy.tsx src/components/QuickNavigation.tsx src/routes/__root.tsx
+
+      - name: Companion policy tests
+        run: bun test src/lib/ai/companion-policy.test.ts
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build and regenerate routes
+        run: bun run build
+
+      - name: Commit integration
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/lesson-workspace-data.ts 'src/routes/hodina.$lessonId.tsx' src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/companion-policy.test.ts src/lib/material-studio-data.ts src/routes/materialy.tsx src/components/QuickNavigation.tsx src/routes/__root.tsx src/routeTree.gen.ts
+          git commit -m "feat: complete material studio library"
+          git push origin HEAD:main
