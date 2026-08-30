@@ -40,8 +40,8 @@ export const COMPANION_NAVIGATION_ITEMS = [
   {
     target: "art_studio",
     label: "Kreativní studio",
-    path: "/kreativni-studio",
-    keywords: ["kreativní studio", "výtvarná", "film", "materiály", "obrázky", "tvorba"],
+    path: "/vytvarna-vychova",
+    keywords: ["kreativní studio", "výtvarná", "film", "obrázky", "omalovánky", "tvorba"],
   },
   {
     target: "special_education",
@@ -68,6 +68,99 @@ export const COMPANION_NAVIGATION_TARGETS: readonly CompanionNavigationTarget[] 
 ];
 
 const navigationTargets = new Set<CompanionNavigationTarget>(COMPANION_NAVIGATION_TARGETS);
+
+function normalizeIntentText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const CREATION_VERBS = [
+  "vymysli",
+  "vytvor",
+  "vytvorit",
+  "udelej",
+  "udelat",
+  "priprav",
+  "pripravit",
+  "navrhni",
+  "navrhnout",
+  "vygeneruj",
+  "vygenerovat",
+  "sepis",
+  "napiš",
+  "napis",
+];
+
+const ART_CREATION_TERMS = [
+  "vytvarna",
+  "vytvarnou",
+  "vytvarne",
+  "omalovank",
+  "obrazek",
+  "obrazky",
+  "kresleni",
+  "malovani",
+  "kolaz",
+  "tvoreni",
+  "kreativni",
+  "film",
+];
+
+const MATERIAL_CREATION_TERMS = [
+  "pracovni list",
+  "pracovniho listu",
+  "test",
+  "kviz",
+  "karticky",
+  "prezentaci",
+  "prezentace",
+  "material",
+  "materialy",
+  "domaci ukol",
+  "aktivitu",
+  "aktivita",
+];
+
+function containsAny(text: string, terms: readonly string[]) {
+  return terms.some((term) => text.includes(term));
+}
+
+/**
+ * Deterministic scope gate for requests that belong to specialized creation screens.
+ * It intentionally runs before the model call so an art/material generation request can
+ * never fail with malformed companion JSON or drift into a generic capability answer.
+ */
+export function classifySpecializedCreationRequest(
+  message: string,
+): Omit<CompanionResult, "usage"> | null {
+  const text = normalizeIntentText(message);
+  const asksToCreate = containsAny(text, CREATION_VERBS);
+  if (!asksToCreate) return null;
+
+  if (containsAny(text, ART_CREATION_TERMS)) {
+    return {
+      mode: "navigate",
+      reply: "Tohle patří do Kreativního studia. Pojď tam, tam to společně vytvoříme.",
+      navigation: { target: "art_studio" },
+      requiresConfirmation: false,
+    };
+  }
+
+  if (containsAny(text, MATERIAL_CREATION_TERMS)) {
+    return {
+      mode: "navigate",
+      reply: "Tohle vytvoříme v Materiálovém studiu. Pojď tam a připravíme to u správné hodiny.",
+      navigation: { target: "materials" },
+      requiresConfirmation: false,
+    };
+  }
+
+  return null;
+}
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
