@@ -1,0 +1,95 @@
+name: Verify Coordinator Now Priority
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-coordinator-now-priority.yml'
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Merge due follow-ups into deterministic now card
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path('src/lib/assistant-coordinator-data.ts')
+          s=p.read_text()
+          type_marker='export type CoordinatorNowCard = {\n'
+          priority_type='''export type CoordinatorPriorityItem = {\n  status: "open" | "done";\n  title: string;\n  due_on: string | null;\n  kind: "note" | "task" | "follow_up";\n  assistantName?: string | null;\n  className?: string | null;\n};\n\n'''
+          if 'export type CoordinatorPriorityItem' not in s:
+              if type_marker not in s: raise SystemExit('priority type marker missing')
+              s=s.replace(type_marker,priority_type+type_marker,1)
+          sig='''export function buildCoordinatorNowCard(\n  now: Date,\n  workSlots: AssistantWorkSlot[],\n  exceptions: AssistantPresenceException[],\n): CoordinatorNowCard {'''
+          sig2='''export function buildCoordinatorNowCard(\n  now: Date,\n  workSlots: AssistantWorkSlot[],\n  exceptions: AssistantPresenceException[],\n  items: CoordinatorPriorityItem[] = [],\n): CoordinatorNowCard {'''
+          if sig in s:
+              s=s.replace(sig,sig2,1)
+          elif 'items: CoordinatorPriorityItem[] = []' not in s:
+              raise SystemExit('now card signature missing')
+          marker='''  const changed = todayExceptions.find((row) => row.kind === "changed");\n'''
+          priority='''  const openDueItems = items\n    .filter((item) => item.status === "open" && item.due_on)\n    .sort((a, b) => (a.due_on ?? "").localeCompare(b.due_on ?? ""));\n  const overdue = openDueItems.find((item) => (item.due_on ?? "") < today);\n  if (overdue) {\n    const context = [overdue.assistantName, overdue.className].filter(Boolean).join(" · ");\n    return {\n      tone: "attention",\n      eyebrow: "Co dnes řeším?",\n      title: `Po termínu: ${overdue.title}`,\n      detail: context ? `${context} · Otevři rozdělané a navazuj.` : "Otevři rozdělané a navazuj.",\n    };\n  }\n\n  const dueToday = openDueItems.find((item) => item.due_on === today);\n  if (dueToday) {\n    const context = [dueToday.assistantName, dueToday.className].filter(Boolean).join(" · ");\n    return {\n      tone: "next",\n      eyebrow: "Co dnes řeším?",\n      title: `Dnes: ${dueToday.title}`,\n      detail: context || "Je to dnešní otevřený follow-up.",\n    };\n  }\n\n'''
+          if 'const openDueItems = items' not in s:
+              if marker not in s: raise SystemExit('changed marker missing')
+              s=s.replace(marker,priority+marker,1)
+          p.write_text(s)
+
+          p=Path('src/components/assistant-coordinator/CoordinatorItemsCard.tsx')
+          s=p.read_text()
+          props='''  classes,\n}: {\n  schoolId: string;\n  assistants: TeachingAssistant[];\n  classes: CoordinatorClass[];\n}) {'''
+          props2='''  classes,\n  onOpenItemsChange,\n}: {\n  schoolId: string;\n  assistants: TeachingAssistant[];\n  classes: CoordinatorClass[];\n  onOpenItemsChange?: (items: AssistantCoordinationItem[]) => void;\n}) {'''
+          if props in s:
+              s=s.replace(props,props2,1)
+          elif 'onOpenItemsChange?:' not in s:
+              raise SystemExit('component props marker missing')
+          load='''      setItems(await loadAssistantCoordinationItems(schoolId, assistants, classes));'''
+          load2='''      const rows = await loadAssistantCoordinationItems(schoolId, assistants, classes);\n      setItems(rows);\n      onOpenItemsChange?.(rows.filter((item) => item.status === "open"));'''
+          if load in s:
+              s=s.replace(load,load2,1)
+          elif 'onOpenItemsChange?.(' not in s:
+              raise SystemExit('component load marker missing')
+          dep='''  }, [schoolId, assistants, classes]);'''
+          dep2='''  }, [schoolId, assistants, classes, onOpenItemsChange]);'''
+          if dep in s:
+              s=s.replace(dep,dep2,1)
+          p.write_text(s)
+
+          p=Path('src/routes/asistenti.tsx')
+          s=p.read_text()
+          import_marker='''import { CoordinatorItemsCard } from "@/components/assistant-coordinator/CoordinatorItemsCard";\n'''
+          if 'type AssistantCoordinationItem' not in s:
+              s=s.replace(import_marker,import_marker+'import type { AssistantCoordinationItem } from "@/lib/assistant-coordinator-items";\n',1)
+          state_marker='''  const [aliases, setAliases] = useState<CoordinatorAliasOption[]>([]);\n'''
+          if 'coordinationItems' not in s:
+              s=s.replace(state_marker,state_marker+'  const [coordinationItems, setCoordinationItems] = useState<AssistantCoordinationItem[]>([]);\n',1)
+          now='''  const nowCard = useMemo(\n    () => buildCoordinatorNowCard(now, workSlots, exceptions),\n    [workSlots, exceptions],\n  );'''
+          now2='''  const nowCard = useMemo(\n    () => buildCoordinatorNowCard(now, workSlots, exceptions, coordinationItems),\n    [now, workSlots, exceptions, coordinationItems],\n  );'''
+          if now in s:
+              s=s.replace(now,now2,1)
+          elif 'coordinationItems)' not in s:
+              raise SystemExit('route now card marker missing')
+          comp='''        <CoordinatorItemsCard\n          schoolId={context.access.schoolId}\n          assistants={assistants}\n          classes={classes}\n        />'''
+          comp2='''        <CoordinatorItemsCard\n          schoolId={context.access.schoolId}\n          assistants={assistants}\n          classes={classes}\n          onOpenItemsChange={setCoordinationItems}\n        />'''
+          if comp in s:
+              s=s.replace(comp,comp2,1)
+          elif 'onOpenItemsChange={setCoordinationItems}' not in s:
+              raise SystemExit('route component marker missing')
+          p.write_text(s)
+          PY
+      - run: bunx prettier --write src/lib/assistant-coordinator-data.ts src/components/assistant-coordinator/CoordinatorItemsCard.tsx src/routes/asistenti.tsx
+      - run: bun run lint
+      - run: bun run build
+      - name: Commit verified priority integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/assistant-coordinator-data.ts src/components/assistant-coordinator/CoordinatorItemsCard.tsx src/routes/asistenti.tsx src/routeTree.gen.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: include coordinator follow-ups in now card"
+            git push origin main
+          fi
