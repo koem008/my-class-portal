@@ -1,3 +1,4 @@
+# retry after typed bridge fix
 name: Verify Coordinator Calendar Bridge
 on:
   push:
