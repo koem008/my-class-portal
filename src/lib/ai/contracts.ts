@@ -56,9 +56,25 @@ export type LessonAiResult = {
 
 export type CompanionTone = "friendly" | "calm" | "efficient" | "custom";
 export type CompanionNavigationTarget =
-  "home" | "schedule" | "calendar" | "memory" | "art_studio" | "special_education" | "lesson";
+  | "home"
+  | "schedule"
+  | "calendar"
+  | "memory"
+  | "art_studio"
+  | "special_education"
+  | "assistants"
+  | "lesson";
 
 export type CompanionConversationTurn = { role: "user" | "assistant"; text: string };
+
+export type CompanionCoordinatorSummary = {
+  activeAssistantCount: number;
+  todayWorkBlockCount: number;
+  todayAbsenceCount: number;
+  todayChangedCount: number;
+  overdueItemCount: number;
+  dueTodayItemCount: number;
+};
 
 /** Minimal, privacy-safe context for the general teacher companion. */
 export type CompanionRequest = {
@@ -71,6 +87,7 @@ export type CompanionRequest = {
   sameDayContext?: string | undefined;
   personalPreferences?: string[] | undefined;
   recentConversation?: CompanionConversationTurn[] | undefined;
+  coordinatorSummary?: CompanionCoordinatorSummary | undefined;
   availableLessons?: Array<{
     lessonId: string;
     subject: string;

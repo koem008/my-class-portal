@@ -25,6 +25,7 @@ import {
   transcribeVoice,
 } from "@/lib/ai/functions";
 import type { CompanionPedagogicalProposal } from "@/lib/ai/contracts";
+import { loadCompanionCoordinatorSummary } from "@/lib/assistant-coordinator-companion";
 import { loadAssistantMemory } from "@/lib/assistant-memory-data";
 import {
   buildMorningMessage,
@@ -166,6 +167,13 @@ function AssistantPage() {
             )
             .join("\n")
         : undefined;
+      let coordinatorSummary;
+      try {
+        coordinatorSummary = await loadCompanionCoordinatorSummary(now);
+      } catch {
+        // Coordinator context is optional. Never broaden access or synthesize fallback data.
+        coordinatorSummary = undefined;
+      }
       const result = await runCompanionAi({
         data: {
           message: transcribed.text,
@@ -179,6 +187,7 @@ function AssistantPage() {
           personalPreferences: settings?.memory_enabled
             ? memories.map((m) => m.content)
             : undefined,
+          coordinatorSummary,
           availableLessons: briefing?.lessons.map((l) => ({
             lessonId: l.id,
             subject: l.subject_name,
@@ -208,6 +217,7 @@ function AssistantPage() {
         else if (nav.target === "art_studio") await navigate({ to: "/vytvarna-vychova" });
         else if (nav.target === "special_education")
           await navigate({ to: "/specialni-pedagogika" });
+        else if (nav.target === "assistants") await navigate({ to: "/asistenti" });
         else if (nav.target === "lesson" && nav.lessonId)
           await navigate({ to: "/hodina/$lessonId", params: { lessonId: nav.lessonId } });
       }

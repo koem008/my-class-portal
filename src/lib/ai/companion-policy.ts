@@ -12,6 +12,7 @@ const navigationTargets = new Set<CompanionNavigationTarget>([
   "memory",
   "art_studio",
   "special_education",
+  "assistants",
   "lesson",
 ]);
 
@@ -109,6 +110,7 @@ export function navigationPath(target: CompanionNavigationTarget): string {
     memory: "/pamet",
     art_studio: "/vytvarna-vychova",
     special_education: "/specialni-pedagogika",
+    assistants: "/asistenti",
   };
   return target === "lesson" ? "/hodina/$lessonId" : paths[target];
 }

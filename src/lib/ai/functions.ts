@@ -51,6 +51,16 @@ const companionRequestSchema = z.object({
     .array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().max(2000) }))
     .max(8)
     .optional(),
+  coordinatorSummary: z
+    .object({
+      activeAssistantCount: z.number().int().min(0).max(500),
+      todayWorkBlockCount: z.number().int().min(0).max(2000),
+      todayAbsenceCount: z.number().int().min(0).max(500),
+      todayChangedCount: z.number().int().min(0).max(500),
+      overdueItemCount: z.number().int().min(0).max(2000),
+      dueTodayItemCount: z.number().int().min(0).max(2000),
+    })
+    .optional(),
   availableLessons: z
     .array(
       z.object({
