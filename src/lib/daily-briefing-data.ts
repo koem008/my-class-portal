@@ -28,7 +28,13 @@ export type RecommendedAction = {
   priority: "high" | "medium" | "low";
   title: string;
   detail: string;
-  kind: "art_studio" | "lesson" | "carry_over";
+  kind:
+    | "art_studio"
+    | "lesson"
+    | "carry_over"
+    | "tomorrow_prep"
+    | "tomorrow_worksheet"
+    | "tomorrow_blocker";
   to: string;
   lessonId?: string;
 };
@@ -160,6 +166,61 @@ export async function loadDailyBriefing(
     })
     .slice(0, 5);
 
+  const tomorrowStart = `${nextDate}T00:00:00`;
+  const tomorrowEnd = `${addDays(nextDate, 1)}T00:00:00`;
+  const [tomorrowLessonsResult, tomorrowCalendarResult, tomorrowSystemResult] = await Promise.all([
+    db
+      .from("lesson_instances")
+      .select(
+        "id,school_id,class_id,academic_year_id,lesson_date,slot_order,starts_at,ends_at,subject_name,title,topic,status,curriculum_subject_id,curriculum_topic_id,teacher_note",
+      )
+      .eq("class_id", classInfo.id)
+      .eq("lesson_date", nextDate)
+      .order("slot_order"),
+    db
+      .from("calendar_events")
+      .select("id,title,kind,starts_at,ends_at,all_day,blocks_lessons")
+      .eq("school_id", classInfo.school_id)
+      .lt("starts_at", tomorrowEnd)
+      .gt("ends_at", tomorrowStart)
+      .or(`class_id.eq.${classInfo.id},scope.eq.school,scope.eq.private`)
+      .order("starts_at"),
+    db
+      .from("system_calendar_days")
+      .select("title,kind,starts_on,ends_on,blocks_lessons")
+      .lte("starts_on", nextDate)
+      .gte("ends_on", nextDate),
+  ]);
+  for (const result of [tomorrowLessonsResult, tomorrowCalendarResult, tomorrowSystemResult])
+    if (result.error) throw result.error;
+
+  const tomorrowLessons = (tomorrowLessonsResult.data ?? []) as LessonInstance[];
+  const tomorrowLessonIds = tomorrowLessons.map((lesson) => lesson.id);
+  const [tomorrowPrepResult, tomorrowMaterialsResult] = await Promise.all([
+    tomorrowLessonIds.length
+      ? db.from("lesson_preparations").select("lesson_id").in("lesson_id", tomorrowLessonIds)
+      : Promise.resolve({ data: [], error: null }),
+    tomorrowLessonIds.length
+      ? db.from("lesson_materials").select("lesson_id,kind").in("lesson_id", tomorrowLessonIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (tomorrowPrepResult.error) throw tomorrowPrepResult.error;
+  if (tomorrowMaterialsResult.error) throw tomorrowMaterialsResult.error;
+
+  const tomorrowPreparedIds = new Set(
+    (tomorrowPrepResult.data ?? []).map((row: any) => row.lesson_id as string),
+  );
+  const tomorrowWorksheetIds = new Set(
+    (tomorrowMaterialsResult.data ?? [])
+      .filter((row: any) => row.kind === "worksheet")
+      .map((row: any) => row.lesson_id as string),
+  );
+  const tomorrowBlockingEvents = [
+    ...(tomorrowCalendarResult.data ?? []),
+    ...(tomorrowSystemResult.data ?? []),
+  ].filter((event: any) => Boolean(event.blocks_lessons));
+  const tomorrowBlocked = tomorrowBlockingEvents.length > 0;
+
   const events: DailyEvent[] = [
     ...(eventsResult.data ?? []).map((e: any) => ({
       id: e.id,
@@ -204,6 +265,45 @@ export async function loadDailyBriefing(
       to: `/hodina/${carry.lessonId}`,
       lessonId: carry.lessonId,
     });
+
+  if (tomorrowBlocked) {
+    const blocker = tomorrowBlockingEvents[0] as any;
+    recommendedActions.push({
+      id: `tomorrow-blocked:${nextDate}`,
+      priority: "high",
+      title: "Zítřek má jiný režim",
+      detail: `${blocker?.title ?? "Školní událost"} blokuje běžnou výuku. Otevři kalendář a zkontroluj den.`,
+      kind: "tomorrow_blocker",
+      to: "/kalendar",
+    });
+  } else {
+    for (const lesson of tomorrowLessons) {
+      if (lesson.status === "cancelled") continue;
+      const prepared = tomorrowPreparedIds.has(lesson.id);
+      if (!prepared) {
+        recommendedActions.push({
+          id: `tomorrow-prep:${lesson.id}`,
+          priority: "medium",
+          title: `Zítra ještě připravit: ${lesson.subject_name}`,
+          detail: `${lesson.slot_order}. hodina · příprava zatím není uložená`,
+          kind: "tomorrow_prep",
+          to: `/hodina/${lesson.id}`,
+          lessonId: lesson.id,
+        });
+        continue;
+      }
+      if (!tomorrowWorksheetIds.has(lesson.id))
+        recommendedActions.push({
+          id: `tomorrow-worksheet:${lesson.id}`,
+          priority: "low",
+          title: `Pracovní list k ${lesson.subject_name}?`,
+          detail: "Příprava je hotová, ale pracovní list k ní zatím není uložený.",
+          kind: "tomorrow_worksheet",
+          to: `/hodina/${lesson.id}`,
+          lessonId: lesson.id,
+        });
+    }
+  }
 
   return {
     date,
