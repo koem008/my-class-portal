@@ -51,7 +51,9 @@ export type GlobalCompanionContext = {
  * student aliases, notes, reflections and all special-education data.
  * Only official curriculum topic names are allowed as topic text.
  */
-export async function loadGlobalCompanionContext(todayIso: string): Promise<GlobalCompanionContext> {
+export async function loadGlobalCompanionContext(
+  todayIso: string,
+): Promise<GlobalCompanionContext> {
   const recentStart = shiftIso(todayIso, -60);
   const upcomingEnd = shiftIso(todayIso, 21);
 
@@ -67,7 +69,11 @@ export async function loadGlobalCompanionContext(todayIso: string): Promise<Glob
 
   const lessons = (lessonsResult.data ?? []) as LessonRow[];
   const topicIds = Array.from(
-    new Set(lessons.map((lesson) => lesson.curriculum_topic_id).filter((id): id is string => Boolean(id))),
+    new Set(
+      lessons
+        .map((lesson) => lesson.curriculum_topic_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
   );
 
   const topicsResult = topicIds.length
@@ -128,7 +134,7 @@ export async function loadGlobalCompanionContext(todayIso: string): Promise<Glob
   };
 }
 
-function shiftIso(iso: string, days: number) {
+function shiftIso(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00`);
   date.setDate(date.getDate() + days);
   const year = date.getFullYear();
