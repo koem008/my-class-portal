@@ -1,0 +1,34 @@
+name: Apply master example 53
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-master-example-53.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply point 53 patch
+        run: python scripts/finish_master_example_53.py
+      - name: Format changed files
+        run: npx prettier --write src/lib/assistant-memory-data.ts src/lib/daily-briefing-data.ts src/routes/pamet.tsx src/routes/asistentka.tsx
+      - name: Commit changes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/assistant-memory-data.ts src/lib/daily-briefing-data.ts src/routes/pamet.tsx src/routes/asistentka.tsx
+          git commit -m "feat: complete personal companion daily context"
+          git push origin HEAD:main
