@@ -1,11 +1,12 @@
-import { Loader2, Mic, MicOff, Volume2, X } from "lucide-react";
+import { Loader2, Mic, MicOff, Play, Volume2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { runCompanionAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";
 
-const SILENCE_MS = 850;
+const SILENCE_MS = 1200;
 const NO_SPEECH_TIMEOUT_MS = 8000;
 const MAX_RECORDING_MS = 45000;
 const SPEECH_THRESHOLD = 0.025;
+const CYRILLIC_RE = /[\u0400-\u04FF]/;
 
 type VoiceState = "idle" | "listening" | "processing" | "reply" | "error";
 
@@ -15,16 +16,25 @@ export function GlobalVoiceCompanion() {
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
   const [notice, setNotice] = useState("");
+  const [speechUrl, setSpeechUrl] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
   const lastSpeechAtRef = useRef(0);
   const heardSpeechRef = useRef(false);
 
-  useEffect(() => () => stopEverything(false), []);
+  useEffect(
+    () => () => {
+      stopEverything(false);
+      audioRef.current?.pause();
+      audioRef.current = null;
+    },
+    [],
+  );
 
   function stopEverything(process = false) {
     if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
@@ -44,12 +54,34 @@ export function GlobalVoiceCompanion() {
     streamRef.current = null;
   }
 
+  async function playSpeech(url = speechUrl) {
+    if (!url) return;
+    try {
+      const audio = audioRef.current ?? new Audio();
+      audioRef.current = audio;
+      if (audio.src !== url) audio.src = url;
+      audio.currentTime = 0;
+      await audio.play();
+      setNotice("Hlas přehrávám.");
+    } catch (error) {
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      console.error("[AUDIO_PLAYBACK_ERROR]", error);
+      setNotice(
+        message.includes("NotAllowedError")
+          ? "iPhone blokuje automatické přehrání. Klepni na „Přehrát hlas“."
+          : `Přehrání v prohlížeči selhalo: ${message}`,
+      );
+    }
+  }
+
   async function beginConversation() {
     if (state === "listening") {
       stopEverything(true);
       return;
     }
 
+    audioRef.current?.pause();
+    setSpeechUrl("");
     setOpen(true);
     setTranscript("");
     setReply("");
@@ -180,6 +212,9 @@ export function GlobalVoiceCompanion() {
       const transcribed = await transcribeVoice({ data: form });
       const text = transcribed.text?.trim();
       if (!text) throw new Error("Nerozuměla jsem nahrávce. Zkus prosím mluvit znovu.");
+      if (CYRILLIC_RE.test(text)) {
+        throw new Error("Přepis nerozpoznal češtinu správně. Zkus prosím větu zopakovat.");
+      }
       setTranscript(text);
       setNotice("Přemýšlím…");
 
@@ -200,30 +235,27 @@ export function GlobalVoiceCompanion() {
       setNotice("Hotovo");
 
       if (conciseReply) {
-        void (async () => {
-          let speech;
-          try {
-            speech = await synthesizeAssistantVoice({
-              data: { text: conciseReply.slice(0, 700) },
-            });
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            console.error("[TTS_API_ERROR]", error);
-            setNotice(`TTS API chyba: ${message}`);
-            return;
-          }
+        let speech;
+        try {
+          speech = await synthesizeAssistantVoice({
+            data: { text: conciseReply.slice(0, 700) },
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error("[TTS_API_ERROR]", error);
+          setNotice(`TTS API chyba: ${message}`);
+          return;
+        }
 
-          try {
-            const audio = new Audio(`data:${speech.mimeType};base64,${speech.audioBase64}`);
-            await audio.play();
-            setNotice("Hlas přehrávám.");
-          } catch (error) {
-            const message =
-              error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-            console.error("[AUDIO_PLAYBACK_ERROR]", error);
-            setNotice(`Přehrání v prohlížeči selhalo: ${message}`);
-          }
-        })();
+        const url = `data:${speech.mimeType};base64,${speech.audioBase64}`;
+        setSpeechUrl(url);
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+          setNotice("Odpověď je hotová. Klepni na „Přehrát hlas“.");
+        } else {
+          await playSpeech(url);
+        }
       }
     } catch (error) {
       setState("error");
@@ -248,7 +280,7 @@ export function GlobalVoiceCompanion() {
       )}
 
       {open && (
-        <section className="fixed bottom-3 right-3 z-[70] max-h-[42dvh] w-[calc(100vw-24px)] max-w-[320px] overflow-hidden rounded-[20px] border border-[#e5e1d8] bg-[#fffefa] p-3 shadow-[0_18px_55px_rgba(32,48,44,.2)] sm:bottom-5 sm:right-5 sm:w-[320px] sm:p-4">
+        <section className="fixed bottom-3 right-3 z-[70] max-h-[48dvh] w-[calc(100vw-24px)] max-w-[320px] overflow-hidden rounded-[20px] border border-[#e5e1d8] bg-[#fffefa] p-3 shadow-[0_18px_55px_rgba(32,48,44,.2)] sm:bottom-5 sm:right-5 sm:w-[320px] sm:p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[9px] font-bold uppercase tracking-[.16em] text-[#4e7772]">
@@ -267,6 +299,7 @@ export function GlobalVoiceCompanion() {
               aria-label="Zavřít hlasovou asistentku"
               onClick={() => {
                 stopEverything(false);
+                audioRef.current?.pause();
                 setOpen(false);
                 setState("idle");
               }}
@@ -312,6 +345,16 @@ export function GlobalVoiceCompanion() {
                   <Volume2 className="h-3 w-3" /> Asistentka
                 </div>
                 <p className="mt-0.5 text-xs leading-4 text-[#34484a]">{reply}</p>
+                {speechUrl && (
+                  <button
+                    type="button"
+                    onClick={() => void playSpeech()}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#276765] px-2.5 py-1.5 text-[11px] font-bold text-white"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    Přehrát hlas
+                  </button>
+                )}
               </div>
             )}
 
