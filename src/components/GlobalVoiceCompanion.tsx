@@ -216,103 +216,106 @@ export function GlobalVoiceCompanion() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => void beginConversation()}
-        aria-label="Mluvit s asistentkou"
-        className="fixed bottom-5 right-5 z-[70] inline-flex min-h-14 items-center gap-2 rounded-full bg-[#276765] px-5 py-3 text-sm font-bold text-white shadow-[0_16px_40px_rgba(39,103,101,.28)] transition hover:-translate-y-0.5 hover:bg-[#215b59] focus:outline-none focus:ring-4 focus:ring-[#bfe0d7]"
-      >
-        {state === "processing" ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
-        ) : state === "listening" ? (
-          <MicOff className="h-5 w-5" />
-        ) : (
+      {!open && (
+        <button
+          type="button"
+          onClick={() => void beginConversation()}
+          aria-label="Mluvit s asistentkou"
+          className="fixed bottom-5 right-5 z-[70] inline-flex min-h-14 items-center gap-2 rounded-full bg-[#276765] px-5 py-3 text-sm font-bold text-white shadow-[0_16px_40px_rgba(39,103,101,.28)] transition hover:-translate-y-0.5 hover:bg-[#215b59] focus:outline-none focus:ring-4 focus:ring-[#bfe0d7]"
+        >
           <Mic className="h-5 w-5" />
-        )}
-        <span className="hidden sm:inline">
-          {state === "listening" ? "Poslouchám…" : "Mluvit s asistentkou"}
-        </span>
-      </button>
+          <span className="hidden sm:inline">Mluvit s asistentkou</span>
+        </button>
+      )}
 
       {open && (
-        <div className="fixed inset-0 z-[65] flex items-end justify-center bg-[#20302c]/25 p-3 backdrop-blur-[2px] sm:items-center sm:p-6">
-          <section className="w-full max-w-xl rounded-[30px] border border-white/70 bg-[#fffefa] p-5 shadow-[0_28px_90px_rgba(32,48,44,.24)] sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-xs font-bold uppercase tracking-[.16em] text-[#4e7772]">
-                  Moje asistentka
-                </div>
-                <h2 className="mt-1 text-xl font-bold text-[#24343f]">
-                  {state === "listening"
-                    ? "Poslouchám tě"
-                    : state === "processing"
-                      ? "Zpracovávám"
-                      : "Můžeme mluvit"}
-                </h2>
+        <section className="fixed bottom-4 right-3 z-[70] max-h-[62dvh] w-[calc(100vw-24px)] max-w-[390px] overflow-y-auto rounded-[24px] border border-[#e5e1d8] bg-[#fffefa] p-4 shadow-[0_22px_70px_rgba(32,48,44,.22)] sm:bottom-5 sm:right-5 sm:w-[390px] sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[.16em] text-[#4e7772]">
+                Moje asistentka
               </div>
-              <button
-                type="button"
-                aria-label="Zavřít hlasovou asistentku"
-                onClick={() => {
-                  stopEverything(false);
-                  setOpen(false);
-                  setState("idle");
-                }}
-                className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#647471] shadow-sm"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <h2 className="mt-0.5 text-lg font-bold text-[#24343f]">
+                {state === "listening"
+                  ? "Poslouchám tě"
+                  : state === "processing"
+                    ? "Zpracovávám"
+                    : "Můžeme mluvit"}
+              </h2>
             </div>
+            <button
+              type="button"
+              aria-label="Zavřít hlasovou asistentku"
+              onClick={() => {
+                stopEverything(false);
+                setOpen(false);
+                setState("idle");
+              }}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f6f4ef] text-[#647471] transition hover:bg-[#eeece6]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
+          <div className="mt-4 flex items-center gap-4">
             <button
               type="button"
               onClick={() => void beginConversation()}
               disabled={state === "processing"}
-              className={`mx-auto mt-7 grid h-28 w-28 place-items-center rounded-full text-white shadow-[0_18px_45px_rgba(39,103,101,.25)] transition disabled:opacity-60 ${state === "listening" ? "animate-pulse bg-[#b85f61]" : "bg-[#276765] hover:scale-105"}`}
+              className={`grid h-20 w-20 shrink-0 place-items-center rounded-full text-white shadow-[0_12px_30px_rgba(39,103,101,.22)] transition disabled:opacity-60 ${state === "listening" ? "animate-pulse bg-[#b85f61]" : "bg-[#276765] hover:scale-105"}`}
             >
               {state === "processing" ? (
-                <Loader2 className="h-10 w-10 animate-spin" />
+                <Loader2 className="h-8 w-8 animate-spin" />
               ) : state === "listening" ? (
-                <MicOff className="h-10 w-10" />
+                <MicOff className="h-8 w-8" />
               ) : (
-                <Mic className="h-10 w-10" />
+                <Mic className="h-8 w-8" />
               )}
             </button>
-            <p className="mt-4 text-center text-sm font-semibold text-[#53696a]">
-              {notice || "Klepni a mluv přirozeně."}
-            </p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-5 text-[#53696a]">
+                {notice || "Klepni a mluv přirozeně."}
+              </p>
+              <p className="mt-1 text-[11px] leading-4 text-[#87928f]">
+                Po krátké pauze se nahrávání samo odešle.
+              </p>
+            </div>
+          </div>
 
-            {transcript && (
-              <div className="mt-5 rounded-2xl bg-[#f4f5f1] p-4">
-                <div className="text-[11px] font-bold uppercase tracking-[.12em] text-[#82908f]">
-                  Ty
-                </div>
-                <p className="mt-1 text-sm leading-6 text-[#34484a]">{transcript}</p>
+          {transcript && (
+            <div className="mt-4 rounded-2xl bg-[#f4f5f1] p-3">
+              <div className="text-[10px] font-bold uppercase tracking-[.12em] text-[#82908f]">
+                Ty
               </div>
-            )}
-            {reply && (
-              <div className="mt-3 rounded-2xl bg-[#eaf6f0] p-4">
-                <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.12em] text-[#4e7772]">
-                  <Volume2 className="h-3.5 w-3.5" /> Asistentka
-                </div>
-                <p className="mt-1 text-sm leading-6 text-[#34484a]">{reply}</p>
-              </div>
-            )}
+              <p className="mt-1 text-sm leading-5 text-[#34484a]">{transcript}</p>
+            </div>
+          )}
 
-            {(state === "reply" || state === "error" || state === "idle") && (
-              <button
-                type="button"
-                onClick={() => void beginConversation()}
-                className="mt-5 w-full rounded-2xl bg-[#276765] px-4 py-3 text-sm font-bold text-white"
-              >
-                Mluvit znovu
-              </button>
-            )}
-            <p className="mt-4 text-center text-[11px] leading-5 text-[#82908f]">
-              Nahrávání se ukončí automaticky po krátké pauze. Zvuk se po zpracování neukládá.
-            </p>
-          </section>
-        </div>
+          {reply && (
+            <div className="mt-3 rounded-2xl bg-[#eaf6f0] p-3">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.12em] text-[#4e7772]">
+                <Volume2 className="h-3.5 w-3.5" /> Asistentka
+              </div>
+              <p className="mt-1 text-sm leading-5 text-[#34484a]">{reply}</p>
+            </div>
+          )}
+
+          {state === "error" && notice && (
+            <div className="mt-3 max-h-28 overflow-y-auto rounded-2xl bg-[#fff3f1] p-3 text-xs leading-5 text-[#8c514f] [overflow-wrap:anywhere]">
+              {notice}
+            </div>
+          )}
+
+          {(state === "reply" || state === "error" || state === "idle") && (
+            <button
+              type="button"
+              onClick={() => void beginConversation()}
+              className="mt-4 w-full rounded-xl bg-[#276765] px-4 py-2.5 text-sm font-bold text-white"
+            >
+              Mluvit znovu
+            </button>
+          )}
+        </section>
       )}
     </>
   );
