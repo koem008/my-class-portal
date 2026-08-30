@@ -39,10 +39,10 @@ jobs:
           grep -q 'Neprobrané hodiny čekající na přesun' src/routes/rozvrh.tsx
 
       - name: Companion policy tests
-        run: bun run test:companion
+        run: bun test tests/companion-policy.test.ts
 
       - name: Format
-        run: bunx prettier --write src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/lib/schedule-data.ts src/routes/rozvrh.tsx
+        run: bunx prettier --write src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/lib/schedule-data.ts src/routes/rozvrh.tsx tests/companion-policy.test.ts
 
       - name: Lint
         run: bun run lint
@@ -59,7 +59,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/lib/schedule-data.ts src/routes/rozvrh.tsx src/routeTree.gen.ts
+          git add src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/lib/schedule-data.ts src/routes/rozvrh.tsx tests/companion-policy.test.ts src/routeTree.gen.ts
           git commit -m "feat: add confirmed voice lesson substitution"
           git fetch origin main
           git rebase origin/main
