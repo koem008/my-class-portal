@@ -33,15 +33,15 @@ export const COMPANION_NAVIGATION_ITEMS = [
   },
   {
     target: "memory",
-    label: "Co si o mně pamatuješ",
+    label: "Co si o mně pamatuješ?",
     path: "/pamet",
     keywords: ["paměť", "preference", "důležitá data"],
   },
   {
     target: "art_studio",
-    label: "Výtvarná výchova",
-    path: "/vytvarna-vychova",
-    keywords: ["výtvarná", "ateliér", "obrázky"],
+    label: "Kreativní studio",
+    path: "/kreativni-studio",
+    keywords: ["kreativní studio", "výtvarná", "film", "materiály", "obrázky", "tvorba"],
   },
   {
     target: "special_education",
