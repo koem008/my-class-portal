@@ -1,43 +1,41 @@
 # Moje třída
 
-AI pracovní systém pro učitele 1. stupně základní školy.
+AI pracovní systém pro učitelku 1. stupně základní školy.
 
-První produkční cíl:
+První produkční scénář:
 
-- 5. ročník ZŠ
-- školní rok 2026/2027
-- jedna konkrétní učitelka a jedna konkrétní třída
-- kompletní plán učiva a skutečný postup výuky
-- přípravy jednotlivých hodin
-- zápisy, pracovní listy, úkoly, testy a kreativní aktivity
-- hlasové zadávání se strukturovaným zpracováním
-- pseudonymní profily žáků bez skutečných identifikačních údajů
-- AI orchestrátor pracující nad ověřeným kurikulem
-
-## Zásadní bezpečnostní pravidla
-
-- skutečná jména a data narození dětí nejsou součástí cílového AI systému
-- žák je reprezentován interním UUID a pseudonymem
-- převodní tabulka mezi skutečnou identitou a pseudonymem zůstává mimo aplikaci
-- každá škola a třída musí být databázově izolovaná
-- frontend není bezpečnostní hranice
-- citlivé tabulky nesmí mít univerzální `USING (true)` RLS policies
-- AI dostává pouze minimální kontext nutný pro konkrétní úlohu
-- kritické změny navrhuje AI, schvaluje učitel
-- hlasové audio je standardně dočasné a po zpracování se odstraní
+- 5. ročník ZŠ,
+- školní rok 2026/2027,
+- jedna učitelka a jedna konkrétní třída,
+- propojený kalendář, rozvrh, kurikulum, hodiny, přípravy a materiály,
+- skutečný postup výuky a návaznost další hodiny,
+- hlasové zadávání a AI asistentka,
+- pseudonymní pedagogické profily bez skutečných identit dětí,
+- oddělená speciální pedagogika s explicitním oprávněním.
 
 ## Aktuální stav
 
-Projekt je ve **Phase 0 — architektura a audit**.
+Aktuální integrační základ je `main`. MVP už není ve Phase 0; bezpečnostní základ, curriculum engine, rozvrh, lesson workflow, Material Studio, AI provider vrstva, voice-first reflexe, obecná AI companion, osobní opt-in paměť, speciální pedagogika, koordinace asistentů pedagoga a Studio Výtvarné výchovy jsou implementované.
 
-Současný technický skeleton je použitelný, ale existující databázový model ještě nesplňuje cílové požadavky na pseudonymizaci a tenant isolation. Před vývojem kurikula, hlasu a AI musí proběhnout Phase 1 — bezpečná přestavba datové a autorizační vrstvy.
+Dne 30. 8. 2026 bylo přímo proti produkční Lovable Supabase ověřeno:
 
-Dokumentace:
+- produkční migration history odpovídá repozitáři 1:1 — 50 migrací v repu / 50 v produkci,
+- žádná repo migrace v produkci nechybí a produkce nemá žádnou migraci navíc,
+- Phase 2 curriculum content pro 5. ročník je v produkci přítomný v očekávaných počtech,
+- projekt My Class Portal v Lovable je publikovaný a preview bylo sestavené z aktuálního `main` HEAD.
 
-- `docs/PHASE-0-AUDIT.md`
-- `docs/ARCHITECTURE.md`
-- `docs/SECURITY.md`
-- `docs/ROADMAP.md`
+Detailní stav je v `docs/IMPLEMENTATION_STATUS.md` a ověřovací záznam v `docs/PRODUCTION_VERIFICATION_2026-08-30.md`.
+
+## Bezpečnostní pravidla
+
+- skutečná jména a data narození dětí nejsou součástí AI kontextu,
+- žáci jsou v cílovém workflow reprezentováni UUID a pseudonymy,
+- tenant/class isolation je vynucována databází a RLS, ne frontendem,
+- AI dostává jen minimální kontext nutný pro konkrétní úlohu,
+- AI změny pedagogických dat vyžadují potvrzení učitelky,
+- hlas je push-to-talk; audio se standardně nearchivuje,
+- provider secrets jsou server-only,
+- při chybě nebo chybějícím API klíči musí AI failovat korektně a nesmí předstírat úspěch.
 
 ## Technologie
 
@@ -50,12 +48,22 @@ Dokumentace:
 - Supabase Auth / Storage
 - Row Level Security
 - Zod
-- PWA v pozdější fázi
-- AI provider abstraction
-- speech-to-text vrstva pro češtinu
+- provider-neutral AI vrstva
+- serverový STT/TTS/image generation
+
+## Ověření
+
+`main` používá GitHub Actions pro:
+
+- lint/build CI,
+- čistý Supabase migration reset,
+- adversarial tenant/class RLS testy,
+- assistant coordinator RLS testy,
+- calendar blocking reconciliation,
+- lesson substitution flow.
+
+Produkční ověření migrací nesmí být nahrazováno pouze lokálním `supabase db reset`; platí pravidla v `docs/FINAL_PRODUCT_ACCEPTANCE.md`.
 
 ## Vývoj
 
-`main` musí zůstávat stabilní. Každá významná fáze se vyvíjí v samostatné branch a kontroluje přes Pull Request.
-
-Projekt je propojený s Lovable; přepisování publikované Git historie force-pushem nebo rebasingem již publikovaných commitů se nepoužívá.
+`main` musí zůstávat stabilní. Významné změny se integrují přes samostatnou větev a Pull Request. Projekt je propojený s Lovable; publikovaná Git historie se nepřepisuje force-pushem ani rebasingem již publikovaných commitů.
