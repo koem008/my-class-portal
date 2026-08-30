@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { navigationPath, parseCompanionPayload } from "./companion-policy";
+import {
+  COMPANION_NAVIGATION_ITEMS,
+  navigationPath,
+  parseCompanionPayload,
+} from "./companion-policy";
 
 describe("general voice companion policy", () => {
   test("ordinary conversation only replies", () => {
@@ -22,6 +26,17 @@ describe("general voice companion policy", () => {
     expect(result.requiresConfirmation).toBe(false);
     expect(result.navigation?.target).toBe("schedule");
     expect(navigationPath("schedule")).toBe("/rozvrh");
+  });
+  test("classroom is a fixed shared navigation target", () => {
+    const result = parseCompanionPayload({
+      mode: "navigate",
+      reply: "Otevírám třídu.",
+      navigation: { target: "classroom" },
+    });
+    expect(result.requiresConfirmation).toBe(false);
+    expect(result.navigation?.target).toBe("classroom");
+    expect(navigationPath("classroom")).toBe("/trida");
+    expect(COMPANION_NAVIGATION_ITEMS.some((item) => item.target === "classroom")).toBe(true);
   });
   test("pedagogical write remains proposal-only", () => {
     const result = parseCompanionPayload({
