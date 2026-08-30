@@ -1,8 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Loader2, Mic, MicOff, Play, Volume2, X } from "lucide-react";
+import { CheckCircle2, Loader2, Mic, MicOff, Play, Send, Volume2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { runCompanionAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";
+import {
+  confirmCompanionPedagogicalAction,
+  runCompanionAi,
+  synthesizeAssistantVoice,
+  transcribeVoice,
+} from "@/lib/ai/functions";
+import type { CompanionPedagogicalProposal } from "@/lib/ai/contracts";
 
 const SILENCE_MS = 1200;
 const NO_SPEECH_TIMEOUT_MS = 8000;
@@ -12,7 +18,6 @@ const CYRILLIC_RE = /[\u0400-\u04FF]/;
 const MEMORY_COMMAND_RE = /(?:^|\s)(?:ulož si|uloz si|pamatuj si)(?:[\s,:-]+)(.+)$/i;
 
 type VoiceState = "idle" | "listening" | "processing" | "reply" | "error";
-
 type MemoryRow = { content: string };
 
 function normalizeCzech(value: string) {
@@ -52,6 +57,8 @@ export function GlobalVoiceCompanion() {
   const [reply, setReply] = useState("");
   const [notice, setNotice] = useState("");
   const [speechUrl, setSpeechUrl] = useState("");
+  const [typedText, setTypedText] = useState("");
+  const [pendingProposal, setPendingProposal] = useState<CompanionPedagogicalProposal | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -113,7 +120,6 @@ export function GlobalVoiceCompanion() {
 
   async function playSpeech(url = speechUrl) {
     if (!url) return;
-
     const playbackContext = playbackContextRef.current;
     if (playbackContext) {
       try {
@@ -150,11 +156,11 @@ export function GlobalVoiceCompanion() {
     }
   }
 
-  async function speakReply(text: string) {
+  async function setAssistantReply(text: string, speak: boolean) {
     setReply(text);
     setState("reply");
     setNotice("Hotovo");
-    if (!text) return;
+    if (!text || !speak) return;
 
     try {
       const speech = await synthesizeAssistantVoice({ data: { text: text.slice(0, 700) } });
@@ -209,10 +215,7 @@ export function GlobalVoiceCompanion() {
     const userId = userResult.data.user.id;
 
     const settings = await db.from("teacher_assistant_settings").upsert(
-      {
-        user_id: userId,
-        memory_enabled: true,
-      },
+      { user_id: userId, memory_enabled: true },
       { onConflict: "user_id" },
     );
     if (settings.error) throw settings.error;
@@ -239,6 +242,91 @@ export function GlobalVoiceCompanion() {
     return { saved: true, content: clean };
   }
 
+  async function handleInput(text: string, speak: boolean) {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+
+    setTranscript(cleanText);
+    setReply("");
+    setSpeechUrl("");
+    setPendingProposal(null);
+    setState("processing");
+    setNotice("Přemýšlím…");
+
+    try {
+      const memoryCommand = extractMemoryCommand(cleanText);
+      if (memoryCommand !== null) {
+        const saved = await savePersonalMemory(memoryCommand);
+        await setAssistantReply(
+          saved.saved
+            ? `Dobře. Uložila jsem si: ${saved.content}`
+            : `Tohle už si pamatuji: ${saved.content}`,
+          speak,
+        );
+        return;
+      }
+
+      if (asksWhatIsRemembered(cleanText)) {
+        const memories = await readPersonalMemory();
+        await setAssistantReply(
+          memories.length
+            ? `Pamatuji si o tobě: ${memories.join("; ")}`
+            : "Zatím o tobě nemám v osobní paměti nic uloženého.",
+          speak,
+        );
+        return;
+      }
+
+      const personalPreferences = await readPersonalMemory();
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const result = await runCompanionAi({
+        data: {
+          message: `${cleanText}\n\nPracuj stejně pro hlasový i psaný vstup. Když chci uložit poznámku, úkol nebo follow-up, vrať návrh create_coordinator_item. Když chci změnit přípravu nebo stav hodiny, vrať odpovídající návrh a vyžádej potvrzení. Běžnou odpověď drž stručnou.`,
+          assistantName: "Asistentka",
+          tone: "friendly",
+          localDate,
+          personalPreferences: personalPreferences.slice(0, 20),
+        },
+      });
+
+      if (result.mode === "propose" && result.proposal) {
+        setPendingProposal(result.proposal);
+        await setAssistantReply(result.reply.trim() || "Mám připravený návrh změny. Potvrď ho prosím.", speak);
+        setNotice("Čekám na potvrzení.");
+        return;
+      }
+
+      await setAssistantReply(result.reply.trim(), speak);
+    } catch (error) {
+      setState("error");
+      setNotice(error instanceof Error ? error.message : "Požadavek se nepodařilo zpracovat.");
+    }
+  }
+
+  async function confirmPendingProposal() {
+    if (!pendingProposal) return;
+    setState("processing");
+    setNotice("Ukládám potvrzenou změnu…");
+    try {
+      const result = await confirmCompanionPedagogicalAction({ data: pendingProposal });
+      setPendingProposal(null);
+      setReply(result.message);
+      setNotice("Uloženo.");
+      setState("reply");
+    } catch (error) {
+      setState("error");
+      setNotice(error instanceof Error ? error.message : "Změnu se nepodařilo uložit.");
+    }
+  }
+
+  async function submitTypedText() {
+    const text = typedText.trim();
+    if (!text || state === "processing") return;
+    setTypedText("");
+    await handleInput(text, false);
+  }
+
   async function beginConversation() {
     if (state === "listening") {
       stopEverything(true);
@@ -251,6 +339,7 @@ export function GlobalVoiceCompanion() {
     setOpen(true);
     setTranscript("");
     setReply("");
+    setPendingProposal(null);
     setNotice("Připojuji mikrofon…");
     setState("processing");
 
@@ -284,7 +373,6 @@ export function GlobalVoiceCompanion() {
 
       const AudioContextCtor = getAudioContextCtor();
       if (!AudioContextCtor) throw new Error("Prohlížeč neumí rozpoznat konec řeči.");
-
       const audioContext = new AudioContextCtor();
       audioContextRef.current = audioContext;
       const source = audioContext.createMediaStreamSource(stream);
@@ -370,56 +458,16 @@ export function GlobalVoiceCompanion() {
       const extension = mimeType.includes("mp4") ? "m4a" : "webm";
       const form = new FormData();
       form.append("audio", blob, `asistentka.${extension}`);
-
       const transcribed = await transcribeVoice({ data: form });
       const text = transcribed.text?.trim();
       if (!text) throw new Error("Nerozuměla jsem nahrávce. Zkus prosím mluvit znovu.");
       if (CYRILLIC_RE.test(text)) {
         throw new Error("Přepis nerozpoznal češtinu správně. Zkus prosím větu zopakovat.");
       }
-      setTranscript(text);
-      setNotice("Přemýšlím…");
-
-      const memoryCommand = extractMemoryCommand(text);
-      if (memoryCommand !== null) {
-        const saved = await savePersonalMemory(memoryCommand);
-        await speakReply(
-          saved.saved
-            ? `Dobře. Uložila jsem si: ${saved.content}`
-            : `Tohle už si pamatuji: ${saved.content}`,
-        );
-        return;
-      }
-
-      if (asksWhatIsRemembered(text)) {
-        const memories = await readPersonalMemory();
-        await speakReply(
-          memories.length
-            ? `Pamatuji si o tobě: ${memories.join("; ")}`
-            : "Zatím o tobě nemám v osobní paměti nic uloženého.",
-        );
-        return;
-      }
-
-      const personalPreferences = await readPersonalMemory();
-      const now = new Date();
-      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-      const result = await runCompanionAi({
-        data: {
-          message: `${text}\n\nPro hlasový režim odpověz co nejstručněji: běžně 1–3 krátké věty. Delší odpověď dej jen když o ni výslovně žádám. Nepoužívej markdownové nadpisy ani dlouhé seznamy.`,
-          assistantName: "Asistentka",
-          tone: "friendly",
-          localDate,
-          personalPreferences: personalPreferences.slice(0, 20),
-        },
-      });
-
-      await speakReply(result.reply.trim());
+      await handleInput(text, true);
     } catch (error) {
       setState("error");
-      setNotice(
-        error instanceof Error ? error.message : "Hlasový požadavek se nepodařilo zpracovat.",
-      );
+      setNotice(error instanceof Error ? error.message : "Hlasový požadavek se nepodařilo zpracovat.");
     }
   }
 
@@ -428,27 +476,31 @@ export function GlobalVoiceCompanion() {
       {!open && (
         <button
           type="button"
-          onClick={() => void beginConversation()}
-          aria-label="Mluvit s asistentkou"
+          onClick={() => {
+            setOpen(true);
+            setState("idle");
+            setNotice("Mluv nebo napiš požadavek.");
+          }}
+          aria-label="Otevřít asistentku"
           className="fixed bottom-5 right-5 z-[70] inline-flex min-h-14 items-center gap-2 rounded-full bg-[#276765] px-5 py-3 text-sm font-bold text-white shadow-[0_16px_40px_rgba(39,103,101,.28)] transition hover:-translate-y-0.5 hover:bg-[#215b59] focus:outline-none focus:ring-4 focus:ring-[#bfe0d7]"
         >
           <Mic className="h-5 w-5" />
-          <span className="hidden sm:inline">Mluvit s asistentkou</span>
+          <span className="hidden sm:inline">Asistentka</span>
         </button>
       )}
 
       {open && (
-        <section className="fixed bottom-3 right-3 z-[70] max-h-[48dvh] w-[calc(100vw-24px)] max-w-[320px] overflow-hidden rounded-[20px] border border-[#e5e1d8] bg-[#fffefa] p-3 shadow-[0_18px_55px_rgba(32,48,44,.2)] sm:bottom-5 sm:right-5 sm:w-[320px] sm:p-4">
+        <section className="fixed bottom-3 right-3 z-[70] max-h-[72dvh] w-[calc(100vw-24px)] max-w-[350px] overflow-hidden rounded-[20px] border border-[#e5e1d8] bg-[#fffefa] p-3 shadow-[0_18px_55px_rgba(32,48,44,.2)] sm:bottom-5 sm:right-5 sm:w-[350px] sm:p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[9px] font-bold uppercase tracking-[.16em] text-[#4e7772]">Moje asistentka</div>
               <div className="mt-0.5 truncate text-sm font-bold text-[#24343f]">
-                {state === "listening" ? "Poslouchám" : state === "processing" ? "Zpracovávám" : "Můžeme mluvit"}
+                {state === "listening" ? "Poslouchám" : state === "processing" ? "Zpracovávám" : "Mluv nebo napiš"}
               </div>
             </div>
             <button
               type="button"
-              aria-label="Zavřít hlasovou asistentku"
+              aria-label="Zavřít asistentku"
               onClick={() => {
                 stopEverything(false);
                 audioRef.current?.pause();
@@ -477,15 +529,41 @@ export function GlobalVoiceCompanion() {
               )}
             </button>
             <p className="min-w-0 flex-1 text-xs font-semibold leading-4 text-[#53696a]">
-              {notice || "Mluv přirozeně."}
+              {notice || "Hlas i psaní používají stejné funkce."}
             </p>
           </div>
 
-          <div className="mt-3 max-h-[22dvh] space-y-2 overflow-y-auto pr-1">
+          <div className="mt-3 flex gap-2">
+            <textarea
+              value={typedText}
+              onChange={(event) => setTypedText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void submitTypedText();
+                }
+              }}
+              disabled={state === "processing"}
+              rows={2}
+              placeholder="Napiš poznámku, úkol, požadavek nebo „Pamatuj si…“"
+              className="min-h-12 flex-1 resize-none rounded-xl border border-[#e1e5df] bg-white px-3 py-2 text-xs leading-4 text-[#24343f] outline-none placeholder:text-[#9ba6a3] focus:border-[#7eaaa4] disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={() => void submitTypedText()}
+              disabled={!typedText.trim() || state === "processing"}
+              aria-label="Odeslat text"
+              className="grid h-12 w-12 shrink-0 place-items-center self-end rounded-xl bg-[#276765] text-white disabled:opacity-40"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-3 max-h-[28dvh] space-y-2 overflow-y-auto pr-1">
             {transcript && (
               <div className="rounded-xl bg-[#f4f5f1] px-3 py-2">
                 <div className="text-[9px] font-bold uppercase tracking-[.12em] text-[#82908f]">Ty</div>
-                <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#34484a]">{transcript}</p>
+                <p className="mt-0.5 text-xs leading-4 text-[#34484a]">{transcript}</p>
               </div>
             )}
 
@@ -508,6 +586,21 @@ export function GlobalVoiceCompanion() {
               </div>
             )}
 
+            {pendingProposal && (
+              <div className="rounded-xl border border-[#cfe4db] bg-white px-3 py-2">
+                <div className="text-[10px] font-bold text-[#276765]">Změna čeká na potvrzení</div>
+                <button
+                  type="button"
+                  onClick={() => void confirmPendingProposal()}
+                  disabled={state === "processing"}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#276765] px-3 py-2 text-[11px] font-bold text-white disabled:opacity-60"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Potvrdit a uložit
+                </button>
+              </div>
+            )}
+
             {state === "error" && notice && (
               <div className="max-h-20 overflow-y-auto rounded-xl bg-[#fff3f1] px-3 py-2 text-[11px] leading-4 text-[#8c514f] [overflow-wrap:anywhere]">
                 {notice}
@@ -521,7 +614,7 @@ export function GlobalVoiceCompanion() {
               onClick={() => void beginConversation()}
               className="mt-3 w-full rounded-xl bg-[#276765] px-3 py-2 text-xs font-bold text-white"
             >
-              Mluvit znovu
+              Mluvit
             </button>
           )}
         </section>
