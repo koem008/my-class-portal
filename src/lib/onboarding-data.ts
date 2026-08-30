@@ -1,49 +1,107 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { AssistantTone, PseudonymSetKey } from "@/lib/workspace-settings-data";
 
-const db = supabase as unknown as SupabaseClient<any>;
+const db = supabase as unknown as SupabaseClient;
+
+export type OnboardingTimetableSlot = {
+  weekday: number;
+  slotOrder: number;
+  startsAt: string;
+  endsAt: string;
+  subjectName: string;
+};
 
 export type OnboardingInput = {
   displayName: string;
   schoolName: string;
   className: string;
+  grade: number;
+  academicYearLabel: string;
+  academicYearStartsOn: string;
+  academicYearEndsOn: string;
+  districtName: string;
+  pseudonymSetKey: PseudonymSetKey;
+  assistantName: string;
+  assistantTone: AssistantTone;
+  timetableSlots: OnboardingTimetableSlot[];
   teachesArt: boolean;
   isSpecialEducator: boolean;
 };
+
+type ExistingClassRow = { id: string };
 
 export async function completeFirstRun(input: OnboardingInput) {
   const displayName = input.displayName.trim();
   const schoolName = input.schoolName.trim();
   const className = input.className.trim();
+  const districtName = input.districtName.trim();
+  const assistantName = input.assistantName.trim();
+  const academicYearLabel = input.academicYearLabel.trim();
+
   if (!schoolName) throw new Error("Doplňte název školy.");
   if (!className) throw new Error("Doplňte označení třídy.");
+  if (input.grade < 1 || input.grade > 5) throw new Error("Ročník musí být 1 až 5.");
+  if (!/^\d{4}\/\d{4}$/.test(academicYearLabel))
+    throw new Error("Školní rok musí mít tvar 2026/2027.");
+  if (!input.academicYearStartsOn || !input.academicYearEndsOn)
+    throw new Error("Doplňte začátek a konec školního roku.");
+  if (input.academicYearEndsOn <= input.academicYearStartsOn)
+    throw new Error("Konec školního roku musí být po jeho začátku.");
+  if (!districtName) throw new Error("Vyberte okres školy.");
+  if (!assistantName) throw new Error("Doplňte jméno AI asistentky.");
+
+  const normalizedSlots = input.timetableSlots.map((slot, index) => {
+    const subjectName = slot.subjectName.trim();
+    if (slot.weekday < 1 || slot.weekday > 5)
+      throw new Error(`Rozvrh: řádek ${index + 1} má neplatný den.`);
+    if (slot.slotOrder < 1 || slot.slotOrder > 12)
+      throw new Error(`Rozvrh: řádek ${index + 1} má neplatné pořadí hodiny.`);
+    if (!slot.startsAt || !slot.endsAt || slot.endsAt <= slot.startsAt)
+      throw new Error(`Rozvrh: zkontrolujte čas na řádku ${index + 1}.`);
+    if (!subjectName) throw new Error(`Rozvrh: doplňte předmět na řádku ${index + 1}.`);
+    return { ...slot, subjectName };
+  });
+
+  const occupiedSlots = new Set<string>();
+  for (const slot of normalizedSlots) {
+    const key = `${slot.weekday}:${slot.slotOrder}`;
+    if (occupiedSlots.has(key))
+      throw new Error("Rozvrh obsahuje dvě hodiny ve stejném dni a pořadí.");
+    occupiedSlots.add(key);
+  }
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   const user = authData.user;
   if (!user) throw new Error("Pro nastavení aplikace je potřeba být přihlášená.");
 
-  if (displayName) {
-    const profile = await db
-      .from("teacher_profiles")
-      .upsert({ user_id: user.id, display_name: displayName }, { onConflict: "user_id" });
-    if (profile.error) throw profile.error;
+  const existing = await db.from("classes").select("id").limit(1);
+  if (existing.error) throw existing.error;
+  if (((existing.data ?? []) as ExistingClassRow[]).length > 0) {
+    throw new Error("První nastavení už bylo dokončeno. Další změny udělejte v Nastavení.");
   }
 
   const tenant = await db.rpc("create_school_tenant", {
     _school_name: schoolName,
-    _academic_year_label: "2026/2027",
-    _starts_on: "2026-09-01",
-    _ends_on: "2027-06-30",
+    _academic_year_label: academicYearLabel,
+    _starts_on: input.academicYearStartsOn,
+    _ends_on: input.academicYearEndsOn,
   });
   if (tenant.error) throw tenant.error;
   const schoolId = String(tenant.data);
+
+  const schoolUpdate = await db
+    .from("schools")
+    .update({ district_name: districtName })
+    .eq("id", schoolId);
+  if (schoolUpdate.error) throw schoolUpdate.error;
 
   const year = await db
     .from("academic_years")
     .select("id")
     .eq("school_id", schoolId)
-    .eq("label", "2026/2027")
+    .eq("label", academicYearLabel)
     .single();
   if (year.error) throw year.error;
 
@@ -53,18 +111,62 @@ export async function completeFirstRun(input: OnboardingInput) {
       school_id: schoolId,
       academic_year_id: year.data.id,
       name: className,
-      grade: 5,
+      grade: input.grade,
+      pseudonym_set_key: input.pseudonymSetKey,
     })
     .select("id")
     .single();
   if (classInsert.error) throw classInsert.error;
+  const classId = String(classInsert.data.id);
 
   const membership = await db.from("class_memberships").insert({
-    class_id: classInsert.data.id,
+    class_id: classId,
     user_id: user.id,
     role: "teacher",
   });
   if (membership.error) throw membership.error;
+
+  const profile = await db.from("teacher_profiles").upsert(
+    {
+      user_id: user.id,
+      display_name: displayName,
+      onboarded_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (profile.error) throw profile.error;
+
+  const assistant = await db.from("teacher_assistant_settings").upsert(
+    {
+      user_id: user.id,
+      assistant_name: assistantName,
+      tone: input.assistantTone,
+      memory_enabled: false,
+      morning_briefing_enabled: true,
+      afternoon_reflection_enabled: true,
+    },
+    { onConflict: "user_id" },
+  );
+  if (assistant.error) throw assistant.error;
+
+  if (normalizedSlots.length > 0) {
+    const slots = await db.from("timetable_slots").insert(
+      normalizedSlots.map((slot) => ({
+        school_id: schoolId,
+        class_id: classId,
+        academic_year_id: year.data.id,
+        weekday: slot.weekday,
+        slot_order: slot.slotOrder,
+        starts_at: slot.startsAt,
+        ends_at: slot.endsAt,
+        subject_name: slot.subjectName,
+        valid_from: input.academicYearStartsOn,
+        valid_to: input.academicYearEndsOn,
+        is_active: true,
+      })),
+    );
+    if (slots.error) throw slots.error;
+  }
 
   if (input.isSpecialEducator) {
     const grant = await db.rpc("grant_special_education_access", {
@@ -81,17 +183,17 @@ export async function completeFirstRun(input: OnboardingInput) {
       .from("curriculum_subjects")
       .select("id")
       .eq("code", "VFV")
-      .lte("grade_from", 5)
-      .gte("grade_to", 5)
+      .lte("grade_from", input.grade)
+      .gte("grade_to", input.grade)
       .maybeSingle();
     if (subject.error) throw subject.error;
-    artSubjectId = subject.data?.id ?? null;
+    artSubjectId = subject.data?.id ? String(subject.data.id) : null;
   }
 
   return {
     schoolId,
-    academicYearId: year.data.id as string,
-    classId: classInsert.data.id as string,
+    academicYearId: String(year.data.id),
+    classId,
     artSubjectId,
     specialEducationEnabled: input.isSpecialEducator,
   };
