@@ -12,6 +12,7 @@ import { Loader2, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import premiumCss from "../premium-ui.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AfternoonReflectionPrompt } from "@/components/AfternoonReflectionPrompt";
 import { DelightLayer } from "@/components/DelightLayer";
@@ -102,10 +103,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: premiumCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
