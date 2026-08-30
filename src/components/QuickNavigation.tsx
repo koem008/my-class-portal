@@ -120,7 +120,9 @@ export function QuickNavigation() {
                     >
                       <div>
                         <div className="text-sm font-black text-[#334a45]">{item.label}</div>
-                        <div className="mt-1 text-xs text-[#8b9692]">{item.keywords.slice(0, 3).join(" · ")}</div>
+                        <div className="mt-1 text-xs text-[#8b9692]">
+                          {item.keywords.slice(0, 3).join(" · ")}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {index === 0 && query && (
