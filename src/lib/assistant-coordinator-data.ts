@@ -19,6 +19,28 @@ type AssignmentRow = {
   is_active: boolean;
 };
 
+type WorkSlotRow = {
+  id: string;
+  school_id: string;
+  assignment_id: string;
+  weekday: number;
+  starts_at: string;
+  ends_at: string;
+  location_note: string | null;
+  is_active: boolean;
+};
+
+type PresenceExceptionRow = {
+  id: string;
+  school_id: string;
+  assistant_id: string;
+  exception_date: string;
+  kind: "absent" | "changed";
+  starts_at: string | null;
+  ends_at: string | null;
+  note: string | null;
+};
+
 export type CoordinatorAccess = {
   schoolId: string;
   role: "coordinator" | "school_admin";
@@ -63,6 +85,24 @@ export type AssistantAssignment = {
   assistantName: string;
   className: string;
   alias: string | null;
+};
+
+export type AssistantWorkSlot = WorkSlotRow & {
+  assistantId: string;
+  assistantName: string;
+  className: string;
+  alias: string | null;
+};
+
+export type AssistantPresenceException = PresenceExceptionRow & {
+  assistantName: string;
+};
+
+export type CoordinatorNowCard = {
+  tone: "attention" | "now" | "next" | "done" | "quiet";
+  eyebrow: string;
+  title: string;
+  detail: string;
 };
 
 async function authUserId() {
@@ -253,4 +293,260 @@ export async function deactivateAssistantAssignment(schoolId: string, assignment
     .eq("id", assignmentId);
   if (error) throw error;
   await writeAudit(schoolId, "assignment_deactivated", "assistant_assignment", assignmentId);
+}
+
+export async function loadAssistantWorkSlots(
+  schoolId: string,
+  assignments: AssistantAssignment[],
+): Promise<AssistantWorkSlot[]> {
+  const { data, error } = await db
+    .from("assistant_work_slots")
+    .select("id,school_id,assignment_id,weekday,starts_at,ends_at,location_note,is_active")
+    .eq("school_id", schoolId)
+    .eq("is_active", true)
+    .order("weekday")
+    .order("starts_at");
+  if (error) throw error;
+
+  const assignmentMap = new Map(assignments.map((row) => [row.id, row]));
+  return ((data ?? []) as WorkSlotRow[])
+    .map((row) => {
+      const assignment = assignmentMap.get(row.assignment_id);
+      if (!assignment) return null;
+      return {
+        ...row,
+        assistantId: assignment.assistant_id,
+        assistantName: assignment.assistantName,
+        className: assignment.className,
+        alias: assignment.alias,
+      } satisfies AssistantWorkSlot;
+    })
+    .filter((row): row is AssistantWorkSlot => row !== null);
+}
+
+export async function createAssistantWorkSlot(input: {
+  schoolId: string;
+  assignmentId: string;
+  weekday: number;
+  startsAt: string;
+  endsAt: string;
+  locationNote?: string;
+}) {
+  const createdBy = await authUserId();
+  if (input.weekday < 1 || input.weekday > 5) throw new Error("Vyberte pracovní den.");
+  if (!input.startsAt || !input.endsAt || input.endsAt <= input.startsAt) {
+    throw new Error("Čas pracovního bloku není platný.");
+  }
+  const { data, error } = await db
+    .from("assistant_work_slots")
+    .insert({
+      school_id: input.schoolId,
+      assignment_id: input.assignmentId,
+      weekday: input.weekday,
+      starts_at: input.startsAt,
+      ends_at: input.endsAt,
+      location_note: input.locationNote?.trim() || null,
+      created_by: createdBy,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(input.schoolId, "work_slot_created", "assistant_work_slot", data.id);
+  return data.id as string;
+}
+
+export async function deactivateAssistantWorkSlot(schoolId: string, slotId: string) {
+  const { error } = await db
+    .from("assistant_work_slots")
+    .update({ is_active: false })
+    .eq("school_id", schoolId)
+    .eq("id", slotId);
+  if (error) throw error;
+  await writeAudit(schoolId, "work_slot_deactivated", "assistant_work_slot", slotId);
+}
+
+export async function loadAssistantPresenceExceptions(
+  schoolId: string,
+  assistants: TeachingAssistant[],
+  fromDate: string,
+  toDate: string,
+): Promise<AssistantPresenceException[]> {
+  const { data, error } = await db
+    .from("assistant_presence_exceptions")
+    .select("id,school_id,assistant_id,exception_date,kind,starts_at,ends_at,note")
+    .eq("school_id", schoolId)
+    .gte("exception_date", fromDate)
+    .lte("exception_date", toDate)
+    .order("exception_date")
+    .order("starts_at");
+  if (error) throw error;
+  const assistantMap = new Map(assistants.map((row) => [row.id, row.display_name]));
+  return ((data ?? []) as PresenceExceptionRow[]).map((row) => ({
+    ...row,
+    assistantName: assistantMap.get(row.assistant_id) ?? "Asistent pedagoga",
+  }));
+}
+
+export async function createAssistantPresenceException(input: {
+  schoolId: string;
+  assistantId: string;
+  exceptionDate: string;
+  kind: "absent" | "changed";
+  startsAt?: string;
+  endsAt?: string;
+  note?: string;
+}) {
+  const createdBy = await authUserId();
+  if (!input.exceptionDate) throw new Error("Vyberte datum změny.");
+  if ((input.startsAt && !input.endsAt) || (!input.startsAt && input.endsAt)) {
+    throw new Error("Pro částečnou změnu vyplňte začátek i konec.");
+  }
+  if (input.startsAt && input.endsAt && input.endsAt <= input.startsAt) {
+    throw new Error("Čas výjimky není platný.");
+  }
+  const { data, error } = await db
+    .from("assistant_presence_exceptions")
+    .insert({
+      school_id: input.schoolId,
+      assistant_id: input.assistantId,
+      exception_date: input.exceptionDate,
+      kind: input.kind,
+      starts_at: input.startsAt || null,
+      ends_at: input.endsAt || null,
+      note: input.note?.trim() || null,
+      created_by: createdBy,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await writeAudit(input.schoolId, "presence_exception_created", "assistant_presence_exception", data.id);
+  return data.id as string;
+}
+
+export async function deleteAssistantPresenceException(schoolId: string, exceptionId: string) {
+  const { error } = await db
+    .from("assistant_presence_exceptions")
+    .delete()
+    .eq("school_id", schoolId)
+    .eq("id", exceptionId);
+  if (error) throw error;
+  await writeAudit(
+    schoolId,
+    "presence_exception_deleted",
+    "assistant_presence_exception",
+    exceptionId,
+  );
+}
+
+export function localIsoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export function coordinatorWeekday(date: Date) {
+  const day = date.getDay();
+  return day === 0 || day === 6 ? 0 : day;
+}
+
+function minutesOf(time: string) {
+  const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function exceptionTouchesSlot(exception: AssistantPresenceException, slot: AssistantWorkSlot) {
+  if (exception.assistant_id !== slot.assistantId) return false;
+  if (!exception.starts_at || !exception.ends_at) return true;
+  return minutesOf(exception.starts_at) < minutesOf(slot.ends_at) &&
+    minutesOf(exception.ends_at) > minutesOf(slot.starts_at);
+}
+
+export function buildCoordinatorNowCard(
+  now: Date,
+  workSlots: AssistantWorkSlot[],
+  exceptions: AssistantPresenceException[],
+): CoordinatorNowCard {
+  const weekday = coordinatorWeekday(now);
+  const today = localIsoDate(now);
+  if (weekday === 0) {
+    return {
+      tone: "quiet",
+      eyebrow: "Co dnes řeším?",
+      title: "Dnes je mimo běžný školní týden.",
+      detail: "Koordinace AP může zůstat v klidu, pokud tu nemáš ručně zadanou změnu.",
+    };
+  }
+
+  const todaySlots = workSlots
+    .filter((slot) => slot.weekday === weekday)
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const todayExceptions = exceptions.filter((row) => row.exception_date === today);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const affected = todaySlots.find((slot) =>
+    todayExceptions.some(
+      (exception) => exception.kind === "absent" && exceptionTouchesSlot(exception, slot),
+    ),
+  );
+  if (affected) {
+    const exception = todayExceptions.find(
+      (row) => row.kind === "absent" && exceptionTouchesSlot(row, affected),
+    );
+    return {
+      tone: "attention",
+      eyebrow: "Co dnes řeším?",
+      title: `${affected.assistantName} dnes chybí u ${affected.className}.`,
+      detail: `${affected.starts_at.slice(0, 5)}–${affected.ends_at.slice(0, 5)} · ${exception?.note?.trim() || "Zkontroluj, jestli je podpora pokrytá."}`,
+    };
+  }
+
+  const changed = todayExceptions.find((row) => row.kind === "changed");
+  if (changed) {
+    return {
+      tone: "attention",
+      eyebrow: "Co dnes řeším?",
+      title: `Dnes je změna u ${changed.assistantName}.`,
+      detail: changed.note?.trim() || "Mrkni na dnešní plán, ať sedí skutečné rozložení podpory.",
+    };
+  }
+
+  const current = todaySlots.find(
+    (slot) => minutesOf(slot.starts_at) <= nowMinutes && minutesOf(slot.ends_at) > nowMinutes,
+  );
+  if (current) {
+    return {
+      tone: "now",
+      eyebrow: "Právě teď",
+      title: `${current.assistantName} · ${current.className}`,
+      detail: `${current.starts_at.slice(0, 5)}–${current.ends_at.slice(0, 5)}${current.alias ? ` · podpora ${current.alias}` : ""}`,
+    };
+  }
+
+  const next = todaySlots.find((slot) => minutesOf(slot.starts_at) > nowMinutes);
+  if (next) {
+    const diff = minutesOf(next.starts_at) - nowMinutes;
+    return {
+      tone: "next",
+      eyebrow: "Co dnes řeším?",
+      title:
+        diff <= 90
+          ? `Za ${diff} min ${next.assistantName} → ${next.className}`
+          : `Další podpora: ${next.assistantName} → ${next.className}`,
+      detail: `${next.starts_at.slice(0, 5)}–${next.ends_at.slice(0, 5)}${next.alias ? ` · ${next.alias}` : ""}`,
+    };
+  }
+
+  if (todaySlots.length > 0) {
+    return {
+      tone: "done",
+      eyebrow: "Co dnes řeším?",
+      title: "Dnešní podpora je podle plánu za tebou.",
+      detail: "Pokud se nic nezměnilo, není teď potřeba nic dalšího řešit.",
+    };
+  }
+
+  return {
+    tone: "quiet",
+    eyebrow: "Co dnes řeším?",
+    title: "Na dnešek tu není naplánovaný žádný blok AP.",
+    detail: "Až přidáš pracovní bloky, budu z nich ukazovat vždy jen nejdůležitější další věc.",
+  };
 }
