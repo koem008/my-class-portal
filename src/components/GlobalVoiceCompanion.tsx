@@ -200,11 +200,27 @@ export function GlobalVoiceCompanion() {
       setNotice("Hotovo");
 
       if (conciseReply) {
-        void synthesizeAssistantVoice({ data: { text: conciseReply.slice(0, 700) } })
-          .then((speech) => new Audio(`data:${speech.mimeType};base64,${speech.audioBase64}`).play())
-          .catch(() => {
-            setNotice("Text je hotový, hlas se nepodařilo přehrát.");
-          });
+        void (async () => {
+          let speech;
+          try {
+            speech = await synthesizeAssistantVoice({ data: { text: conciseReply.slice(0, 700) } });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error("[TTS_API_ERROR]", error);
+            setNotice(`TTS API chyba: ${message}`);
+            return;
+          }
+
+          try {
+            const audio = new Audio(`data:${speech.mimeType};base64,${speech.audioBase64}`);
+            await audio.play();
+            setNotice("Hlas přehrávám.");
+          } catch (error) {
+            const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            console.error("[AUDIO_PLAYBACK_ERROR]", error);
+            setNotice(`Přehrání v prohlížeči selhalo: ${message}`);
+          }
+        })();
       }
     } catch (error) {
       setState("error");
