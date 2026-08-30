@@ -38,7 +38,9 @@ export function CoordinatorMeetingsCard({
 
   const upcoming = useMemo(
     () =>
-      meetings.filter((meeting) => new Date(meeting.ends_at).getTime() >= Date.now()).slice(0, 5),
+      meetings
+        .filter((meeting) => new Date(meeting.ends_at).getTime() >= Date.now())
+        .slice(0, 5),
     [meetings],
   );
 
@@ -159,7 +161,11 @@ export function CoordinatorMeetingsCard({
                     <div className="text-sm font-black">Porada AP</div>
                     <div className="mt-0.5 text-xs font-bold text-[#71817b]">
                       {meetingLabel(meeting.starts_at)}
-                      {`–${new Intl.DateTimeFormat("cs-CZ", { timeZone: "Europe/Prague", hour: "2-digit", minute: "2-digit" }).format(new Date(meeting.ends_at))}`}
+                      {`–${new Intl.DateTimeFormat("cs-CZ", {
+                        timeZone: "Europe/Prague",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(new Date(meeting.ends_at))}`}
                     </div>
                   </div>
                   <button
