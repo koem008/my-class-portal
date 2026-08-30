@@ -1,0 +1,66 @@
+name: Finish Master Example 52
+
+on:
+  push:
+    paths:
+      - .github/workflows/finish-master-example-52.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply confirmed substitution patch
+        run: python scripts/finish_master_example_52.py
+
+      - name: Guard human confirmation and carry-over semantics
+        shell: bash
+        run: |
+          grep -q 'substitute_lesson_activity' src/lib/ai/contracts.ts
+          grep -q 'substitute_lesson_with_activity' src/lib/ai/functions.ts
+          grep -q 'Původní hodina zůstane neprobraná' src/lib/ai/provider.server.ts
+          grep -q 'Návrh změny — zatím neprovedeno' src/routes/asistentka.tsx
+          grep -q 'Neprobrané hodiny čekající na přesun' src/routes/rozvrh.tsx
+
+      - name: Companion policy tests
+        run: bun run test:companion
+
+      - name: Format
+        run: bunx prettier --write src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/lib/schedule-data.ts src/routes/rozvrh.tsx
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build
+        run: bun run build
+
+      - name: Commit integration
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/ai/contracts.ts src/lib/ai/companion-policy.ts src/lib/ai/functions.ts src/lib/ai/provider.server.ts src/routes/asistentka.tsx src/lib/schedule-data.ts src/routes/rozvrh.tsx src/routeTree.gen.ts
+          git commit -m "feat: add confirmed voice lesson substitution"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
