@@ -33,10 +33,12 @@ export function CoordinatorItemsCard({
   schoolId,
   assistants,
   classes,
+  onOpenItemsChange,
 }: {
   schoolId: string;
   assistants: TeachingAssistant[];
   classes: CoordinatorClass[];
+  onOpenItemsChange?: (items: AssistantCoordinationItem[]) => void;
 }) {
   const [items, setItems] = useState<AssistantCoordinationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,9 @@ export function CoordinatorItemsCard({
     setLoading(true);
     setError("");
     try {
-      setItems(await loadAssistantCoordinationItems(schoolId, assistants, classes));
+      const rows = await loadAssistantCoordinationItems(schoolId, assistants, classes);
+      setItems(rows);
+      onOpenItemsChange?.(rows.filter((item) => item.status === "open"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Úkoly a poznámky se nepodařilo načíst.");
     } finally {
@@ -65,7 +69,7 @@ export function CoordinatorItemsCard({
 
   useEffect(() => {
     void reload();
-  }, [schoolId, assistants, classes]);
+  }, [schoolId, assistants, classes, onOpenItemsChange]);
 
   const openItems = useMemo(() => items.filter((item) => item.status === "open"), [items]);
   const doneItems = useMemo(

@@ -98,6 +98,15 @@ export type AssistantPresenceException = PresenceExceptionRow & {
   assistantName: string;
 };
 
+export type CoordinatorPriorityItem = {
+  status: "open" | "done";
+  title: string;
+  due_on: string | null;
+  kind: "note" | "task" | "follow_up";
+  assistantName?: string | null;
+  className?: string | null;
+};
+
 export type CoordinatorNowCard = {
   tone: "attention" | "now" | "next" | "done" | "quiet";
   eyebrow: string;
@@ -470,6 +479,7 @@ export function buildCoordinatorNowCard(
   now: Date,
   workSlots: AssistantWorkSlot[],
   exceptions: AssistantPresenceException[],
+  items: CoordinatorPriorityItem[] = [],
 ): CoordinatorNowCard {
   const weekday = coordinatorWeekday(now);
   const today = localIsoDate(now);
@@ -502,6 +512,31 @@ export function buildCoordinatorNowCard(
       eyebrow: "Co dnes řeším?",
       title: `${affected.assistantName} dnes chybí u ${affected.className}.`,
       detail: `${affected.starts_at.slice(0, 5)}–${affected.ends_at.slice(0, 5)} · ${exception?.note?.trim() || "Zkontroluj, jestli je podpora pokrytá."}`,
+    };
+  }
+
+  const openDueItems = items
+    .filter((item) => item.status === "open" && item.due_on)
+    .sort((a, b) => (a.due_on ?? "").localeCompare(b.due_on ?? ""));
+  const overdue = openDueItems.find((item) => (item.due_on ?? "") < today);
+  if (overdue) {
+    const context = [overdue.assistantName, overdue.className].filter(Boolean).join(" · ");
+    return {
+      tone: "attention",
+      eyebrow: "Co dnes řeším?",
+      title: `Po termínu: ${overdue.title}`,
+      detail: context ? `${context} · Otevři rozdělané a navazuj.` : "Otevři rozdělané a navazuj.",
+    };
+  }
+
+  const dueToday = openDueItems.find((item) => item.due_on === today);
+  if (dueToday) {
+    const context = [dueToday.assistantName, dueToday.className].filter(Boolean).join(" · ");
+    return {
+      tone: "next",
+      eyebrow: "Co dnes řeším?",
+      title: `Dnes: ${dueToday.title}`,
+      detail: context || "Je to dnešní otevřený follow-up.",
     };
   }
 

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CoordinatorItemsCard } from "@/components/assistant-coordinator/CoordinatorItemsCard";
+import type { AssistantCoordinationItem } from "@/lib/assistant-coordinator-items";
 import {
   activateCoordinatorAccess,
   buildCoordinatorNowCard,
@@ -69,6 +70,7 @@ function AssistantCoordinatorPage() {
   const [workSlots, setWorkSlots] = useState<AssistantWorkSlot[]>([]);
   const [exceptions, setExceptions] = useState<AssistantPresenceException[]>([]);
   const [aliases, setAliases] = useState<CoordinatorAliasOption[]>([]);
+  const [coordinationItems, setCoordinationItems] = useState<AssistantCoordinationItem[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -181,8 +183,8 @@ function AssistantCoordinatorPage() {
     [exceptions, todayIso],
   );
   const nowCard = useMemo(
-    () => buildCoordinatorNowCard(now, workSlots, exceptions),
-    [now, workSlots, exceptions],
+    () => buildCoordinatorNowCard(now, workSlots, exceptions, coordinationItems),
+    [now, workSlots, exceptions, coordinationItems],
   );
 
   async function activate() {
@@ -530,6 +532,7 @@ function AssistantCoordinatorPage() {
           schoolId={context.access.schoolId}
           assistants={assistants}
           classes={classes}
+          onOpenItemsChange={setCoordinationItems}
         />
 
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
