@@ -1,5 +1,7 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { Loader2, Mic, MicOff, Play, Volume2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { runCompanionAi, synthesizeAssistantVoice, transcribeVoice } from "@/lib/ai/functions";
 
 const SILENCE_MS = 1200;
@@ -7,8 +9,41 @@ const NO_SPEECH_TIMEOUT_MS = 8000;
 const MAX_RECORDING_MS = 45000;
 const SPEECH_THRESHOLD = 0.025;
 const CYRILLIC_RE = /[\u0400-\u04FF]/;
+const MEMORY_COMMAND_RE = /(?:^|\s)(?:ulož si|uloz si|pamatuj si)(?:[\s,:-]+)(.+)$/i;
 
 type VoiceState = "idle" | "listening" | "processing" | "reply" | "error";
+
+type MemoryRow = { content: string };
+
+function normalizeCzech(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function extractMemoryCommand(text: string): string | null {
+  const match = text.match(MEMORY_COMMAND_RE);
+  if (!match?.[1]) return null;
+  return match[1].replace(/^že\s+/i, "").trim();
+}
+
+function asksWhatIsRemembered(text: string) {
+  const normalized = normalizeCzech(text);
+  return (
+    normalized.includes("co si o mne pamatujes") ||
+    normalized.includes("co o mne vis") ||
+    normalized.includes("co mas o mne ulozene")
+  );
+}
+
+function isSensitiveMemory(text: string) {
+  const normalized = normalizeCzech(text);
+  return /(hesl|password|\bpin\b|rodne cislo|cislo karty|\bcvv\b|bankovni ucet|diagnoz|zdravotni dokument|lekarsk)/i.test(
+    normalized,
+  );
+}
 
 export function GlobalVoiceCompanion() {
   const [open, setOpen] = useState(false);
@@ -115,14 +150,101 @@ export function GlobalVoiceCompanion() {
     }
   }
 
+  async function speakReply(text: string) {
+    setReply(text);
+    setState("reply");
+    setNotice("Hotovo");
+    if (!text) return;
+
+    try {
+      const speech = await synthesizeAssistantVoice({ data: { text: text.slice(0, 700) } });
+      const url = `data:${speech.mimeType};base64,${speech.audioBase64}`;
+      setSpeechUrl(url);
+      await playSpeech(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[TTS_API_ERROR]", error);
+      setNotice(`TTS API chyba: ${message}`);
+    }
+  }
+
+  async function readPersonalMemory(): Promise<string[]> {
+    const db = supabase as unknown as SupabaseClient;
+    const userResult = await db.auth.getUser();
+    if (userResult.error || !userResult.data.user) return [];
+
+    const settings = await db
+      .from("teacher_assistant_settings")
+      .select("memory_enabled")
+      .eq("user_id", userResult.data.user.id)
+      .maybeSingle();
+    if (settings.error || !settings.data?.memory_enabled) return [];
+
+    const memories = await db
+      .from("teacher_personal_memory")
+      .select("content")
+      .eq("user_id", userResult.data.user.id)
+      .eq("is_active", true)
+      .eq("explicitly_confirmed", true)
+      .order("updated_at", { ascending: false })
+      .limit(20);
+    if (memories.error) throw memories.error;
+    return ((memories.data ?? []) as MemoryRow[]).map((item) => item.content.trim()).filter(Boolean);
+  }
+
+  async function savePersonalMemory(content: string) {
+    const clean = content.trim().slice(0, 1200);
+    if (!clean) throw new Error("Po povelu „ulož si“ nebo „pamatuj si“ musí následovat informace.");
+    if (isSensitiveMemory(clean)) {
+      throw new Error(
+        "Tuhle informaci do osobní paměti neuložím. Hesla, platební údaje a citlivé zdravotní údaje do ní nepatří.",
+      );
+    }
+
+    const db = supabase as unknown as SupabaseClient;
+    const userResult = await db.auth.getUser();
+    if (userResult.error || !userResult.data.user) {
+      throw userResult.error ?? new Error("Pro osobní paměť je nutné přihlášení.");
+    }
+    const userId = userResult.data.user.id;
+
+    const settings = await db.from("teacher_assistant_settings").upsert(
+      {
+        user_id: userId,
+        memory_enabled: true,
+      },
+      { onConflict: "user_id" },
+    );
+    if (settings.error) throw settings.error;
+
+    const existing = await db
+      .from("teacher_personal_memory")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("content", clean)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+    if (existing.error) throw existing.error;
+    if (existing.data?.id) return { saved: false, content: clean };
+
+    const inserted = await db.from("teacher_personal_memory").insert({
+      user_id: userId,
+      kind: "personal_note",
+      content: clean,
+      is_active: true,
+      explicitly_confirmed: true,
+    });
+    if (inserted.error) throw inserted.error;
+    return { saved: true, content: clean };
+  }
+
   async function beginConversation() {
     if (state === "listening") {
       stopEverything(true);
       return;
     }
 
-    // Must run synchronously from the user's tap. Safari then keeps this Web Audio context
-    // authorized for the delayed TTS response even after STT/AI/TTS network requests finish.
     unlockPlayback();
     audioRef.current?.pause();
     setSpeechUrl("");
@@ -219,9 +341,7 @@ export function GlobalVoiceCompanion() {
       setState("error");
       const message = error instanceof Error ? error.message : "Mikrofon se nepodařilo spustit.";
       setNotice(
-        message.includes("Permission") ||
-          message.includes("denied") ||
-          message.includes("NotAllowed")
+        message.includes("Permission") || message.includes("denied") || message.includes("NotAllowed")
           ? "Mikrofon je zablokovaný. Povol ho pro tento web a zkus to znovu."
           : message,
       );
@@ -260,6 +380,28 @@ export function GlobalVoiceCompanion() {
       setTranscript(text);
       setNotice("Přemýšlím…");
 
+      const memoryCommand = extractMemoryCommand(text);
+      if (memoryCommand !== null) {
+        const saved = await savePersonalMemory(memoryCommand);
+        await speakReply(
+          saved.saved
+            ? `Dobře. Uložila jsem si: ${saved.content}`
+            : `Tohle už si pamatuji: ${saved.content}`,
+        );
+        return;
+      }
+
+      if (asksWhatIsRemembered(text)) {
+        const memories = await readPersonalMemory();
+        await speakReply(
+          memories.length
+            ? `Pamatuji si o tobě: ${memories.join("; ")}`
+            : "Zatím o tobě nemám v osobní paměti nic uloženého.",
+        );
+        return;
+      }
+
+      const personalPreferences = await readPersonalMemory();
       const now = new Date();
       const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const result = await runCompanionAi({
@@ -268,31 +410,11 @@ export function GlobalVoiceCompanion() {
           assistantName: "Asistentka",
           tone: "friendly",
           localDate,
+          personalPreferences: personalPreferences.slice(0, 20),
         },
       });
 
-      const conciseReply = result.reply.trim();
-      setReply(conciseReply);
-      setState("reply");
-      setNotice("Hotovo");
-
-      if (conciseReply) {
-        let speech;
-        try {
-          speech = await synthesizeAssistantVoice({
-            data: { text: conciseReply.slice(0, 700) },
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          console.error("[TTS_API_ERROR]", error);
-          setNotice(`TTS API chyba: ${message}`);
-          return;
-        }
-
-        const url = `data:${speech.mimeType};base64,${speech.audioBase64}`;
-        setSpeechUrl(url);
-        await playSpeech(url);
-      }
+      await speakReply(result.reply.trim());
     } catch (error) {
       setState("error");
       setNotice(
@@ -319,15 +441,9 @@ export function GlobalVoiceCompanion() {
         <section className="fixed bottom-3 right-3 z-[70] max-h-[48dvh] w-[calc(100vw-24px)] max-w-[320px] overflow-hidden rounded-[20px] border border-[#e5e1d8] bg-[#fffefa] p-3 shadow-[0_18px_55px_rgba(32,48,44,.2)] sm:bottom-5 sm:right-5 sm:w-[320px] sm:p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[9px] font-bold uppercase tracking-[.16em] text-[#4e7772]">
-                Moje asistentka
-              </div>
+              <div className="text-[9px] font-bold uppercase tracking-[.16em] text-[#4e7772]">Moje asistentka</div>
               <div className="mt-0.5 truncate text-sm font-bold text-[#24343f]">
-                {state === "listening"
-                  ? "Poslouchám"
-                  : state === "processing"
-                    ? "Zpracovávám"
-                    : "Můžeme mluvit"}
+                {state === "listening" ? "Poslouchám" : state === "processing" ? "Zpracovávám" : "Můžeme mluvit"}
               </div>
             </div>
             <button
@@ -368,9 +484,7 @@ export function GlobalVoiceCompanion() {
           <div className="mt-3 max-h-[22dvh] space-y-2 overflow-y-auto pr-1">
             {transcript && (
               <div className="rounded-xl bg-[#f4f5f1] px-3 py-2">
-                <div className="text-[9px] font-bold uppercase tracking-[.12em] text-[#82908f]">
-                  Ty
-                </div>
+                <div className="text-[9px] font-bold uppercase tracking-[.12em] text-[#82908f]">Ty</div>
                 <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#34484a]">{transcript}</p>
               </div>
             )}
@@ -388,7 +502,7 @@ export function GlobalVoiceCompanion() {
                     className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#276765] px-2.5 py-1.5 text-[11px] font-bold text-white"
                   >
                     <Play className="h-3.5 w-3.5" />
-                    Přehrát znovu
+                    Přehrát hlas
                   </button>
                 )}
               </div>
